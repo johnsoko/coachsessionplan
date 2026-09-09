@@ -1,0 +1,9 @@
+name = "coachsessionplan"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "."
+
+# Once we add a backend, D1 binding goes here, e.g.:
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "coachsessionplan-db"
+# database_id = "REPLACE_AFTER_CREATING_DB"
