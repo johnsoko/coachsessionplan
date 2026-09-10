@@ -39,6 +39,17 @@ async function getUserId(request, env) {
 async function handleApi(request, env, url) {
   const parts = url.pathname.split("/").filter(Boolean); // ["api","drills", maybe ":id"]
 
+  // GET /api/drills — list every practice plan the signed-in user owns,
+  // for the dashboard. Requires sign-in.
+  if (request.method === "GET" && parts.length === 2 && parts[1] === "drills") {
+    const userId = await getUserId(request, env);
+    if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
+    const { results } = await env.DB.prepare(
+      "SELECT id, title, created_at, updated_at FROM drills WHERE user_id = ? ORDER BY updated_at DESC"
+    ).bind(userId).all();
+    return jsonResponse({ drills: results });
+  }
+
   // POST /api/drills — create a new drill, returns its id. Requires sign-in.
   if (request.method === "POST" && parts.length === 2 && parts[1] === "drills") {
     const userId = await getUserId(request, env);

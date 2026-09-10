@@ -672,7 +672,7 @@
      update reads as a transition rather than a hard jump (landing-screen
      has its own separate fonts-ready fade, handled above, so it's left
      out here to avoid the two competing) */
-  #signin-screen.screen-enter, #app-shell.screen-enter {
+  #signin-screen.screen-enter, #dashboard-screen.screen-enter, #app-shell.screen-enter {
     animation: screenFadeIn 0.25s ease;
   }
   .landing-inner { max-width: 560px; text-align: center; }
@@ -687,6 +687,41 @@
   .landing-sub { font-size: 16px; line-height: 1.6; color: var(--ink-soft); margin-bottom: 32px; }
   .landing-cta { font-size: 15px; padding: 13px 28px; }
   .signin-inner { width: 100%; max-width: 420px; text-align: center; }
+
+  /* ═════════════════════════════════════════════════════════════════════
+     DASHBOARD
+  ═════════════════════════════════════════════════════════════════════ */
+  #dashboard-screen { display: flex; min-height: 100vh; }
+  .dash-sidebar {
+    width: 220px; flex-shrink: 0; background: var(--paper-card); border-right: 1px solid var(--line);
+    padding: 20px 14px; display: flex; flex-direction: column;
+  }
+  .dash-logo {
+    font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--pitch-deep); margin-bottom: 28px; padding: 0 6px;
+  }
+  .dash-section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--ink-faint); padding: 0 6px; margin-bottom: 8px;
+  }
+  .dash-nav-item {
+    display: block; width: 100%; text-align: left; border: none; background: transparent;
+    color: var(--ink-soft); font-size: 14px; font-weight: 500; padding: 9px 10px; border-radius: 7px;
+    margin-bottom: 2px;
+  }
+  .dash-nav-item.active { background: var(--pitch-tint); color: var(--pitch-deep); font-weight: 600; }
+  .dash-nav-item:disabled { opacity: 0.45; cursor: not-allowed; }
+  .dash-main { flex: 1; padding: 36px 44px; overflow-y: auto; }
+  .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .dash-header h1 { font-family: var(--display); font-size: 26px; font-weight: 700; color: var(--ink); }
+  .dash-empty { color: var(--ink-faint); font-size: 14px; padding: 20px 0; }
+  .dash-plan-row {
+    display: flex; align-items: center; justify-content: space-between; padding: 14px 16px;
+    border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; background: var(--paper-card);
+  }
+  .dash-plan-row:hover { border-color: var(--pitch); background: var(--paper-raised); }
+  .dash-plan-title { font-weight: 600; font-size: 14.5px; color: var(--ink); }
+  .dash-plan-date { font-size: 12.5px; color: var(--ink-faint); }
 </style>
 </head>
 <body>
@@ -725,6 +760,30 @@
   </div>
 
   <!-- ══════════════════════════ MAIN APP (hidden until signed in) ══════════════════════════ -->
+  <!-- ══════════════════════════ DASHBOARD ══════════════════════════ -->
+  <div id="dashboard-screen" style="display:none;">
+    <div class="dash-sidebar">
+      <div class="dash-logo">coachsessionplan</div>
+      <div class="dash-section-label">Practice Planning</div>
+      <button class="dash-nav-item" id="dash-nav-drills" disabled title="Coming soon — save individual drills here">
+        Drills
+      </button>
+      <button class="dash-nav-item active" id="dash-nav-plans">
+        Practice Plans
+      </button>
+      <button class="dash-nav-item" id="dash-nav-library" disabled title="Coming soon — shared library for team accounts">
+        Drill Library
+      </button>
+    </div>
+    <div class="dash-main">
+      <div class="dash-header">
+        <h1>Practice Plans</h1>
+        <button class="btn btn-primary" id="dash-new-plan-btn">+ New Practice Plan</button>
+      </div>
+      <div id="dash-plans-list"><p class="dash-empty">Loading…</p></div>
+    </div>
+  </div>
+
   <div id="app-shell" style="display:none;">
 
   <!-- ══════════════════════════ TOP BAR ══════════════════════════ -->
@@ -4945,11 +5004,13 @@ function showScreen(name) {
   document.getElementById("initial-loading").style.display = "none";
   document.getElementById("landing-screen").style.display = name === "landing" ? "flex" : "none";
   document.getElementById("signin-screen").style.display = name === "signin" ? "flex" : "none";
+  document.getElementById("dashboard-screen").style.display = name === "dashboard" ? "flex" : "none";
   document.getElementById("app-shell").style.display = name === "app" ? "block" : "none";
   // crossfade whichever screen just became visible in, rather than an
   // instant hard cut — restart the animation each time by removing and
   // re-adding the class (forcing a reflow in between so it re-triggers)
   const el = name === "signin" ? document.getElementById("signin-screen")
+    : name === "dashboard" ? document.getElementById("dashboard-screen")
     : name === "app" ? document.getElementById("app-shell") : null;
   if (el) {
     el.classList.remove("screen-enter");
@@ -5014,6 +5075,7 @@ function consumeJustSignedOut() {
   sessionStorage.removeItem("justSignedOut");
   return was;
 }
+let initialRouteDecided = false;
 function refreshAuthUI() {
   const signInBtn = document.getElementById("clerk-signin-btn");
   const accountWrap = document.getElementById("clerk-account-wrap");
@@ -5023,7 +5085,20 @@ function refreshAuthUI() {
     accountWrap.style.display = "flex";
     avatarImg.src = Clerk.user.imageUrl || "";
     avatarImg.alt = Clerk.user.firstName || "Account";
-    showScreen("app");
+    if (!initialRouteDecided) {
+      initialRouteDecided = true;
+      // opening a specific saved/shared plan (?id=... in the URL) goes
+      // straight into the editor; otherwise land on the dashboard —
+      // loadDrillFromUrl() was already kicked off at the bottom of this
+      // script and populates the data whether or not app-shell is visible yet
+      if (new URLSearchParams(location.search).get("id")) {
+        showScreen("app");
+        requestAnimationFrame(() => resizeCanvas());
+      } else {
+        showScreen("dashboard");
+        renderDashboardPlans();
+      }
+    }
   } else {
     signInBtn.style.display = "inline-flex";
     accountWrap.style.display = "none";
@@ -5071,16 +5146,17 @@ async function saveDrill() {
 
 async function loadDrillFromUrl() {
   const id = new URLSearchParams(location.search).get("id");
-  if (!id) return;
+  if (!id) return false;
   try {
     const res = await fetch(`/api/drills/${id}`);
-    if (!res.ok) { toast("Could not find that saved drill"); return; }
+    if (!res.ok) { toast("Could not find that saved drill"); return false; }
     const data = await res.json();
     currentDrillId = id;
     loadAppState(data);
-    toast("Loaded saved drill");
+    return true;
   } catch {
     toast("Could not load that drill — check your connection");
+    return false;
   }
 }
 
@@ -5093,27 +5169,78 @@ initArrowPopover();
 initShapePopover();
 initTextPopover();
 
-// seed phase 1 with an example so the canvas isn't empty on load
-applySurface("full");
-addToken("player", 30, 52, "light");
-addToken("player", 56, 68, "light");
-addToken("player", 72, 30, "dark");
-addEquipmentToken("cone", 40, 22);
-addEquipmentToken("cone", 40, 68);
-addEquipmentToken("minigoal", 96, 47);
-shapes.push({ id: nextId++, style: "pass", x1: 32, y1: 50, x2: 54, y2: 66, color: drawDefaults.color, width: drawDefaults.width });
-shapes.push({ id: nextId++, style: "run",  x1: 58, y1: 64, x2: 70, y2: 34, color: drawDefaults.color, width: drawDefaults.width });
-renderTokens();
+// builds a fresh example practice plan — used both for the very first
+// visit's demo, and whenever "+ New Practice Plan" is clicked from the
+// dashboard. Never runs automatically just because the dashboard is
+// empty — only an explicit action seeds a new one.
+function seedFreshDrill() {
+  currentDrillId = null;
+  history.replaceState(null, "", location.pathname);
+  tokens = []; shapes = []; phases = []; phaseNextId = 1; sceneNextId = 1; nextId = 1;
+  drillDescriptionBlocks = ["Emphasize quick first touch out of feet before the overlap run."];
+  document.getElementById("title-input").value = "Overload to finish";
+  applySurface("full");
+  addToken("player", 30, 52, "light");
+  addToken("player", 56, 68, "light");
+  addToken("player", 72, 30, "dark");
+  addEquipmentToken("cone", 40, 22);
+  addEquipmentToken("cone", 40, 68);
+  addEquipmentToken("minigoal", 96, 47);
+  shapes.push({ id: nextId++, style: "pass", x1: 32, y1: 50, x2: 54, y2: 66, color: drawDefaults.color, width: drawDefaults.width });
+  shapes.push({ id: nextId++, style: "run",  x1: 58, y1: 64, x2: 70, y2: 34, color: drawDefaults.color, width: drawDefaults.width });
+  renderTokens();
+  const firstPhase = newPhaseObj(null);
+  firstPhase.scenes[0].tokens = tokens; firstPhase.scenes[0].shapes = shapes; firstPhase.surface = surface;
+  phases = [firstPhase];
+  activePhaseId = firstPhase.id;
+  renderPhaseList();
+  document.getElementById("output-date").textContent = "Last edited " + new Date().toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
+  showScreen("app");
+  requestAnimationFrame(() => resizeCanvas());
+}
 
-const firstPhase = newPhaseObj(null);
-firstPhase.scenes[0].tokens = tokens; firstPhase.scenes[0].shapes = shapes; firstPhase.surface = surface;
-phases = [firstPhase];
-activePhaseId = firstPhase.id;
-renderPhaseList();
+async function renderDashboardPlans() {
+  const listEl = document.getElementById("dash-plans-list");
+  listEl.innerHTML = '<p class="dash-empty">Loading…</p>';
+  try {
+    const token = await getAuthToken();
+    const headers = token ? { authorization: "Bearer " + token } : {};
+    const res = await fetch("/api/drills", { headers });
+    if (!res.ok) { listEl.innerHTML = '<p class="dash-empty">Could not load your practice plans.</p>'; return; }
+    const { drills } = await res.json();
+    if (!drills.length) {
+      listEl.innerHTML = '<p class="dash-empty">No practice plans yet — click "+ New Practice Plan" to create your first one.</p>';
+      return;
+    }
+    listEl.innerHTML = "";
+    drills.forEach(d => {
+      const row = document.createElement("div");
+      row.className = "dash-plan-row";
+      const updated = new Date(d.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+      row.innerHTML = `
+        <span class="dash-plan-title">${escapeHtml(d.title || "Untitled Play")}</span>
+        <span class="dash-plan-date">Last edited ${updated}</span>
+      `;
+      row.addEventListener("click", () => openPracticePlan(d.id));
+      listEl.appendChild(row);
+    });
+  } catch {
+    listEl.innerHTML = '<p class="dash-empty">Could not load your practice plans.</p>';
+  }
+}
+async function openPracticePlan(id) {
+  history.pushState(null, "", "?id=" + id);
+  const ok = await loadDrillFromUrl();
+  showScreen(ok ? "app" : "dashboard");
+  if (!ok) renderDashboardPlans();
+  else requestAnimationFrame(() => resizeCanvas());
+}
+document.getElementById("dash-new-plan-btn").addEventListener("click", seedFreshDrill);
+document.getElementById("close-btn").addEventListener("click", () => {
+  showScreen("dashboard");
+  renderDashboardPlans();
+});
 
-document.getElementById("output-date").textContent = "Last edited " + new Date().toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
-
-requestAnimationFrame(() => { resizeCanvas(); });
 loadDrillFromUrl();
 initClerkAuth();
 </script>
