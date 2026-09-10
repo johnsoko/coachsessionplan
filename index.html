@@ -789,9 +789,10 @@
         </div>
       </div>
 
-      <div id="clerk-auth-slot" style="display:flex; align-items:center; margin-right:6px;">
+      <div id="clerk-auth-slot" style="display:flex; align-items:center; gap:8px; margin-right:6px;">
         <button class="btn btn-ghost" id="clerk-signin-btn" style="display:none;">Sign In</button>
         <div id="clerk-user-button" style="display:none;"></div>
+        <button class="btn btn-ghost" id="clerk-signout-btn" style="display:none;" title="Sign out">Sign Out</button>
       </div>
 
       <div class="dd-wrap save-split" id="save-menu-wrap">
@@ -4952,6 +4953,13 @@ async function initClerkAuth() {
   refreshAuthUI();
   Clerk.addListener(refreshAuthUI);
   document.getElementById("clerk-signin-btn").addEventListener("click", () => Clerk.openSignIn());
+  // calls signOut() directly with an explicit redirect, rather than
+  // relying on the "Sign out" item inside the UserButton dropdown — that
+  // one still bounces through Clerk's hosted accounts.dev domain on a
+  // Development instance even with afterSignOutUrl set at load time
+  document.getElementById("clerk-signout-btn").addEventListener("click", () => {
+    Clerk.signOut({ redirectUrl: window.location.origin + window.location.pathname });
+  });
   // uses openSignIn() (the same proven-working popup method as the topbar
   // button) rather than mountSignIn() — the embedded full-page form tries
   // a cross-domain redirect to sync the session back that gets stuck on
@@ -4961,9 +4969,11 @@ async function initClerkAuth() {
 function refreshAuthUI() {
   const signInBtn = document.getElementById("clerk-signin-btn");
   const userButtonEl = document.getElementById("clerk-user-button");
+  const signOutBtn = document.getElementById("clerk-signout-btn");
   if (Clerk.user) {
     signInBtn.style.display = "none";
     userButtonEl.style.display = "block";
+    signOutBtn.style.display = "inline-flex";
     if (!userButtonEl.dataset.mounted) {
       Clerk.mountUserButton(userButtonEl);
       userButtonEl.dataset.mounted = "1";
@@ -4972,6 +4982,7 @@ function refreshAuthUI() {
   } else {
     signInBtn.style.display = "inline-flex";
     userButtonEl.style.display = "none";
+    signOutBtn.style.display = "none";
     // don't bounce off the sign-in screen mid-flow just because Clerk.user
     // is still momentarily null — only land on the landing page from a
     // fresh page load or an actual sign-out
