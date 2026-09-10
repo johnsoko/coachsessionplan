@@ -655,6 +655,18 @@
     min-height: 100vh; display: flex; align-items: center; justify-content: center;
     background: var(--paper); padding: 24px;
   }
+  /* hide landing content until the real fonts are loaded, instead of
+     briefly showing fallback-font text that then visibly swaps */
+  #landing-screen { opacity: 0; transition: opacity 0.2s ease; }
+  #landing-screen.fonts-ready { opacity: 1; }
+  @keyframes screenFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  /* soft crossfade whenever we switch to signin/app, so an auth-state
+     update reads as a transition rather than a hard jump (landing-screen
+     has its own separate fonts-ready fade, handled above, so it's left
+     out here to avoid the two competing) */
+  #signin-screen.screen-enter, #app-shell.screen-enter {
+    animation: screenFadeIn 0.25s ease;
+  }
   .landing-inner { max-width: 560px; text-align: center; }
   .landing-logo {
     font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: 0.04em;
@@ -680,6 +692,14 @@
       <button class="btn btn-primary landing-cta" id="landing-signin-btn">Sign In to Get Started</button>
     </div>
   </div>
+  <script>
+    // reveal the landing page only once the real fonts are ready, instead
+    // of showing fallback-font text that then visibly swaps to Barlow
+    // Condensed/Work Sans a moment later. Capped at 800ms so a slow font
+    // load never leaves the page blank.
+    Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 800))])
+      .then(() => document.getElementById("landing-screen").classList.add("fonts-ready"));
+  </script>
 
   <!-- ══════════════════════════ SIGN-IN SCREEN ══════════════════════════ -->
   <div id="signin-screen" style="display:none;">
@@ -4895,6 +4915,16 @@ function showScreen(name) {
   document.getElementById("landing-screen").style.display = name === "landing" ? "flex" : "none";
   document.getElementById("signin-screen").style.display = name === "signin" ? "flex" : "none";
   document.getElementById("app-shell").style.display = name === "app" ? "block" : "none";
+  // crossfade whichever screen just became visible in, rather than an
+  // instant hard cut — restart the animation each time by removing and
+  // re-adding the class (forcing a reflow in between so it re-triggers)
+  const el = name === "signin" ? document.getElementById("signin-screen")
+    : name === "app" ? document.getElementById("app-shell") : null;
+  if (el) {
+    el.classList.remove("screen-enter");
+    void el.offsetWidth;
+    el.classList.add("screen-enter");
+  }
   if (name === "app") requestAnimationFrame(() => resizeCanvas());
 }
 
