@@ -859,7 +859,7 @@
       </div>
     </div>
 
-    <input id="title-input" value="Overload to finish" />
+    <input id="title-input" value="Overload to finish" placeholder="Session Title" />
 
     <div class="topbar-right">
       <button class="icon-btn" id="undo-btn" title="Undo">
@@ -1358,7 +1358,7 @@
     <!-- ══════════════════════════ NOTES VIEW ══════════════════════════ -->
     <div class="view" id="view-notes" style="display:none;">
       <div class="notes-page">
-        <input class="notes-title-input" id="notes-title-input" value="Overload to finish" />
+        <input class="notes-title-input" id="notes-title-input" value="Overload to finish" placeholder="Session Title" />
 
         <div class="notes-field" style="display:flex; gap:16px;">
           <div style="flex:1;">
@@ -5229,25 +5229,22 @@ function seedFreshDrill() {
   currentDrillId = null;
   history.replaceState(null, "", location.pathname);
   tokens = []; shapes = []; phases = []; phaseNextId = 1; sceneNextId = 1; nextId = 1;
-  drillDescriptionBlocks = ["Emphasize quick first touch out of feet before the overlap run."];
-  document.getElementById("title-input").value = "Overload to finish";
+  drillDescriptionBlocks = [""];
+  document.getElementById("title-input").value = "";
+  document.getElementById("notes-title-input").value = "";
   document.getElementById("practice-date-input").value = "";
   document.getElementById("practice-duration-input").value = "";
+  // clear any category tags left over from a previous plan
+  document.querySelectorAll("#tag-field .chip").forEach(chip => chip.remove());
+  if (typeof updateAddTagVisibility === "function") updateAddTagVisibility();
   applySurface("full");
-  addToken("player", 30, 52, "light");
-  addToken("player", 56, 68, "light");
-  addToken("player", 72, 30, "dark");
-  addEquipmentToken("cone", 40, 22);
-  addEquipmentToken("cone", 40, 68);
-  addEquipmentToken("minigoal", 96, 47);
-  shapes.push({ id: nextId++, style: "pass", x1: 32, y1: 50, x2: 54, y2: 66, color: drawDefaults.color, width: drawDefaults.width });
-  shapes.push({ id: nextId++, style: "run",  x1: 58, y1: 64, x2: 70, y2: 34, color: drawDefaults.color, width: drawDefaults.width });
   renderTokens();
   const firstPhase = newPhaseObj(null);
   firstPhase.scenes[0].tokens = tokens; firstPhase.scenes[0].shapes = shapes; firstPhase.surface = surface;
   phases = [firstPhase];
   activePhaseId = firstPhase.id;
   renderPhaseList();
+  renderDrillDescriptionBlocks();
   document.getElementById("output-date").textContent = "Last edited " + new Date().toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
   switchMode("draw");
   showScreen("app");
