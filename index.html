@@ -4922,14 +4922,11 @@ async function initClerkAuth() {
   refreshAuthUI();
   Clerk.addListener(refreshAuthUI);
   document.getElementById("clerk-signin-btn").addEventListener("click", () => Clerk.openSignIn());
-  document.getElementById("landing-signin-btn").addEventListener("click", () => {
-    showScreen("signin");
-    const mount = document.getElementById("signin-mount");
-    if (!mount.dataset.mounted) {
-      Clerk.mountSignIn(mount);
-      mount.dataset.mounted = "1";
-    }
-  });
+  // uses openSignIn() (the same proven-working popup method as the topbar
+  // button) rather than mountSignIn() — the embedded full-page form tries
+  // a cross-domain redirect to sync the session back that gets stuck on
+  // a Development instance, the same issue we saw with sign-out earlier
+  document.getElementById("landing-signin-btn").addEventListener("click", () => Clerk.openSignIn());
 }
 function refreshAuthUI() {
   const signInBtn = document.getElementById("clerk-signin-btn");
