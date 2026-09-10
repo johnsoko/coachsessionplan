@@ -4867,7 +4867,10 @@ async function initClerkAuth() {
     document.head.appendChild(script);
   });
   if (typeof Clerk === "undefined") return; // failed to load — Save still works, just without auth
-  await Clerk.load();
+  // without this, signing out falls back to Clerk's hosted Account
+  // Portal page (dear-bass-7256.accounts.dev/sign-in) instead of just
+  // clearing the session and staying on the actual site
+  await Clerk.load({ afterSignOutUrl: window.location.origin + window.location.pathname });
   refreshAuthUI();
   Clerk.addListener(refreshAuthUI);
   document.getElementById("clerk-signin-btn").addEventListener("click", () => Clerk.openSignIn());
