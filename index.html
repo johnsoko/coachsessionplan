@@ -5053,6 +5053,10 @@ function loadAppState(data) {
 let currentScreen = null;
 function showScreen(name) {
   currentScreen = name;
+  // remembers which of the two "real" app screens was last active, so a
+  // refresh lands back on the editor rather than bouncing to the
+  // dashboard just because there's no ?id= for an unsaved new plan yet
+  if (name === "app" || name === "dashboard") sessionStorage.setItem("lastScreen", name);
   document.getElementById("initial-loading").style.display = "none";
   document.getElementById("landing-screen").style.display = name === "landing" ? "flex" : "none";
   document.getElementById("signin-screen").style.display = name === "signin" ? "flex" : "none";
@@ -5109,6 +5113,7 @@ async function initClerkAuth() {
   document.getElementById("clerk-signout-item").addEventListener("click", () => {
     document.getElementById("clerk-account-menu").classList.remove("open");
     markJustSignedOut();
+    sessionStorage.removeItem("lastScreen"); // fresh sign-in later should land on the dashboard, not reopen a stale editor session
     Clerk.signOut({ redirectUrl: window.location.origin + window.location.pathname });
   });
   // uses openSignIn() (the same proven-working popup method as the topbar
@@ -5140,12 +5145,19 @@ function refreshAuthUI() {
     if (!initialRouteDecided) {
       initialRouteDecided = true;
       // opening a specific saved/shared plan (?id=... in the URL) goes
-      // straight into the editor; otherwise land on the dashboard —
-      // loadDrillFromUrl() was already kicked off at the bottom of this
-      // script and populates the data whether or not app-shell is visible yet
+      // straight into the editor; loadDrillFromUrl() was already kicked
+      // off at the bottom of this script and populates the data whether
+      // or not app-shell is visible yet. Otherwise, fall back to whichever
+      // screen (editor or dashboard) was last active in this tab — a
+      // refresh shouldn't bounce someone out of the editor just because
+      // their new, unsaved plan has no id yet. (Note: only the *screen*
+      // survives a refresh this way, not the unsaved content itself —
+      // that would need separate autosave/draft support.)
       if (new URLSearchParams(location.search).get("id")) {
         showScreen("app");
         requestAnimationFrame(() => resizeCanvas());
+      } else if (sessionStorage.getItem("lastScreen") === "app") {
+        seedFreshDrill();
       } else {
         showScreen("dashboard");
         renderDashboardPlans();
