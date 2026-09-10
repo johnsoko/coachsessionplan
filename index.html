@@ -656,9 +656,11 @@
     background: var(--paper); padding: 24px;
   }
   #initial-loading { min-height: 100vh; background: var(--paper); }
+  #clerk-account-wrap { align-items: center; }
   .clerk-avatar-btn {
     width: 30px; height: 30px; border-radius: 50%; border: none; padding: 0; overflow: hidden;
     background: var(--paper-raised); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
   }
   .clerk-avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
   /* hide landing content until the real fonts are loaded, instead of
@@ -5009,7 +5011,7 @@ function refreshAuthUI() {
   const avatarImg = document.getElementById("clerk-avatar-img");
   if (Clerk.user) {
     signInBtn.style.display = "none";
-    accountWrap.style.display = "block";
+    accountWrap.style.display = "flex";
     avatarImg.src = Clerk.user.imageUrl || "";
     avatarImg.alt = Clerk.user.firstName || "Account";
     showScreen("app");
