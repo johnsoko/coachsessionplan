@@ -346,39 +346,44 @@
   textarea { width: 100%; border: 1px solid var(--line-md); background: var(--paper-card); border-radius: 7px; padding: 10px 12px; font-size: 13.5px; color: var(--ink); resize: vertical; min-height: 90px; font-family: var(--body); }
   .notes-divider { height: 1px; background: var(--line); margin: 30px 0; }
   .notes-hint { font-size: 12.5px; color: var(--ink-faint); }
-  .phase-notes-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+  .phase-notes-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
   .timetable-summary {
-    display: flex; align-items: center; gap: 8px; background: var(--paper-card); border: 1px solid var(--line);
-    border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 7px; background: var(--paper-card); border: 1px solid var(--line);
+    border-radius: 9px; padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 14px;
   }
   .timetable-header-row {
-    display: grid; grid-template-columns: 24px 120px 180px 1fr 76px; gap: 14px; padding: 0 16px 8px;
-    font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint);
+    display: grid; grid-template-columns: 20px 96px 150px 1fr 64px; gap: 12px; padding: 0 12px 6px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint);
   }
   .phase-note-card {
-    display: grid; grid-template-columns: 24px 120px 180px 1fr 76px; gap: 14px; align-items: start;
-    padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-card);
+    display: grid; grid-template-columns: 20px 96px 150px 1fr 64px; gap: 12px; align-items: start;
+    padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper-card);
   }
+  .phase-note-card .field-input { padding: 6px 8px; font-size: 12px; }
   .phase-note-drag-handle {
     display: flex; align-items: center; justify-content: center; height: 100%; color: var(--ink-faint);
     cursor: grab; padding-top: 4px;
   }
   .phase-note-drag-handle:active { cursor: grabbing; }
-  .phase-note-time input.field-input { margin-bottom: 6px; }
-  .phase-note-time-range { font-size: 12px; color: var(--ink-faint); }
-  .phase-note-drill-title { font-weight: 600; font-size: 13.5px; margin-bottom: 8px; }
+  .phase-note-time input.field-input { margin-bottom: 4px; }
+  .phase-note-time-range { font-size: 10.5px; color: var(--ink-faint); }
+  .phase-note-drill-title { font-weight: 600; font-size: 12px; margin-bottom: 6px; }
   .phase-note-add-exercise {
-    font-size: 12.5px; color: var(--pitch-deep); border: 1.5px dashed var(--line-md); border-radius: 6px;
-    padding: 6px 10px; background: none; margin-top: 8px;
+    font-size: 11px; color: var(--pitch-deep); border: 1.5px dashed var(--line-md); border-radius: 5px;
+    padding: 4px 7px; background: none; margin-top: 6px;
   }
-  .phase-note-row-actions { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .phase-note-row-actions { display: flex; flex-direction: column; gap: 4px; align-items: center; }
   .phase-note-row-actions button {
-    width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; color: var(--ink-faint);
+    width: 24px; height: 24px; border-radius: 5px; border: none; background: transparent; color: var(--ink-faint);
     display: flex; align-items: center; justify-content: center;
   }
+  .phase-note-row-actions button svg { width: 13px; height: 13px; }
   .phase-note-row-actions button:hover { background: var(--paper-raised); color: var(--ink); }
   .phase-note-row-actions button.danger:hover { color: #B3452C; }
-  .phase-note-thumb { position: relative; width: 150px; max-width: 100%; aspect-ratio: 4/2.7; border-radius: 10px; overflow: hidden; background: var(--pitch); margin-top: 8px; box-shadow: 0 10px 24px -14px rgba(27,33,28,0.3); }
+  .phase-note-thumb { position: relative; width: 100px; max-width: 100%; aspect-ratio: 4/2.7; border-radius: 8px; overflow: hidden; background: var(--pitch); margin-top: 4px; box-shadow: 0 8px 18px -12px rgba(27,33,28,0.3); }
+  .phase-note-notes.note-blocks { min-height: 56px; padding: 6px 6px; }
+  .phase-note-notes .note-block-text { font-size: 12.5px; padding: 3px 4px; line-height: 1.4; }
+  .phase-note-notes .note-block-add { width: 15px; height: 15px; font-size: 12px; }
   .thumb-play-btn {
     position: absolute; bottom: 8px; right: 8px; z-index: 6; width: 28px; height: 28px; border-radius: 50%;
     border: none; background: rgba(27,33,28,0.55); color: #F7F8F3; display: flex; align-items: center; justify-content: center;
@@ -1487,7 +1492,7 @@
           <span></span>
         </div>
         <div class="phase-notes-list" id="phase-notes-list"></div>
-        <button class="btn btn-primary" id="add-timeslot-btn" style="margin-top:12px;">+ Add Time Slot</button>
+        <button class="btn btn-primary" id="add-timeslot-btn" style="margin-top:10px; padding:7px 14px; font-size:12.5px;">+ Add Time Slot</button>
 
         <p class="notes-hint">More block types — video embeds, images — are coming to this page later.</p>
       </div>
