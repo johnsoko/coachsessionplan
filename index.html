@@ -356,8 +356,11 @@
     font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint);
   }
   .phase-note-card {
-    display: grid; grid-template-columns: 20px 96px 150px 1fr 64px; gap: 12px; align-items: start;
+    display: flex; flex-direction: column; gap: 8px;
     padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper-card);
+  }
+  .phase-note-body {
+    display: grid; grid-template-columns: 20px 96px 150px 1fr 64px; gap: 12px; align-items: start;
   }
   .phase-note-card .field-input { padding: 6px 8px; font-size: 12px; }
   .phase-note-drag-handle {
@@ -367,7 +370,7 @@
   .phase-note-drag-handle:active { cursor: grabbing; }
   .phase-note-time input.field-input { margin-bottom: 4px; }
   .phase-note-time-range { font-size: 10.5px; color: var(--ink-faint); }
-  .phase-note-drill-title { font-weight: 600; font-size: 12px; margin-bottom: 6px; }
+  .phase-note-card .phase-note-drill-title { font-weight: 600; font-size: 13px; }
   .phase-note-add-exercise {
     font-size: 11px; color: var(--pitch-deep); border: 1.5px dashed var(--line-md); border-radius: 5px;
     padding: 4px 7px; background: none; margin-top: 6px;
@@ -395,7 +398,7 @@
   .thumb-play-btn.playing { background: var(--bib); color: #201200; }
   .phase-note-label { font-family: var(--display); font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
   .note-blocks { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; padding: 10px 8px; background: var(--paper); min-height: 110px; }
-  #drill-description-blocks { min-height: 110px; }
+  #drill-description-blocks { min-height: 36px; }
   .note-block-row { display: flex; align-items: flex-start; gap: 3px; border-radius: 5px; position: relative; }
   .note-block-row:hover { background: var(--paper-raised); }
   .note-block-row.dragging { opacity: 0.4; }
@@ -4380,6 +4383,16 @@ function renderPhaseNotes() {
     card.draggable = true;
     card.dataset.phaseId = ph.id;
 
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.className = "field-input phase-note-drill-title";
+    titleInput.placeholder = "Drill Title";
+    titleInput.value = ph.title || "";
+    titleInput.addEventListener("input", () => { ph.title = titleInput.value; });
+
+    const body = document.createElement("div");
+    body.className = "phase-note-body";
+
     const handle = document.createElement("div");
     handle.className = "phase-note-drag-handle";
     handle.innerHTML = `<svg width="12" height="18" viewBox="0 0 12 18" fill="none"><circle cx="3" cy="3" r="1.4" fill="currentColor"/><circle cx="9" cy="3" r="1.4" fill="currentColor"/><circle cx="3" cy="9" r="1.4" fill="currentColor"/><circle cx="9" cy="9" r="1.4" fill="currentColor"/><circle cx="3" cy="15" r="1.4" fill="currentColor"/><circle cx="9" cy="15" r="1.4" fill="currentColor"/></svg>`;
@@ -4392,18 +4405,12 @@ function renderPhaseNotes() {
 
     const drillWrap = document.createElement("div");
     drillWrap.className = "phase-note-drill";
-    const titleInput = document.createElement("input");
-    titleInput.type = "text";
-    titleInput.className = "field-input phase-note-drill-title";
-    titleInput.placeholder = "Drill Title";
-    titleInput.value = ph.title || "";
-    titleInput.addEventListener("input", () => { ph.title = titleInput.value; });
     const thumb = createAnimatedThumb(ph, "phase-note-thumb");
     const importBtn = document.createElement("button");
     importBtn.className = "phase-note-add-exercise";
     importBtn.textContent = "+ Add Exercise";
     importBtn.addEventListener("click", () => toast("Drill Library is coming soon"));
-    drillWrap.appendChild(titleInput); drillWrap.appendChild(thumb); drillWrap.appendChild(importBtn);
+    drillWrap.appendChild(thumb); drillWrap.appendChild(importBtn);
 
     const notesWrap = document.createElement("div");
     notesWrap.className = "phase-note-notes note-blocks";
@@ -4433,7 +4440,8 @@ function renderPhaseNotes() {
     });
     actions.appendChild(dupBtn); actions.appendChild(delBtn);
 
-    card.appendChild(handle); card.appendChild(timeWrap); card.appendChild(drillWrap); card.appendChild(notesWrap); card.appendChild(actions);
+    body.appendChild(handle); body.appendChild(timeWrap); body.appendChild(drillWrap); body.appendChild(notesWrap); body.appendChild(actions);
+    card.appendChild(titleInput); card.appendChild(body);
 
     card.addEventListener("dragstart", e => { draggedPhaseId = ph.id; e.dataTransfer.effectAllowed = "move"; setTimeout(() => card.classList.add("dragging"), 0); });
     card.addEventListener("dragend", () => { draggedPhaseId = null; card.classList.remove("dragging"); });
