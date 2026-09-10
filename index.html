@@ -1402,22 +1402,6 @@
     </div>
   </div>
 
-  <div class="modal-overlay" id="plan-details-modal-overlay">
-    <div class="modal-card">
-      <h4>Edit Details</h4>
-      <span class="tp-label" style="margin-top:0;">Practice Plan Name</span>
-      <input type="text" id="plan-modal-title" class="field-input" placeholder="e.g. Overload to finish" maxlength="200">
-      <span class="tp-label">Practice Date</span>
-      <input type="date" id="plan-modal-date" class="field-input">
-      <span class="tp-label">Duration (minutes)</span>
-      <input type="number" id="plan-modal-duration" class="field-input" min="0" step="5" placeholder="e.g. 60">
-      <div class="modal-actions">
-        <button class="btn btn-ghost" id="plan-modal-cancel">Cancel</button>
-        <button class="btn btn-primary" id="plan-modal-save">Save</button>
-      </div>
-    </div>
-  </div>
-
   <div class="dropdown-menu output-settings-menu" id="output-settings-overlay">
       <div class="output-settings-head">
         <h4>Drill Settings <span class="output-settings-badge">CLASSIC EDITOR</span></h4>
@@ -5411,5 +5395,21 @@ initClerkAuth();
 </script>
 
   </div> <!-- /app-shell -->
+
+  <div class="modal-overlay" id="plan-details-modal-overlay">
+    <div class="modal-card">
+      <h4>Edit Details</h4>
+      <span class="tp-label" style="margin-top:0;">Practice Plan Name</span>
+      <input type="text" id="plan-modal-title" class="field-input" placeholder="e.g. Overload to finish" maxlength="200">
+      <span class="tp-label">Practice Date</span>
+      <input type="date" id="plan-modal-date" class="field-input">
+      <span class="tp-label">Duration (minutes)</span>
+      <input type="number" id="plan-modal-duration" class="field-input" min="0" step="5" placeholder="e.g. 60">
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="plan-modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="plan-modal-save">Save</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
