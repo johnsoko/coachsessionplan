@@ -4995,7 +4995,7 @@ async function initClerkAuth() {
   // Development instance even with afterSignOutUrl set at load time
   document.getElementById("clerk-signout-item").addEventListener("click", () => {
     document.getElementById("clerk-account-menu").classList.remove("open");
-    justSignedOut = true;
+    markJustSignedOut();
     Clerk.signOut({ redirectUrl: window.location.origin + window.location.pathname });
   });
   // uses openSignIn() (the same proven-working popup method as the topbar
@@ -5004,7 +5004,16 @@ async function initClerkAuth() {
   // a Development instance, the same issue we saw with sign-out earlier
   document.getElementById("landing-signin-btn").addEventListener("click", () => Clerk.openSignIn());
 }
-let justSignedOut = false;
+// Clerk.signOut() triggers a real page reload (even when redirecting to
+// the same URL), which wipes any plain JS variable — sessionStorage
+// survives that reload, so this is how we remember "show the sign-in
+// screen, not the marketing landing page" across it
+function markJustSignedOut() { sessionStorage.setItem("justSignedOut", "1"); }
+function consumeJustSignedOut() {
+  const was = sessionStorage.getItem("justSignedOut") === "1";
+  sessionStorage.removeItem("justSignedOut");
+  return was;
+}
 function refreshAuthUI() {
   const signInBtn = document.getElementById("clerk-signin-btn");
   const accountWrap = document.getElementById("clerk-account-wrap");
@@ -5023,9 +5032,8 @@ function refreshAuthUI() {
     // screen (or the marketing landing page) mid-sign-in-flow just because
     // Clerk.user is still momentarily null
     if (currentScreen !== "signin" && currentScreen !== "landing") {
-      showScreen(justSignedOut ? "signin" : "landing");
+      showScreen(consumeJustSignedOut() ? "signin" : "landing");
     }
-    justSignedOut = false;
   }
 }
 async function getAuthToken() {
