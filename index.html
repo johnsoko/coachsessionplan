@@ -4827,8 +4827,14 @@ function loadAppState(data) {
   if (data.nextId) nextId = data.nextId;
   if (Array.isArray(data.drillDescriptionBlocks)) drillDescriptionBlocks = data.drillDescriptionBlocks;
   if (data.outputSettings) Object.assign(outputSettings, data.outputSettings);
-  activePhaseId = phases[0] ? phases[0].id : null;
-  if (activePhaseId != null) loadPhase(activePhaseId);
+  // clear activePhaseId before calling loadPhase — loadPhase's first
+  // move is to save the CURRENT canvas into whatever phase activePhaseId
+  // points at, so if it were already pointing at the freshly-loaded
+  // phase, that save would immediately overwrite the loaded data with
+  // the stale pre-load canvas content
+  activePhaseId = null;
+  const first = phases[0];
+  if (first) loadPhase(first.id);
   renderPhaseList();
 }
 
