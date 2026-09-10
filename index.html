@@ -4833,7 +4833,6 @@ document.getElementById("quick-save-item").addEventListener("click", () => {
   document.getElementById("save-menu").classList.remove("open");
   saveDrill();
 });
-document.getElementById("close-btn").addEventListener("click", () => toast("Nothing to close yet — this is a preview"));
 document.getElementById("help-btn").addEventListener("click", () => toast("Tutorials coming soon"));
 document.getElementById("settings-btn").addEventListener("click", () => toast("Settings coming soon"));
 document.querySelectorAll("[data-toast]:not(.dropdown-item)").forEach(el => {
@@ -5398,6 +5397,11 @@ async function openPracticePlan(id) {
 }
 document.getElementById("dash-new-plan-btn").addEventListener("click", seedFreshDrill);
 document.getElementById("close-btn").addEventListener("click", () => {
+  // clear ?id= from the URL — otherwise a refresh (or the next deploy
+  // reloading the page) would read the stale URL and jump right back
+  // into whatever plan was last open, regardless of being back on the
+  // dashboard visually
+  history.replaceState(null, "", location.pathname);
   showScreen("dashboard");
   renderDashboardPlans();
 });
