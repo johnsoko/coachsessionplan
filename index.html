@@ -346,8 +346,42 @@
   textarea { width: 100%; border: 1px solid var(--line-md); background: var(--paper-card); border-radius: 7px; padding: 10px 12px; font-size: 13.5px; color: var(--ink); resize: vertical; min-height: 90px; font-family: var(--body); }
   .notes-divider { height: 1px; background: var(--line); margin: 30px 0; }
   .notes-hint { font-size: 12.5px; color: var(--ink-faint); }
-  .phase-notes-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 26px; margin-bottom: 8px; }
-  .phase-note-card { display: flex; flex-direction: column; }
+  .phase-notes-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+  .timetable-summary {
+    display: flex; align-items: center; gap: 8px; background: var(--paper-card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 16px;
+  }
+  .timetable-header-row {
+    display: grid; grid-template-columns: 24px 130px 260px 1fr 76px; gap: 14px; padding: 0 16px 8px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint);
+  }
+  .phase-note-card {
+    display: grid; grid-template-columns: 24px 130px 260px 1fr 76px; gap: 14px; align-items: start;
+    padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-card);
+  }
+  .phase-note-drag-handle {
+    display: flex; align-items: center; justify-content: center; height: 100%; color: var(--ink-faint);
+    cursor: grab; padding-top: 4px;
+  }
+  .phase-note-drag-handle:active { cursor: grabbing; }
+  .phase-note-time input.field-input { margin-bottom: 6px; }
+  .phase-note-time-range { font-size: 12px; color: var(--ink-faint); }
+  .phase-note-drill-title { font-weight: 600; font-size: 13.5px; margin-bottom: 8px; }
+  .phase-note-add-exercise {
+    font-size: 12.5px; color: var(--pitch-deep); border: 1.5px dashed var(--line-md); border-radius: 6px;
+    padding: 6px 10px; background: none; margin-top: 8px;
+  }
+  .phase-note-notes-input {
+    width: 100%; border: 1px solid var(--line-md); background: var(--paper); border-radius: 7px; padding: 8px 10px;
+    font-size: 13px; color: var(--ink); resize: vertical; min-height: 60px; font-family: var(--body);
+  }
+  .phase-note-row-actions { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .phase-note-row-actions button {
+    width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; color: var(--ink-faint);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .phase-note-row-actions button:hover { background: var(--paper-raised); color: var(--ink); }
+  .phase-note-row-actions button.danger:hover { color: #B3452C; }
   .phase-note-thumb { position: relative; width: 100%; aspect-ratio: 4/2.7; border-radius: 10px; overflow: hidden; background: var(--pitch); margin-bottom: 10px; box-shadow: 0 10px 24px -14px rgba(27,33,28,0.3); }
   .thumb-play-btn {
     position: absolute; bottom: 8px; right: 8px; z-index: 6; width: 28px; height: 28px; border-radius: 50%;
@@ -1418,6 +1452,10 @@
             <input type="date" id="practice-date-input" class="field-input" />
           </div>
           <div style="flex:1;">
+            <label>Start Time</label>
+            <input type="time" id="practice-starttime-input" class="field-input" value="09:00" />
+          </div>
+          <div style="flex:1;">
             <label>Duration (minutes)</label>
             <input type="number" id="practice-duration-input" class="field-input" min="0" step="5" placeholder="e.g. 60" />
           </div>
@@ -1440,7 +1478,20 @@
 
         <div class="notes-divider"></div>
 
+        <div class="timetable-summary">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M7.5 4v4l2.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <span id="timetable-total-duration">Total Practice Duration: 0 min</span>
+        </div>
+
+        <div class="timetable-header-row">
+          <span></span>
+          <span>Time</span>
+          <span>Drill</span>
+          <span>Notes</span>
+          <span></span>
+        </div>
         <div class="phase-notes-list" id="phase-notes-list"></div>
+        <button class="btn btn-primary" id="add-timeslot-btn" style="margin-top:12px;">+ Add Time Slot</button>
 
         <p class="notes-hint">More block types — video embeds, images — are coming to this page later.</p>
       </div>
@@ -3531,7 +3582,10 @@ function newPhaseObj(contentSrc, surfaceSrc) {
   // animation is something you build per-phase in Animate, not something
   // that should carry over when duplicating
   const scene = newSceneObj(contentSrc ? contentSrc.scenes[0] : null);
-  return { id: phaseNextId++, surface: surfaceSrc || "full", scenes: [scene], activeSceneId: scene.id, noteBlocks: [""] };
+  return {
+    id: phaseNextId++, surface: surfaceSrc || "full", scenes: [scene], activeSceneId: scene.id,
+    noteBlocks: [""], title: contentSrc ? (contentSrc.title || "") : "", duration: contentSrc ? (contentSrc.duration || "") : ""
+  };
 }
 function saveActiveScene() {
   const ph = phases.find(p => p.id === activePhaseId);
@@ -3647,7 +3701,7 @@ function mirrorCurrentPhase() {
     });
     return clone;
   });
-  const ph = { id: phaseNextId++, surface: current.surface, scenes: newScenes, activeSceneId: newScenes[Math.max(0, current.scenes.findIndex(s=>s.id===current.activeSceneId))].id, noteBlocks: [""] };
+  const ph = { id: phaseNextId++, surface: current.surface, scenes: newScenes, activeSceneId: newScenes[Math.max(0, current.scenes.findIndex(s=>s.id===current.activeSceneId))].id, noteBlocks: [""], title: current.title || "", duration: current.duration || "" };
   const idx = phases.findIndex(p => p.id === activePhaseId);
   phases.splice(idx + 1, 0, ph);
   loadPhase(ph.id);
@@ -4261,23 +4315,138 @@ function createAnimatedThumb(ph, wrapClass, opts) {
   return wrap;
 }
 
+function formatClockTime(mins) {
+  const h24 = Math.floor(mins / 60) % 24, m = ((mins % 60) + 60) % 60;
+  const ampm = h24 >= 12 ? "PM" : "AM";
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+function timetableTotalDuration() {
+  return phases.reduce((sum, ph) => sum + (parseInt(ph.duration, 10) || 0), 0);
+}
+function livePositionPhaseNoteRow(draggedId, targetId) {
+  const fromIdx = phases.findIndex(p => p.id === draggedId);
+  const toIdx = phases.findIndex(p => p.id === targetId);
+  if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+  const list = document.getElementById("phase-notes-list");
+  const items = Array.from(list.children);
+  const firstRects = new Map();
+  items.forEach(el => firstRects.set(el, el.getBoundingClientRect()));
+  const [moved] = phases.splice(fromIdx, 1);
+  phases.splice(toIdx, 0, moved);
+  const idToEl = new Map(items.map(el => [Number(el.dataset.phaseId), el]));
+  phases.forEach(ph => list.appendChild(idToEl.get(ph.id)));
+  items.forEach(el => {
+    if (Number(el.dataset.phaseId) === draggedId) return;
+    const first = firstRects.get(el);
+    const last = el.getBoundingClientRect();
+    const dy = first.top - last.top;
+    if (dy) {
+      el.style.transition = "none";
+      el.style.transform = `translateY(${dy}px)`;
+      requestAnimationFrame(() => { el.style.transition = "transform 0.22s cubic-bezier(.2,.7,.3,1)"; el.style.transform = ""; });
+    }
+  });
+  updateTimetableTimeRanges();
+}
+function updateTimetableTimeRanges() {
+  const [sh, sm] = (document.getElementById("practice-starttime-input").value || "09:00").split(":").map(Number);
+  let cursor = sh * 60 + sm;
+  document.getElementById("timetable-total-duration").textContent = "Total Practice Duration: " + timetableTotalDuration() + " min";
+  phases.forEach(ph => {
+    const dur = parseInt(ph.duration, 10) || 0;
+    const rangeEl = document.querySelector(`.phase-note-card[data-phase-id="${ph.id}"] .phase-note-time-range`);
+    if (rangeEl) rangeEl.textContent = dur ? `${formatClockTime(cursor)} - ${formatClockTime(cursor + dur)}` : "";
+    cursor += dur;
+  });
+}
 function renderPhaseNotes() {
   const list = document.getElementById("phase-notes-list");
   if (!list) return;
   saveActivePhase();
   list.innerHTML = "";
-  phases.forEach((ph, i) => {
+  const [sh, sm] = (document.getElementById("practice-starttime-input").value || "09:00").split(":").map(Number);
+  let cursor = sh * 60 + sm;
+  document.getElementById("timetable-total-duration").textContent = "Total Practice Duration: " + timetableTotalDuration() + " min";
+  phases.forEach((ph) => {
     if (!ph.noteBlocks || !ph.noteBlocks.length) ph.noteBlocks = [""];
+    const dur = parseInt(ph.duration, 10) || 0;
+    const startEnd = dur ? `${formatClockTime(cursor)} - ${formatClockTime(cursor + dur)}` : "";
+    cursor += dur;
+
     const card = document.createElement("div");
     card.className = "phase-note-card";
-    const label = document.createElement("div");
-    label.className = "phase-note-label";
-    label.textContent = "Phase " + (i + 1);
+    card.draggable = true;
+    card.dataset.phaseId = ph.id;
+
+    const handle = document.createElement("div");
+    handle.className = "phase-note-drag-handle";
+    handle.innerHTML = `<svg width="12" height="18" viewBox="0 0 12 18" fill="none"><circle cx="3" cy="3" r="1.4" fill="currentColor"/><circle cx="9" cy="3" r="1.4" fill="currentColor"/><circle cx="3" cy="9" r="1.4" fill="currentColor"/><circle cx="9" cy="9" r="1.4" fill="currentColor"/><circle cx="3" cy="15" r="1.4" fill="currentColor"/><circle cx="9" cy="15" r="1.4" fill="currentColor"/></svg>`;
+
+    const timeWrap = document.createElement("div");
+    timeWrap.className = "phase-note-time";
+    timeWrap.innerHTML = `<input type="number" class="field-input" min="0" step="5" placeholder="min" value="${ph.duration || ""}"><div class="phase-note-time-range">${startEnd}</div>`;
+    const durInput = timeWrap.querySelector("input");
+    durInput.addEventListener("input", () => { ph.duration = durInput.value; updateTimetableTimeRanges(); });
+
+    const drillWrap = document.createElement("div");
+    drillWrap.className = "phase-note-drill";
     const thumb = createAnimatedThumb(ph, "phase-note-thumb");
-    const blocksWrap = document.createElement("div");
-    blocksWrap.className = "note-blocks";
-    card.appendChild(label); card.appendChild(thumb); card.appendChild(blocksWrap);
-    renderNoteBlocks(ph.noteBlocks, blocksWrap);
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.className = "field-input phase-note-drill-title";
+    titleInput.placeholder = "Drill Title";
+    titleInput.value = ph.title || "";
+    titleInput.addEventListener("input", () => { ph.title = titleInput.value; });
+    const importBtn = document.createElement("button");
+    importBtn.className = "phase-note-add-exercise";
+    importBtn.textContent = "+ Import from Drill Library";
+    importBtn.addEventListener("click", () => toast("Drill Library is coming soon"));
+    drillWrap.appendChild(thumb); drillWrap.appendChild(titleInput); drillWrap.appendChild(importBtn);
+
+    const notesWrap = document.createElement("div");
+    notesWrap.className = "phase-note-notes";
+    const notesInput = document.createElement("textarea");
+    notesInput.className = "phase-note-notes-input";
+    notesInput.placeholder = "Add notes for this drill…";
+    notesInput.value = ph.noteBlocks[0] || "";
+    notesInput.addEventListener("input", () => { ph.noteBlocks[0] = notesInput.value; });
+    notesWrap.appendChild(notesInput);
+
+    const actions = document.createElement("div");
+    actions.className = "phase-note-row-actions";
+    const dupBtn = document.createElement("button");
+    dupBtn.title = "Duplicate";
+    dupBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="4.5" width="7.5" height="8.5" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 4.5V3a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H11" stroke="currentColor" stroke-width="1.2"/></svg>`;
+    dupBtn.addEventListener("click", () => {
+      const idx = phases.findIndex(p => p.id === ph.id);
+      const clone = newPhaseObj(ph, ph.surface);
+      clone.noteBlocks = [...ph.noteBlocks];
+      phases.splice(idx + 1, 0, clone);
+      renderPhaseNotes();
+      renderPhaseList();
+    });
+    const delBtn = document.createElement("button");
+    delBtn.title = "Delete";
+    delBtn.className = "danger";
+    delBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 4.5h9M6 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4.5 4.5V12a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>`;
+    delBtn.addEventListener("click", () => {
+      if (phases.length <= 1) { toast("A session needs at least one phase"); return; }
+      deletePhase(ph.id);
+      renderPhaseNotes();
+    });
+    actions.appendChild(dupBtn); actions.appendChild(delBtn);
+
+    card.appendChild(handle); card.appendChild(timeWrap); card.appendChild(drillWrap); card.appendChild(notesWrap); card.appendChild(actions);
+
+    card.addEventListener("dragstart", e => { draggedPhaseId = ph.id; e.dataTransfer.effectAllowed = "move"; setTimeout(() => card.classList.add("dragging"), 0); });
+    card.addEventListener("dragend", () => { draggedPhaseId = null; card.classList.remove("dragging"); });
+    card.addEventListener("dragover", e => {
+      e.preventDefault();
+      if (draggedPhaseId === null || draggedPhaseId === ph.id) return;
+      livePositionPhaseNoteRow(draggedPhaseId, ph.id);
+    });
+
     list.appendChild(card);
   });
 }
@@ -5084,6 +5253,7 @@ function serializeAppState() {
     phases, phaseNextId, sceneNextId, nextId,
     drillDescriptionBlocks, outputSettings,
     practiceDate: document.getElementById("practice-date-input").value,
+    practiceStartTime: document.getElementById("practice-starttime-input").value,
     duration: document.getElementById("practice-duration-input").value,
     tags: getTags()
   };
@@ -5098,6 +5268,7 @@ function loadAppState(data) {
   if (Array.isArray(data.drillDescriptionBlocks)) drillDescriptionBlocks = data.drillDescriptionBlocks;
   if (data.outputSettings) Object.assign(outputSettings, data.outputSettings);
   document.getElementById("practice-date-input").value = data.practiceDate || "";
+  document.getElementById("practice-starttime-input").value = data.practiceStartTime || "09:00";
   document.getElementById("practice-duration-input").value = data.duration || "";
   setTags(data.tags || []);
   // clear activePhaseId before calling loadPhase — loadPhase's first
@@ -5318,6 +5489,7 @@ function seedFreshDrill() {
   document.getElementById("notes-title-input").value = "";
   document.getElementById("practice-date-input").value = "";
   document.getElementById("practice-duration-input").value = "";
+  document.getElementById("practice-starttime-input").value = "09:00";
   // clear any category tags left over from a previous plan
   document.querySelectorAll("#tag-field .chip").forEach(chip => chip.remove());
   if (typeof updateAddTagVisibility === "function") updateAddTagVisibility();
@@ -5576,6 +5748,11 @@ async function openPracticePlan(id) {
   else requestAnimationFrame(() => resizeCanvas());
 }
 document.getElementById("dash-new-plan-btn").addEventListener("click", seedFreshDrill);
+document.getElementById("add-timeslot-btn").addEventListener("click", () => {
+  addPhase(false);
+  renderPhaseNotes();
+});
+document.getElementById("practice-starttime-input").addEventListener("input", updateTimetableTimeRanges);
 document.getElementById("close-btn").addEventListener("click", () => {
   // clear ?id= from the URL — otherwise a refresh (or the next deploy
   // reloading the page) would read the stale URL and jump right back
