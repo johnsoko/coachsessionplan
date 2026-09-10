@@ -714,9 +714,38 @@
   .dash-main { flex: 1; padding: 36px 44px; overflow-y: auto; }
   .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
   .dash-header h1 { font-family: var(--display); font-size: 26px; font-weight: 700; color: var(--ink); }
+  .dash-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .dash-toolbar .btn-ghost { position: relative; }
+  #dash-filter-count {
+    position: absolute; top: -5px; right: -5px; background: var(--bib); color: #201200; font-size: 10px;
+    font-weight: 700; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
+  }
+  .dash-row-check { width: 15px; height: 15px; }
+
+  .dash-filter-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(27,33,28,0.35); z-index: 300;
+  }
+  .dash-filter-overlay.open { display: block; }
+  .dash-filter-panel {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 340px; background: var(--paper-card); z-index: 301;
+    box-shadow: -12px 0 30px rgba(27,33,28,0.15); transform: translateX(100%); transition: transform 0.22s ease;
+    display: flex; flex-direction: column; padding: 22px;
+  }
+  .dash-filter-panel.open { transform: translateX(0); }
+  .dash-filter-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .dash-filter-header h3 { font-family: var(--display); font-size: 18px; font-weight: 700; }
+  .dash-filter-header button { border: none; background: transparent; font-size: 20px; color: var(--ink-faint); }
+  .dash-filter-body { flex: 1; overflow-y: auto; }
+  .dash-filter-tags-label { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin: 18px 0 8px; }
+  .dash-filter-tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .dash-filter-tag-chip {
+    font-size: 12.5px; font-weight: 500; border: 1.5px solid var(--line-md); border-radius: 6px;
+    padding: 6px 10px; background: var(--paper-raised); color: var(--ink-soft);
+  }
+  .dash-filter-tag-chip.selected { background: var(--pitch); border-color: var(--pitch); color: #F7F8F3; }
   .dash-empty { color: var(--ink-faint); font-size: 14px; padding: 20px 0; }
   .dash-plans-header, .dash-plan-row {
-    display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 32px; align-items: center; gap: 12px;
+    display: grid; grid-template-columns: 28px 2fr 1fr 1fr 1fr 32px; align-items: center; gap: 12px;
   }
   .dash-plans-header {
     padding: 0 16px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
@@ -795,7 +824,15 @@
         <h1>Practice Plans</h1>
         <button class="btn btn-primary" id="dash-new-plan-btn">+ New Practice Plan</button>
       </div>
+      <div class="dash-toolbar">
+        <input type="text" id="dash-search-input" class="field-input" placeholder="Search practice plans…" style="max-width:340px;">
+        <button class="btn btn-ghost" id="dash-filter-btn">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 3.5h11M4.5 7.5h6M6.5 11.5h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          Filter<span id="dash-filter-count" style="display:none;"></span>
+        </button>
+      </div>
       <div class="dash-plans-header">
+        <span></span>
         <span>Practice Plan Name</span>
         <span>Practice Date</span>
         <span>Duration</span>
@@ -820,6 +857,21 @@
         <button class="btn btn-primary" id="plan-modal-save">Save</button>
       </div>
     </div>
+  </div>
+
+  <div class="dash-filter-overlay" id="dash-filter-overlay"></div>
+  <div class="dash-filter-panel" id="dash-filter-panel">
+    <div class="dash-filter-header">
+      <h3>Filter Practice Plans</h3>
+      <button id="dash-filter-close-btn">&times;</button>
+    </div>
+    <div class="dash-filter-body">
+      <input type="text" id="dash-filter-search-input" class="field-input" placeholder="Search plan…">
+      <div class="dash-filter-tags-label">Tags</div>
+      <input type="text" id="dash-filter-tag-search-input" class="field-input" placeholder="Search in tags…" style="margin-bottom:10px;">
+      <div class="dash-filter-tag-list" id="dash-filter-tag-list"></div>
+    </div>
+    <button class="btn btn-primary" id="dash-filter-apply-btn" style="width:100%; margin-top:16px;">Show all Practice Plans</button>
   </div>
 
   <div id="app-shell" style="display:none;">
@@ -5013,13 +5065,27 @@ document.getElementById("opt-scale").addEventListener("input", e => {
 ═════════════════════════════════════════════════════════════════════ */
 let currentDrillId = new URLSearchParams(location.search).get("id") || null;
 
+function getTags() {
+  return Array.from(document.querySelectorAll("#tag-field .chip")).map(chip => {
+    const clone = chip.cloneNode(true);
+    const btn = clone.querySelector("button");
+    if (btn) btn.remove();
+    return clone.textContent.trim();
+  });
+}
+function setTags(tags) {
+  document.querySelectorAll("#tag-field .chip").forEach(chip => chip.remove());
+  (tags || []).forEach(t => addTagChip(t));
+  updateAddTagVisibility();
+}
 function serializeAppState() {
   return {
     title: document.getElementById("title-input").value,
     phases, phaseNextId, sceneNextId, nextId,
     drillDescriptionBlocks, outputSettings,
     practiceDate: document.getElementById("practice-date-input").value,
-    duration: document.getElementById("practice-duration-input").value
+    duration: document.getElementById("practice-duration-input").value,
+    tags: getTags()
   };
 }
 
@@ -5033,6 +5099,7 @@ function loadAppState(data) {
   if (data.outputSettings) Object.assign(outputSettings, data.outputSettings);
   document.getElementById("practice-date-input").value = data.practiceDate || "";
   document.getElementById("practice-duration-input").value = data.duration || "";
+  setTags(data.tags || []);
   // clear activePhaseId before calling loadPhase — loadPhase's first
   // move is to save the CURRENT canvas into whatever phase activePhaseId
   // points at, so if it were already pointing at the freshly-loaded
@@ -5268,6 +5335,10 @@ function seedFreshDrill() {
   requestAnimationFrame(() => resizeCanvas());
 }
 
+let allDashboardPlans = [];
+let selectedDashboardTags = new Set();
+let selectedRowIds = new Set(); // for future bulk delete/duplicate/visibility actions
+
 async function renderDashboardPlans() {
   const listEl = document.getElementById("dash-plans-list");
   listEl.innerHTML = '<p class="dash-empty">Loading…</p>';
@@ -5277,62 +5348,151 @@ async function renderDashboardPlans() {
     const res = await fetch("/api/drills", { headers });
     if (!res.ok) { listEl.innerHTML = '<p class="dash-empty">Could not load your practice plans.</p>'; return; }
     const { drills } = await res.json();
-    if (!drills.length) {
-      listEl.innerHTML = '<p class="dash-empty">No practice plans yet — click "+ New Practice Plan" to create your first one.</p>';
-      return;
-    }
-    listEl.innerHTML = "";
-    drills.forEach(d => {
-      const row = document.createElement("div");
-      row.className = "dash-plan-row";
-      const updated = new Date(d.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
-      const practiceDate = d.practice_date
-        ? new Date(d.practice_date + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" })
-        : "—";
-      const duration = d.duration ? d.duration + " min" : "—";
-      const menuId = "dash-menu-" + d.id;
-      row.innerHTML = `
-        <span class="dash-plan-title">${escapeHtml(d.title || "Untitled Play")}</span>
-        <span class="dash-plan-cell">${practiceDate}</span>
-        <span class="dash-plan-cell">${duration}</span>
-        <span class="dash-plan-cell">${updated}</span>
-        <span class="dash-plan-menu-wrap dd-wrap">
-          <button class="dash-plan-menu-btn" title="More">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3.5" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="8" cy="12.5" r="1.2" fill="currentColor"/></svg>
-          </button>
-          <div class="dropdown-menu dash-plan-menu" id="${menuId}" style="right:0;">
-            <div class="dropdown-item" data-action="edit">Edit Plan</div>
-            <div class="dropdown-item" data-action="details">Edit Details</div>
-            <div class="dropdown-item danger" data-action="delete">Delete</div>
-          </div>
-        </span>
-      `;
-      row.addEventListener("click", e => {
-        if (e.target.closest(".dash-plan-menu-wrap")) return;
-        openPracticePlan(d.id);
-      });
-      row.querySelector(".dash-plan-menu-btn").addEventListener("click", e => toggleMenu(menuId, e));
-      row.querySelector('[data-action="edit"]').addEventListener("click", e => {
-        e.stopPropagation();
-        document.getElementById(menuId).classList.remove("open");
-        openPracticePlan(d.id);
-      });
-      row.querySelector('[data-action="details"]').addEventListener("click", e => {
-        e.stopPropagation();
-        document.getElementById(menuId).classList.remove("open");
-        openEditDetailsModal(d.id);
-      });
-      row.querySelector('[data-action="delete"]').addEventListener("click", e => {
-        e.stopPropagation();
-        document.getElementById(menuId).classList.remove("open");
-        deletePracticePlan(d.id, d.title);
-      });
-      listEl.appendChild(row);
+    allDashboardPlans = drills.map(d => {
+      let tags = [];
+      try { tags = JSON.parse(d.tags || "[]"); } catch {}
+      return { ...d, tags: Array.isArray(tags) ? tags : [] };
     });
+    selectedRowIds.clear();
+    applyDashboardFilters();
   } catch {
     listEl.innerHTML = '<p class="dash-empty">Could not load your practice plans.</p>';
   }
 }
+
+function getFilteredDashboardPlans() {
+  const search = (document.getElementById("dash-search-input").value || "").trim().toLowerCase();
+  return allDashboardPlans.filter(d => {
+    if (search && !(d.title || "").toLowerCase().includes(search)) return false;
+    if (selectedDashboardTags.size && !d.tags.some(t => selectedDashboardTags.has(t))) return false;
+    return true;
+  });
+}
+
+function renderDashboardPlanRows(list) {
+  const listEl = document.getElementById("dash-plans-list");
+  if (!allDashboardPlans.length) {
+    listEl.innerHTML = '<p class="dash-empty">No practice plans yet — click "+ New Practice Plan" to create your first one.</p>';
+    return;
+  }
+  if (!list.length) {
+    listEl.innerHTML = '<p class="dash-empty">No practice plans match your search/filter.</p>';
+    return;
+  }
+  listEl.innerHTML = "";
+  list.forEach(d => {
+    const row = document.createElement("div");
+    row.className = "dash-plan-row";
+    const updated = new Date(d.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+    const practiceDate = d.practice_date
+      ? new Date(d.practice_date + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" })
+      : "—";
+    const duration = d.duration ? d.duration + " min" : "—";
+    const menuId = "dash-menu-" + d.id;
+    row.innerHTML = `
+      <input type="checkbox" class="dash-row-check" ${selectedRowIds.has(d.id) ? "checked" : ""}>
+      <span class="dash-plan-title">${escapeHtml(d.title || "Untitled Play")}</span>
+      <span class="dash-plan-cell">${practiceDate}</span>
+      <span class="dash-plan-cell">${duration}</span>
+      <span class="dash-plan-cell">${updated}</span>
+      <span class="dash-plan-menu-wrap dd-wrap">
+        <button class="dash-plan-menu-btn" title="More">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3.5" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="8" cy="12.5" r="1.2" fill="currentColor"/></svg>
+        </button>
+        <div class="dropdown-menu dash-plan-menu" id="${menuId}" style="right:0;">
+          <div class="dropdown-item" data-action="edit">Edit Plan</div>
+          <div class="dropdown-item" data-action="details">Edit Details</div>
+          <div class="dropdown-item danger" data-action="delete">Delete</div>
+        </div>
+      </span>
+    `;
+    row.querySelector(".dash-row-check").addEventListener("click", e => {
+      e.stopPropagation();
+      if (e.target.checked) selectedRowIds.add(d.id); else selectedRowIds.delete(d.id);
+    });
+    row.addEventListener("click", e => {
+      if (e.target.closest(".dash-plan-menu-wrap") || e.target.closest(".dash-row-check")) return;
+      openPracticePlan(d.id);
+    });
+    row.querySelector(".dash-plan-menu-btn").addEventListener("click", e => toggleMenu(menuId, e));
+    row.querySelector('[data-action="edit"]').addEventListener("click", e => {
+      e.stopPropagation();
+      document.getElementById(menuId).classList.remove("open");
+      openPracticePlan(d.id);
+    });
+    row.querySelector('[data-action="details"]').addEventListener("click", e => {
+      e.stopPropagation();
+      document.getElementById(menuId).classList.remove("open");
+      openEditDetailsModal(d.id);
+    });
+    row.querySelector('[data-action="delete"]').addEventListener("click", e => {
+      e.stopPropagation();
+      document.getElementById(menuId).classList.remove("open");
+      deletePracticePlan(d.id, d.title);
+    });
+    listEl.appendChild(row);
+  });
+}
+
+function applyDashboardFilters() {
+  renderDashboardPlanRows(getFilteredDashboardPlans());
+  const filterCountEl = document.getElementById("dash-filter-count");
+  if (selectedDashboardTags.size) {
+    filterCountEl.textContent = selectedDashboardTags.size;
+    filterCountEl.style.display = "flex";
+  } else {
+    filterCountEl.style.display = "none";
+  }
+}
+
+function renderFilterTagList() {
+  const tagSearch = (document.getElementById("dash-filter-tag-search-input").value || "").trim().toLowerCase();
+  const counts = new Map();
+  allDashboardPlans.forEach(d => d.tags.forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
+  const listEl = document.getElementById("dash-filter-tag-list");
+  const tags = Array.from(counts.keys()).filter(t => t.toLowerCase().includes(tagSearch)).sort();
+  if (!tags.length) { listEl.innerHTML = '<p class="dash-empty" style="padding:4px 0;">No tags yet.</p>'; return; }
+  listEl.innerHTML = tags.map(t =>
+    `<button class="dash-filter-tag-chip${selectedDashboardTags.has(t) ? " selected" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)} (${counts.get(t)})</button>`
+  ).join("");
+  listEl.querySelectorAll(".dash-filter-tag-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const tag = chip.dataset.tag;
+      if (selectedDashboardTags.has(tag)) selectedDashboardTags.delete(tag); else selectedDashboardTags.add(tag);
+      renderFilterTagList();
+      updateFilterApplyButton();
+    });
+  });
+}
+
+function updateFilterApplyButton() {
+  const count = getFilteredDashboardPlans().length;
+  document.getElementById("dash-filter-apply-btn").textContent =
+    count === allDashboardPlans.length ? "Show all Practice Plans" : `Show ${count} Practice Plan${count === 1 ? "" : "s"}`;
+}
+
+function openFilterPanel() {
+  document.getElementById("dash-filter-search-input").value = document.getElementById("dash-search-input").value;
+  renderFilterTagList();
+  updateFilterApplyButton();
+  document.getElementById("dash-filter-overlay").classList.add("open");
+  document.getElementById("dash-filter-panel").classList.add("open");
+}
+function closeFilterPanel() {
+  document.getElementById("dash-filter-overlay").classList.remove("open");
+  document.getElementById("dash-filter-panel").classList.remove("open");
+}
+document.getElementById("dash-filter-btn").addEventListener("click", openFilterPanel);
+document.getElementById("dash-filter-close-btn").addEventListener("click", closeFilterPanel);
+document.getElementById("dash-filter-overlay").addEventListener("click", closeFilterPanel);
+document.getElementById("dash-filter-apply-btn").addEventListener("click", () => {
+  document.getElementById("dash-search-input").value = document.getElementById("dash-filter-search-input").value;
+  applyDashboardFilters();
+  closeFilterPanel();
+});
+document.getElementById("dash-filter-search-input").addEventListener("input", updateFilterApplyButton);
+document.getElementById("dash-filter-tag-search-input").addEventListener("input", renderFilterTagList);
+document.getElementById("dash-search-input").addEventListener("input", applyDashboardFilters);
 async function deletePracticePlan(id, title) {
   if (!confirm(`Delete "${title || "this practice plan"}"? This can't be undone.`)) return;
   try {

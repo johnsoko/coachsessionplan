@@ -47,7 +47,8 @@ async function handleApi(request, env, url) {
     const { results } = await env.DB.prepare(
       `SELECT id, title, created_at, updated_at,
               json_extract(data, '$.practiceDate') as practice_date,
-              json_extract(data, '$.duration') as duration
+              json_extract(data, '$.duration') as duration,
+              json_extract(data, '$.tags') as tags
        FROM drills WHERE user_id = ? ORDER BY updated_at DESC`
     ).bind(userId).all();
     return jsonResponse({ drills: results });
