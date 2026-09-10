@@ -5062,12 +5062,8 @@ async function saveDrill() {
     currentDrillId = json.id;
     history.replaceState(null, "", "?id=" + json.id);
     const shareUrl = location.origin + location.pathname + "?id=" + json.id;
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      toast("Saved! Link copied to clipboard");
-    } catch {
-      toast("Saved! " + shareUrl);
-    }
+    try { await navigator.clipboard.writeText(shareUrl); } catch {}
+    toast("Session saved");
   } catch (err) {
     toast("Save failed — check your connection and try again");
   }
