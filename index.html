@@ -738,7 +738,7 @@
           <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2.5 4l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="dropdown-menu" id="save-menu" style="right:0;">
-          <div class="dropdown-item" data-toast="Sign in to save this session">
+          <div class="dropdown-item" id="quick-save-item">
             <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2.5 2h7L12.5 4.5v8.5h-10v-11z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
             Quick Save
           </div>
@@ -4625,7 +4625,11 @@ document.querySelectorAll(".dropdown-item[data-toast]").forEach(item => {
     toast(item.dataset.toast);
   });
 });
-document.getElementById("save-btn").addEventListener("click", () => toast("Sign in to save this session"));
+document.getElementById("save-btn").addEventListener("click", saveDrill);
+document.getElementById("quick-save-item").addEventListener("click", () => {
+  document.getElementById("save-menu").classList.remove("open");
+  saveDrill();
+});
 document.getElementById("close-btn").addEventListener("click", () => toast("Nothing to close yet — this is a preview"));
 document.getElementById("help-btn").addEventListener("click", () => toast("Tutorials coming soon"));
 document.getElementById("settings-btn").addEventListener("click", () => toast("Settings coming soon"));
@@ -4801,6 +4805,71 @@ document.getElementById("opt-scale").addEventListener("input", e => {
 });
 
 /* ═════════════════════════════════════════════════════════════════════
+   SAVE / LOAD — talks to the D1-backed /api/drills endpoint. Anonymous
+   for now (no accounts yet): saving gives you a shareable link with an
+   id in it; opening that link loads the drill back.
+═════════════════════════════════════════════════════════════════════ */
+let currentDrillId = new URLSearchParams(location.search).get("id") || null;
+
+function serializeAppState() {
+  return {
+    title: document.getElementById("title-input").value,
+    phases, phaseNextId, sceneNextId, nextId,
+    drillDescriptionBlocks, outputSettings
+  };
+}
+
+function loadAppState(data) {
+  if (data.title != null) document.getElementById("title-input").value = data.title;
+  if (Array.isArray(data.phases) && data.phases.length) phases = data.phases;
+  if (data.phaseNextId) phaseNextId = data.phaseNextId;
+  if (data.sceneNextId) sceneNextId = data.sceneNextId;
+  if (data.nextId) nextId = data.nextId;
+  if (Array.isArray(data.drillDescriptionBlocks)) drillDescriptionBlocks = data.drillDescriptionBlocks;
+  if (data.outputSettings) Object.assign(outputSettings, data.outputSettings);
+  activePhaseId = phases[0] ? phases[0].id : null;
+  if (activePhaseId != null) loadPhase(activePhaseId);
+  renderPhaseList();
+}
+
+async function saveDrill() {
+  const payload = serializeAppState();
+  try {
+    const res = currentDrillId
+      ? await fetch(`/api/drills/${currentDrillId}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) })
+      : await fetch(`/api/drills`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+    if (!res.ok) throw new Error("save failed");
+    const json = await res.json();
+    currentDrillId = json.id;
+    history.replaceState(null, "", "?id=" + json.id);
+    const shareUrl = location.origin + location.pathname + "?id=" + json.id;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast("Saved! Link copied to clipboard");
+    } catch {
+      toast("Saved! " + shareUrl);
+    }
+  } catch (err) {
+    toast("Save failed — check your connection and try again");
+  }
+}
+
+async function loadDrillFromUrl() {
+  const id = new URLSearchParams(location.search).get("id");
+  if (!id) return;
+  try {
+    const res = await fetch(`/api/drills/${id}`);
+    if (!res.ok) { toast("Could not find that saved drill"); return; }
+    const data = await res.json();
+    currentDrillId = id;
+    loadAppState(data);
+    toast("Loaded saved drill");
+  } catch {
+    toast("Could not load that drill — check your connection");
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════
    INIT
 ═════════════════════════════════════════════════════════════════════ */
 initTeamPopovers();
@@ -4830,6 +4899,7 @@ renderPhaseList();
 document.getElementById("output-date").textContent = "Last edited " + new Date().toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
 
 requestAnimationFrame(() => { resizeCanvas(); });
+loadDrillFromUrl();
 </script>
 
 </body>

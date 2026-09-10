@@ -80,13 +80,33 @@ every push.
 
 ## Later: adding the backend (D1 + save/load)
 
-When we're ready:
+**Status: built, needs one-time setup.** The save/load API (`src/worker.js`)
+and database schema (`schema.sql`) are already written. Three commands
+finish the setup — run these from the project folder, logged into your
+Cloudflare account (`npx wrangler login` first if you haven't):
 
 ```bash
+# 1. Create the database
 npx wrangler d1 create coachsessionplan-db
 ```
 
-Copy the `database_id` it prints into `wrangler.toml`, then we add
-`/functions` routes (Cloudflare Pages Functions) for save/load, and a
-`schema.sql` for the drills table. This plugs into the same Pages
-project — no separate deploy needed.
+That prints a `database_id` — copy it into `wrangler.toml`, replacing
+`REPLACE_AFTER_CREATING_DB`.
+
+```bash
+# 2. Create the table
+npx wrangler d1 execute coachsessionplan-db --remote --file=schema.sql
+
+# 3. Commit and push — the Git-connected build picks up the D1 binding
+# from wrangler.toml automatically
+git add wrangler.toml
+git commit -m "Add D1 database binding"
+git push
+```
+
+After that deploys, the **Save** button actually saves — it creates a
+shareable link like `coachsessionplan.com/?id=abc123def456` and copies
+it to your clipboard. Opening that link loads the drill back. No
+accounts yet (that's the Clerk step below) — anyone with the link can
+open or re-save it, which is fine for now and gets fully locked down
+once auth is in place.

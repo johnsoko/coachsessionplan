@@ -1,13 +1,15 @@
 name = "coachsessionplan"
 compatibility_date = "2025-01-01"
+main = "src/worker.js"
 
-# this project deploys as a Worker serving static assets (not a classic
-# Pages project) — this tells wrangler where those static files live
+# static site (index.html etc.) — served for any request that isn't /api/*
 [assets]
 directory = "."
+binding = "ASSETS"
 
-# Once we add a backend, D1 binding goes here, e.g.:
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "coachsessionplan-db"
-# database_id = "REPLACE_AFTER_CREATING_DB"
+# fill in database_id after running:
+#   npx wrangler d1 create coachsessionplan-db
+[[d1_databases]]
+binding = "DB"
+database_name = "coachsessionplan-db"
+database_id = "1e5a4aef-ce47-434c-a017-07c790d94475"
