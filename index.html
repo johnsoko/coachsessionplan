@@ -5249,6 +5249,7 @@ function seedFreshDrill() {
   activePhaseId = firstPhase.id;
   renderPhaseList();
   document.getElementById("output-date").textContent = "Last edited " + new Date().toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
+  switchMode("draw");
   showScreen("app");
   requestAnimationFrame(() => resizeCanvas());
 }
