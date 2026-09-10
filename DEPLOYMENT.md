@@ -78,35 +78,58 @@ every push.
 
 ---
 
-## Later: adding the backend (D1 + save/load)
+## Later: adding auth (Clerk)
 
-**Status: built, needs one-time setup.** The save/load API (`src/worker.js`)
-and database schema (`schema.sql`) are already written. Three commands
-finish the setup — run these from the project folder, logged into your
-Cloudflare account (`npx wrangler login` first if you haven't):
+**Status: built, needs one-time setup.** Sign-in is now required to save;
+loading a shared link to *view* a drill still works without an account,
+but saving or updating one requires being signed in, and only the
+original owner can update an existing drill.
 
-```bash
-# 1. Create the database
-npx wrangler d1 create coachsessionplan-db
+**1. Create a Clerk account and application**
+- Go to [clerk.com](https://clerk.com) → sign up → **Create application**
+- Name it whatever you like (e.g. "coachsessionplan")
+
+**2. Get your keys**
+- In the Clerk Dashboard → **API Keys** page, you'll see:
+  - **Publishable key** (starts with `pk_`) — not secret, safe to put in code
+  - **Secret key** (starts with `sk_`) — never put this in code or git
+- Also note your **Frontend API** URL, shown on that same page (looks like
+  `your-app-name-12.clerk.accounts.dev`)
+
+**3. Fill in the publishable key and frontend API URL**
+
+In `index.html`, near the top, replace the placeholders in the Clerk
+`<script>` tag:
+```html
+data-clerk-publishable-key="pk_..."          <!-- your real publishable key -->
+src="https://your-app-name-12.clerk.accounts.dev/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"
 ```
 
-That prints a `database_id` — copy it into `wrangler.toml`, replacing
-`REPLACE_AFTER_CREATING_DB`.
+In `wrangler.toml`, under `[vars]`, replace:
+```toml
+CLERK_PUBLISHABLE_KEY = "pk_..."             <!-- same publishable key -->
+```
 
+**4. Set the secret key (never goes in a file, never gets committed)**
 ```bash
-# 2. Create the table
-npx wrangler d1 execute coachsessionplan-db --remote --file=schema.sql
+npx wrangler secret put CLERK_SECRET_KEY
+```
+Paste your secret key when prompted.
 
-# 3. Commit and push — the Git-connected build picks up the D1 binding
-# from wrangler.toml automatically
-git add wrangler.toml
-git commit -m "Add D1 database binding"
+**5. Run the auth migration** (adds a `user_id` column to the existing table):
+```bash
+npx wrangler d1 execute coachsessionplan-db --remote --file=schema_v2_auth.sql
+```
+
+**6. Commit and push**
+```bash
+git add .
+git commit -m "Add Clerk authentication"
 git push
 ```
 
-After that deploys, the **Save** button actually saves — it creates a
-shareable link like `coachsessionplan.com/?id=abc123def456` and copies
-it to your clipboard. Opening that link loads the drill back. No
-accounts yet (that's the Clerk step below) — anyone with the link can
-open or re-save it, which is fine for now and gets fully locked down
-once auth is in place.
+Once that deploys: a "Sign In" button appears in the topbar. Signed out,
+clicking Save opens the sign-in dialog instead of saving. Signed in, Save
+works as before, and only you (as the signed-in user) can update a drill
+you created — anyone else gets an error if they try to overwrite it,
+though viewing a shared link still works for everyone.

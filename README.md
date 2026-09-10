@@ -22,7 +22,7 @@ Deployed via Cloudflare Pages, connected to this GitHub repo. Every push to
 
 - [x] Drill/session designer (draw, animate, output)
 - [x] Backend: save/load drills (Cloudflare D1) — see DEPLOYMENT.md for the one-time setup
-- [ ] Auth (Clerk)
+- [x] Auth (Clerk) — see DEPLOYMENT.md for the one-time setup
 - [ ] PDF/print export
 - [ ] Share links
 - [ ] Video clip attachments

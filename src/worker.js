@@ -1,6 +1,9 @@
-// Handles the save/load API for drills, backed by D1. Everything that
-// isn't an /api/ request just falls through to the static site (the
-// same index.html that was being served before this file existed).
+// Handles the save/load API for drills, backed by D1 + Clerk auth.
+// Everything that isn't an /api/ request just falls through to the
+// static site (the same index.html that was being served before this
+// file existed).
+
+import { createClerkClient } from "@clerk/backend";
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -15,37 +18,63 @@ function newId() {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
 }
 
+// returns the signed-in Clerk userId, or null if not signed in
+async function getUserId(request, env) {
+  if (!env.CLERK_SECRET_KEY || !env.CLERK_PUBLISHABLE_KEY) return null;
+  const clerkClient = createClerkClient({
+    secretKey: env.CLERK_SECRET_KEY,
+    publishableKey: env.CLERK_PUBLISHABLE_KEY,
+  });
+  const requestState = await clerkClient.authenticateRequest(request, {
+    authorizedParties: [
+      "https://coachsessionplan.com",
+      "https://www.coachsessionplan.com",
+      "https://coachsessionplan.johnsoko.workers.dev",
+    ],
+  });
+  if (!requestState.isSignedIn) return null;
+  return requestState.toAuth().userId;
+}
+
 async function handleApi(request, env, url) {
   const parts = url.pathname.split("/").filter(Boolean); // ["api","drills", maybe ":id"]
 
-  // POST /api/drills — create a new drill, returns its id
+  // POST /api/drills — create a new drill, returns its id. Requires sign-in.
   if (request.method === "POST" && parts.length === 2 && parts[1] === "drills") {
+    const userId = await getUserId(request, env);
+    if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object") return jsonResponse({ error: "Invalid body" }, 400);
     const id = newId();
     const now = Date.now();
     const title = (body.title || "Untitled Play").slice(0, 200);
     await env.DB.prepare(
-      "INSERT INTO drills (id, title, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
-    ).bind(id, title, JSON.stringify(body), now, now).run();
+      "INSERT INTO drills (id, title, data, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(id, title, JSON.stringify(body), userId, now, now).run();
     return jsonResponse({ id, title, created_at: now, updated_at: now });
   }
 
-  // PUT /api/drills/:id — update an existing drill
+  // PUT /api/drills/:id — update an existing drill. Requires sign-in AND ownership.
   if (request.method === "PUT" && parts.length === 3 && parts[1] === "drills") {
+    const userId = await getUserId(request, env);
+    if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
     const id = parts[2];
+    const existing = await env.DB.prepare("SELECT user_id FROM drills WHERE id = ?").bind(id).first();
+    if (!existing) return jsonResponse({ error: "Not found" }, 404);
+    if (existing.user_id && existing.user_id !== userId) {
+      return jsonResponse({ error: "You don't own this drill" }, 403);
+    }
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object") return jsonResponse({ error: "Invalid body" }, 400);
     const now = Date.now();
     const title = (body.title || "Untitled Play").slice(0, 200);
-    const result = await env.DB.prepare(
-      "UPDATE drills SET title = ?, data = ?, updated_at = ? WHERE id = ?"
-    ).bind(title, JSON.stringify(body), now, id).run();
-    if (!result.meta.changes) return jsonResponse({ error: "Not found" }, 404);
+    await env.DB.prepare(
+      "UPDATE drills SET title = ?, data = ?, user_id = ?, updated_at = ? WHERE id = ?"
+    ).bind(title, JSON.stringify(body), userId, now, id).run();
     return jsonResponse({ id, title, updated_at: now });
   }
 
-  // GET /api/drills/:id — load a drill
+  // GET /api/drills/:id — load a drill. Public — anyone with the link can view.
   if (request.method === "GET" && parts.length === 3 && parts[1] === "drills") {
     const id = parts[2];
     const row = await env.DB.prepare("SELECT id, title, data, updated_at FROM drills WHERE id = ?")

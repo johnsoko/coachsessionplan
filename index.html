@@ -729,6 +729,11 @@
         </div>
       </div>
 
+      <div id="clerk-auth-slot" style="display:flex; align-items:center; margin-right:6px;">
+        <button class="btn btn-ghost" id="clerk-signin-btn" style="display:none;">Sign In</button>
+        <div id="clerk-user-button" style="display:none;"></div>
+      </div>
+
       <div class="dd-wrap save-split" id="save-menu-wrap">
         <button class="btn btn-primary" id="save-btn">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 2h7L11.5 4.5v7.5h-9v-10z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" fill="none"/><rect x="4.5" y="2" width="4" height="3" fill="currentColor"/></svg>
@@ -4838,12 +4843,71 @@ function loadAppState(data) {
   renderPhaseList();
 }
 
+/* ─────────────────────────────────────────────────────────
+   CLERK AUTH — sign-in is required to save from here on; the
+   session token gets sent with save requests so the backend can
+   verify who's saving and enforce that only the owner can update
+   an existing drill.
+───────────────────────────────────────────────────────── */
+async function initClerkAuth() {
+  // the Clerk script tag loads asynchronously — rather than assume it's
+  // ready by some fixed point in page load (a race that silently failed
+  // before), we inject it ourselves and only proceed once it actually
+  // fires its own load event
+  const CLERK_PUBLISHABLE_KEY = "pk_test_ZGVhci1iYXNzLTcyNTYuY2xlcmsuYWNjb3VudHMuZGV2JA";
+  const CLERK_FRONTEND_API = "dear-bass-7256.clerk.accounts.dev";
+  await new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.async = true;
+    script.crossOrigin = "anonymous";
+    script.setAttribute("data-clerk-publishable-key", CLERK_PUBLISHABLE_KEY);
+    script.src = `https://${CLERK_FRONTEND_API}/npm/@clerk/clerk-js@latest/dist/clerk.browser.js`;
+    script.addEventListener("load", resolve);
+    script.addEventListener("error", resolve); // don't hang forever if it fails to load
+    document.head.appendChild(script);
+  });
+  if (typeof Clerk === "undefined") return; // failed to load — Save still works, just without auth
+  await Clerk.load();
+  refreshAuthUI();
+  Clerk.addListener(refreshAuthUI);
+  document.getElementById("clerk-signin-btn").addEventListener("click", () => Clerk.openSignIn());
+}
+function refreshAuthUI() {
+  const signInBtn = document.getElementById("clerk-signin-btn");
+  const userButtonEl = document.getElementById("clerk-user-button");
+  if (Clerk.user) {
+    signInBtn.style.display = "none";
+    userButtonEl.style.display = "block";
+    if (!userButtonEl.dataset.mounted) {
+      Clerk.mountUserButton(userButtonEl);
+      userButtonEl.dataset.mounted = "1";
+    }
+  } else {
+    signInBtn.style.display = "inline-flex";
+    userButtonEl.style.display = "none";
+  }
+}
+async function getAuthToken() {
+  if (typeof Clerk === "undefined" || !Clerk.session) return null;
+  return Clerk.session.getToken();
+}
+
 async function saveDrill() {
+  if (typeof Clerk !== "undefined" && !Clerk.user) {
+    Clerk.openSignIn();
+    toast("Sign in to save your drill");
+    return;
+  }
   const payload = serializeAppState();
   try {
+    const token = await getAuthToken();
+    const headers = { "content-type": "application/json" };
+    if (token) headers["authorization"] = "Bearer " + token;
     const res = currentDrillId
-      ? await fetch(`/api/drills/${currentDrillId}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) })
-      : await fetch(`/api/drills`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+      ? await fetch(`/api/drills/${currentDrillId}`, { method: "PUT", headers, body: JSON.stringify(payload) })
+      : await fetch(`/api/drills`, { method: "POST", headers, body: JSON.stringify(payload) });
+    if (res.status === 401) { toast("Please sign in and try saving again"); return; }
+    if (res.status === 403) { toast("You don't own this drill — try Save as Copy instead"); return; }
     if (!res.ok) throw new Error("save failed");
     const json = await res.json();
     currentDrillId = json.id;
@@ -4906,6 +4970,7 @@ document.getElementById("output-date").textContent = "Last edited " + new Date()
 
 requestAnimationFrame(() => { resizeCanvas(); });
 loadDrillFromUrl();
+initClerkAuth();
 </script>
 
 </body>

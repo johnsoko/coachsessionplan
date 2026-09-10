@@ -1,5 +1,6 @@
 name = "coachsessionplan"
 compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
 main = "src/worker.js"
 
 # static site (index.html etc.) — served for any request that isn't /api/*
@@ -7,9 +8,13 @@ main = "src/worker.js"
 directory = "."
 binding = "ASSETS"
 
-# fill in database_id after running:
-#   npx wrangler d1 create coachsessionplan-db
 [[d1_databases]]
 binding = "DB"
 database_name = "coachsessionplan-db"
 database_id = "1e5a4aef-ce47-434c-a017-07c790d94475"
+
+# Clerk publishable key isn't secret — safe to keep in this file.
+# CLERK_SECRET_KEY is NOT set here — set it with:
+#   npx wrangler secret put CLERK_SECRET_KEY
+[vars]
+CLERK_PUBLISHABLE_KEY = "pk_test_ZGVhci1iYXNzLTcyNTYuY2xlcmsuYWNjb3VudHMuZGV2JA"
