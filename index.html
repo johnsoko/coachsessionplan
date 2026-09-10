@@ -352,11 +352,11 @@
     border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 16px;
   }
   .timetable-header-row {
-    display: grid; grid-template-columns: 24px 130px 260px 1fr 76px; gap: 14px; padding: 0 16px 8px;
+    display: grid; grid-template-columns: 24px 120px 180px 1fr 76px; gap: 14px; padding: 0 16px 8px;
     font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint);
   }
   .phase-note-card {
-    display: grid; grid-template-columns: 24px 130px 260px 1fr 76px; gap: 14px; align-items: start;
+    display: grid; grid-template-columns: 24px 120px 180px 1fr 76px; gap: 14px; align-items: start;
     padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper-card);
   }
   .phase-note-drag-handle {
@@ -371,10 +371,6 @@
     font-size: 12.5px; color: var(--pitch-deep); border: 1.5px dashed var(--line-md); border-radius: 6px;
     padding: 6px 10px; background: none; margin-top: 8px;
   }
-  .phase-note-notes-input {
-    width: 100%; border: 1px solid var(--line-md); background: var(--paper); border-radius: 7px; padding: 8px 10px;
-    font-size: 13px; color: var(--ink); resize: vertical; min-height: 60px; font-family: var(--body);
-  }
   .phase-note-row-actions { display: flex; flex-direction: column; gap: 6px; align-items: center; }
   .phase-note-row-actions button {
     width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; color: var(--ink-faint);
@@ -382,7 +378,7 @@
   }
   .phase-note-row-actions button:hover { background: var(--paper-raised); color: var(--ink); }
   .phase-note-row-actions button.danger:hover { color: #B3452C; }
-  .phase-note-thumb { position: relative; width: 100%; aspect-ratio: 4/2.7; border-radius: 10px; overflow: hidden; background: var(--pitch); margin-bottom: 10px; box-shadow: 0 10px 24px -14px rgba(27,33,28,0.3); }
+  .phase-note-thumb { position: relative; width: 150px; max-width: 100%; aspect-ratio: 4/2.7; border-radius: 10px; overflow: hidden; background: var(--pitch); margin-top: 8px; box-shadow: 0 10px 24px -14px rgba(27,33,28,0.3); }
   .thumb-play-btn {
     position: absolute; bottom: 8px; right: 8px; z-index: 6; width: 28px; height: 28px; border-radius: 50%;
     border: none; background: rgba(27,33,28,0.55); color: #F7F8F3; display: flex; align-items: center; justify-content: center;
@@ -4391,27 +4387,22 @@ function renderPhaseNotes() {
 
     const drillWrap = document.createElement("div");
     drillWrap.className = "phase-note-drill";
-    const thumb = createAnimatedThumb(ph, "phase-note-thumb");
     const titleInput = document.createElement("input");
     titleInput.type = "text";
     titleInput.className = "field-input phase-note-drill-title";
     titleInput.placeholder = "Drill Title";
     titleInput.value = ph.title || "";
     titleInput.addEventListener("input", () => { ph.title = titleInput.value; });
+    const thumb = createAnimatedThumb(ph, "phase-note-thumb");
     const importBtn = document.createElement("button");
     importBtn.className = "phase-note-add-exercise";
     importBtn.textContent = "+ Import from Drill Library";
     importBtn.addEventListener("click", () => toast("Drill Library is coming soon"));
-    drillWrap.appendChild(thumb); drillWrap.appendChild(titleInput); drillWrap.appendChild(importBtn);
+    drillWrap.appendChild(titleInput); drillWrap.appendChild(thumb); drillWrap.appendChild(importBtn);
 
     const notesWrap = document.createElement("div");
-    notesWrap.className = "phase-note-notes";
-    const notesInput = document.createElement("textarea");
-    notesInput.className = "phase-note-notes-input";
-    notesInput.placeholder = "Add notes for this drill…";
-    notesInput.value = ph.noteBlocks[0] || "";
-    notesInput.addEventListener("input", () => { ph.noteBlocks[0] = notesInput.value; });
-    notesWrap.appendChild(notesInput);
+    notesWrap.className = "phase-note-notes note-blocks";
+    renderNoteBlocks(ph.noteBlocks, notesWrap);
 
     const actions = document.createElement("div");
     actions.className = "phase-note-row-actions";
