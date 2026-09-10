@@ -709,8 +709,11 @@
 
   <!-- ══════════════════════════ SIGN-IN SCREEN ══════════════════════════ -->
   <div id="signin-screen" style="display:none;">
-    <div class="signin-inner">
-      <div id="signin-mount"></div>
+    <div class="signin-inner" style="text-align:center;">
+      <div class="landing-logo">coachsessionplan</div>
+      <h1 class="landing-headline" style="font-size:26px;">You've been signed out</h1>
+      <p class="landing-sub">Sign back in to keep working on your drills.</p>
+      <button class="btn btn-primary landing-cta" id="signedout-signin-btn">Sign In</button>
     </div>
   </div>
 
@@ -798,6 +801,7 @@
       <div id="clerk-auth-slot" style="display:flex; align-items:center; gap:8px; margin-right:6px;">
         <button class="btn btn-ghost" id="clerk-signin-btn" style="display:none;">Sign In</button>
         <span id="clerk-user-label" style="display:none; font-size:13px; color:var(--ink-soft);"></span>
+        <button class="btn btn-ghost" id="clerk-manage-btn" style="display:none;" title="Manage account">Manage Account</button>
         <button class="btn btn-ghost" id="clerk-signout-btn" style="display:none;" title="Sign out">Sign Out</button>
       </div>
 
@@ -4960,11 +4964,14 @@ async function initClerkAuth() {
   refreshAuthUI();
   Clerk.addListener(refreshAuthUI);
   document.getElementById("clerk-signin-btn").addEventListener("click", () => Clerk.openSignIn());
+  document.getElementById("clerk-manage-btn").addEventListener("click", () => Clerk.openUserProfile());
+  document.getElementById("signedout-signin-btn").addEventListener("click", () => Clerk.openSignIn());
   // calls signOut() directly with an explicit redirect, rather than
   // relying on the "Sign out" item inside the UserButton dropdown — that
   // one still bounces through Clerk's hosted accounts.dev domain on a
   // Development instance even with afterSignOutUrl set at load time
   document.getElementById("clerk-signout-btn").addEventListener("click", () => {
+    justSignedOut = true;
     Clerk.signOut({ redirectUrl: window.location.origin + window.location.pathname });
   });
   // uses openSignIn() (the same proven-working popup method as the topbar
@@ -4973,24 +4980,32 @@ async function initClerkAuth() {
   // a Development instance, the same issue we saw with sign-out earlier
   document.getElementById("landing-signin-btn").addEventListener("click", () => Clerk.openSignIn());
 }
+let justSignedOut = false;
 function refreshAuthUI() {
   const signInBtn = document.getElementById("clerk-signin-btn");
   const userLabel = document.getElementById("clerk-user-label");
+  const manageBtn = document.getElementById("clerk-manage-btn");
   const signOutBtn = document.getElementById("clerk-signout-btn");
   if (Clerk.user) {
     signInBtn.style.display = "none";
     userLabel.style.display = "inline";
     userLabel.textContent = "Signed in as " + (Clerk.user.firstName || Clerk.user.primaryEmailAddress?.emailAddress || "you");
+    manageBtn.style.display = "inline-flex";
     signOutBtn.style.display = "inline-flex";
     showScreen("app");
   } else {
     signInBtn.style.display = "inline-flex";
     userLabel.style.display = "none";
+    manageBtn.style.display = "none";
     signOutBtn.style.display = "none";
-    // don't bounce off the sign-in screen mid-flow just because Clerk.user
-    // is still momentarily null — only land on the landing page from a
-    // fresh page load or an actual sign-out
-    if (currentScreen !== "signin") showScreen("landing");
+    // after an explicit sign-out, show the "you've been signed out" prompt
+    // instead of the marketing landing page — but don't bounce off that
+    // screen (or the marketing landing page) mid-sign-in-flow just because
+    // Clerk.user is still momentarily null
+    if (currentScreen !== "signin" && currentScreen !== "landing") {
+      showScreen(justSignedOut ? "signin" : "landing");
+    }
+    justSignedOut = false;
   }
 }
 async function getAuthToken() {
