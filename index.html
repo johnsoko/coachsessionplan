@@ -715,13 +715,28 @@
   .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
   .dash-header h1 { font-family: var(--display); font-size: 26px; font-weight: 700; color: var(--ink); }
   .dash-empty { color: var(--ink-faint); font-size: 14px; padding: 20px 0; }
+  .dash-plans-header, .dash-plan-row {
+    display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 32px; align-items: center; gap: 12px;
+  }
+  .dash-plans-header {
+    padding: 0 16px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--ink-faint); border-bottom: 1px solid var(--line); margin-bottom: 4px;
+  }
   .dash-plan-row {
-    display: flex; align-items: center; justify-content: space-between; padding: 14px 16px;
-    border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; background: var(--paper-card);
+    padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; background: var(--paper-card);
+    cursor: pointer;
   }
   .dash-plan-row:hover { border-color: var(--pitch); background: var(--paper-raised); }
   .dash-plan-title { font-weight: 600; font-size: 14.5px; color: var(--ink); }
-  .dash-plan-date { font-size: 12.5px; color: var(--ink-faint); }
+  .dash-plan-cell { font-size: 13px; color: var(--ink-soft); }
+  .dash-plan-menu-wrap { position: relative; }
+  .dash-plan-menu-btn {
+    width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; color: var(--ink-faint);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .dash-plan-menu-btn:hover { background: var(--paper-raised); }
+  .dash-plan-menu { min-width: 150px; }
+  .dash-plan-menu .dropdown-item.danger { color: #B3452C; }
 </style>
 </head>
 <body>
@@ -779,6 +794,13 @@
       <div class="dash-header">
         <h1>Practice Plans</h1>
         <button class="btn btn-primary" id="dash-new-plan-btn">+ New Practice Plan</button>
+      </div>
+      <div class="dash-plans-header">
+        <span>Practice Plan Name</span>
+        <span>Practice Date</span>
+        <span>Duration</span>
+        <span>Last Edit</span>
+        <span></span>
       </div>
       <div id="dash-plans-list"><p class="dash-empty">Loading…</p></div>
     </div>
@@ -1321,6 +1343,17 @@
     <div class="view" id="view-notes" style="display:none;">
       <div class="notes-page">
         <input class="notes-title-input" id="notes-title-input" value="Overload to finish" />
+
+        <div class="notes-field" style="display:flex; gap:16px;">
+          <div style="flex:1;">
+            <label>Practice Date</label>
+            <input type="date" id="practice-date-input" class="field-input" />
+          </div>
+          <div style="flex:1;">
+            <label>Duration (minutes)</label>
+            <input type="number" id="practice-duration-input" class="field-input" min="0" step="5" placeholder="e.g. 60" />
+          </div>
+        </div>
 
         <div class="notes-field">
           <label>Category</label>
@@ -4969,7 +5002,9 @@ function serializeAppState() {
   return {
     title: document.getElementById("title-input").value,
     phases, phaseNextId, sceneNextId, nextId,
-    drillDescriptionBlocks, outputSettings
+    drillDescriptionBlocks, outputSettings,
+    practiceDate: document.getElementById("practice-date-input").value,
+    duration: document.getElementById("practice-duration-input").value
   };
 }
 
@@ -4981,6 +5016,8 @@ function loadAppState(data) {
   if (data.nextId) nextId = data.nextId;
   if (Array.isArray(data.drillDescriptionBlocks)) drillDescriptionBlocks = data.drillDescriptionBlocks;
   if (data.outputSettings) Object.assign(outputSettings, data.outputSettings);
+  document.getElementById("practice-date-input").value = data.practiceDate || "";
+  document.getElementById("practice-duration-input").value = data.duration || "";
   // clear activePhaseId before calling loadPhase — loadPhase's first
   // move is to save the CURRENT canvas into whatever phase activePhaseId
   // points at, so if it were already pointing at the freshly-loaded
@@ -5179,6 +5216,8 @@ function seedFreshDrill() {
   tokens = []; shapes = []; phases = []; phaseNextId = 1; sceneNextId = 1; nextId = 1;
   drillDescriptionBlocks = ["Emphasize quick first touch out of feet before the overlap run."];
   document.getElementById("title-input").value = "Overload to finish";
+  document.getElementById("practice-date-input").value = "";
+  document.getElementById("practice-duration-input").value = "";
   applySurface("full");
   addToken("player", 30, 52, "light");
   addToken("player", 56, 68, "light");
@@ -5217,15 +5256,58 @@ async function renderDashboardPlans() {
       const row = document.createElement("div");
       row.className = "dash-plan-row";
       const updated = new Date(d.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+      const practiceDate = d.practice_date
+        ? new Date(d.practice_date + "T00:00:00").toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" })
+        : "—";
+      const duration = d.duration ? d.duration + " min" : "—";
+      const menuId = "dash-menu-" + d.id;
       row.innerHTML = `
         <span class="dash-plan-title">${escapeHtml(d.title || "Untitled Play")}</span>
-        <span class="dash-plan-date">Last edited ${updated}</span>
+        <span class="dash-plan-cell">${practiceDate}</span>
+        <span class="dash-plan-cell">${duration}</span>
+        <span class="dash-plan-cell">${updated}</span>
+        <span class="dash-plan-menu-wrap dd-wrap">
+          <button class="dash-plan-menu-btn" title="More">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="3.5" r="1.2" fill="currentColor"/><circle cx="8" cy="8" r="1.2" fill="currentColor"/><circle cx="8" cy="12.5" r="1.2" fill="currentColor"/></svg>
+          </button>
+          <div class="dropdown-menu dash-plan-menu" id="${menuId}" style="right:0;">
+            <div class="dropdown-item" data-action="edit">Edit Plan</div>
+            <div class="dropdown-item danger" data-action="delete">Delete</div>
+          </div>
+        </span>
       `;
-      row.addEventListener("click", () => openPracticePlan(d.id));
+      row.addEventListener("click", e => {
+        if (e.target.closest(".dash-plan-menu-wrap")) return;
+        openPracticePlan(d.id);
+      });
+      row.querySelector(".dash-plan-menu-btn").addEventListener("click", e => toggleMenu(menuId, e));
+      row.querySelector('[data-action="edit"]').addEventListener("click", e => {
+        e.stopPropagation();
+        document.getElementById(menuId).classList.remove("open");
+        openPracticePlan(d.id);
+      });
+      row.querySelector('[data-action="delete"]').addEventListener("click", e => {
+        e.stopPropagation();
+        document.getElementById(menuId).classList.remove("open");
+        deletePracticePlan(d.id, d.title);
+      });
       listEl.appendChild(row);
     });
   } catch {
     listEl.innerHTML = '<p class="dash-empty">Could not load your practice plans.</p>';
+  }
+}
+async function deletePracticePlan(id, title) {
+  if (!confirm(`Delete "${title || "this practice plan"}"? This can't be undone.`)) return;
+  try {
+    const token = await getAuthToken();
+    const headers = token ? { authorization: "Bearer " + token } : {};
+    const res = await fetch(`/api/drills/${id}`, { method: "DELETE", headers });
+    if (!res.ok) { toast("Could not delete that plan"); return; }
+    toast("Practice plan deleted");
+    renderDashboardPlans();
+  } catch {
+    toast("Could not delete that plan — check your connection");
   }
 }
 async function openPracticePlan(id) {

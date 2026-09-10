@@ -45,7 +45,10 @@ async function handleApi(request, env, url) {
     const userId = await getUserId(request, env);
     if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
     const { results } = await env.DB.prepare(
-      "SELECT id, title, created_at, updated_at FROM drills WHERE user_id = ? ORDER BY updated_at DESC"
+      `SELECT id, title, created_at, updated_at,
+              json_extract(data, '$.practiceDate') as practice_date,
+              json_extract(data, '$.duration') as duration
+       FROM drills WHERE user_id = ? ORDER BY updated_at DESC`
     ).bind(userId).all();
     return jsonResponse({ drills: results });
   }
@@ -92,6 +95,20 @@ async function handleApi(request, env, url) {
       .bind(id).first();
     if (!row) return jsonResponse({ error: "Not found" }, 404);
     return jsonResponse({ id: row.id, title: row.title, updated_at: row.updated_at, ...JSON.parse(row.data) });
+  }
+
+  // DELETE /api/drills/:id — requires sign-in AND ownership.
+  if (request.method === "DELETE" && parts.length === 3 && parts[1] === "drills") {
+    const userId = await getUserId(request, env);
+    if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
+    const id = parts[2];
+    const existing = await env.DB.prepare("SELECT user_id FROM drills WHERE id = ?").bind(id).first();
+    if (!existing) return jsonResponse({ error: "Not found" }, 404);
+    if (existing.user_id && existing.user_id !== userId) {
+      return jsonResponse({ error: "You don't own this drill" }, 403);
+    }
+    await env.DB.prepare("DELETE FROM drills WHERE id = ?").bind(id).run();
+    return jsonResponse({ ok: true });
   }
 
   return jsonResponse({ error: "Not found" }, 404);
