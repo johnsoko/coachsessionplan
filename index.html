@@ -647,9 +647,49 @@
     }
     .mobile-tool-btn.active { color: var(--pitch-deep); }
   }
+
+  /* ═════════════════════════════════════════════════════════════════════
+     LANDING + SIGN-IN SCREENS
+  ═════════════════════════════════════════════════════════════════════ */
+  #landing-screen, #signin-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: var(--paper); padding: 24px;
+  }
+  .landing-inner { max-width: 560px; text-align: center; }
+  .landing-logo {
+    font-family: var(--display); font-weight: 700; font-size: 15px; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--pitch-deep); margin-bottom: 28px;
+  }
+  .landing-headline {
+    font-family: var(--display); font-weight: 700; font-size: 34px; line-height: 1.2;
+    color: var(--ink); margin-bottom: 16px;
+  }
+  .landing-sub { font-size: 16px; line-height: 1.6; color: var(--ink-soft); margin-bottom: 32px; }
+  .landing-cta { font-size: 15px; padding: 13px 28px; }
+  .signin-inner { width: 100%; max-width: 420px; display: flex; justify-content: center; }
 </style>
 </head>
 <body>
+
+  <!-- ══════════════════════════ LANDING SCREEN ══════════════════════════ -->
+  <div id="landing-screen">
+    <div class="landing-inner">
+      <div class="landing-logo">coachsessionplan</div>
+      <h1 class="landing-headline">Design and animate soccer drills, right in your browser.</h1>
+      <p class="landing-sub">Draw formations, build multi-phase sessions, and animate them for your team — then save and share with a link.</p>
+      <button class="btn btn-primary landing-cta" id="landing-signin-btn">Sign In to Get Started</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ SIGN-IN SCREEN ══════════════════════════ -->
+  <div id="signin-screen" style="display:none;">
+    <div class="signin-inner">
+      <div id="signin-mount"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ MAIN APP (hidden until signed in) ══════════════════════════ -->
+  <div id="app-shell" style="display:none;">
 
   <!-- ══════════════════════════ TOP BAR ══════════════════════════ -->
   <div id="topbar">
@@ -4849,6 +4889,15 @@ function loadAppState(data) {
    verify who's saving and enforce that only the owner can update
    an existing drill.
 ───────────────────────────────────────────────────────── */
+let currentScreen = null;
+function showScreen(name) {
+  currentScreen = name;
+  document.getElementById("landing-screen").style.display = name === "landing" ? "flex" : "none";
+  document.getElementById("signin-screen").style.display = name === "signin" ? "flex" : "none";
+  document.getElementById("app-shell").style.display = name === "app" ? "block" : "none";
+  if (name === "app") requestAnimationFrame(() => resizeCanvas());
+}
+
 async function initClerkAuth() {
   // the Clerk script tag loads asynchronously — rather than assume it's
   // ready by some fixed point in page load (a race that silently failed
@@ -4866,14 +4915,21 @@ async function initClerkAuth() {
     script.addEventListener("error", resolve); // don't hang forever if it fails to load
     document.head.appendChild(script);
   });
-  if (typeof Clerk === "undefined") return; // failed to load — Save still works, just without auth
+  if (typeof Clerk === "undefined") { showScreen("landing"); return; } // failed to load
   // without this, signing out falls back to Clerk's hosted Account
-  // Portal page (dear-bass-7256.accounts.dev/sign-in) instead of just
-  // clearing the session and staying on the actual site
+  // Portal page instead of just clearing the session and staying on site
   await Clerk.load({ afterSignOutUrl: window.location.origin + window.location.pathname });
   refreshAuthUI();
   Clerk.addListener(refreshAuthUI);
   document.getElementById("clerk-signin-btn").addEventListener("click", () => Clerk.openSignIn());
+  document.getElementById("landing-signin-btn").addEventListener("click", () => {
+    showScreen("signin");
+    const mount = document.getElementById("signin-mount");
+    if (!mount.dataset.mounted) {
+      Clerk.mountSignIn(mount);
+      mount.dataset.mounted = "1";
+    }
+  });
 }
 function refreshAuthUI() {
   const signInBtn = document.getElementById("clerk-signin-btn");
@@ -4885,9 +4941,14 @@ function refreshAuthUI() {
       Clerk.mountUserButton(userButtonEl);
       userButtonEl.dataset.mounted = "1";
     }
+    showScreen("app");
   } else {
     signInBtn.style.display = "inline-flex";
     userButtonEl.style.display = "none";
+    // don't bounce off the sign-in screen mid-flow just because Clerk.user
+    // is still momentarily null — only land on the landing page from a
+    // fresh page load or an actual sign-out
+    if (currentScreen !== "signin") showScreen("landing");
   }
 }
 async function getAuthToken() {
@@ -4976,5 +5037,6 @@ loadDrillFromUrl();
 initClerkAuth();
 </script>
 
+  </div> <!-- /app-shell -->
 </body>
 </html>
