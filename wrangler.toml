@@ -1,6 +1,10 @@
 name = "coachsessionplan"
 compatibility_date = "2025-01-01"
-pages_build_output_dir = "."
+
+# this project deploys as a Worker serving static assets (not a classic
+# Pages project) — this tells wrangler where those static files live
+[assets]
+directory = "."
 
 # Once we add a backend, D1 binding goes here, e.g.:
 # [[d1_databases]]
