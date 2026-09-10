@@ -655,6 +655,7 @@
     min-height: 100vh; display: flex; align-items: center; justify-content: center;
     background: var(--paper); padding: 24px;
   }
+  #initial-loading { min-height: 100vh; background: var(--paper); }
   /* hide landing content until the real fonts are loaded, instead of
      briefly showing fallback-font text that then visibly swaps */
   #landing-screen { opacity: 0; transition: opacity 0.2s ease; }
@@ -683,8 +684,13 @@
 </head>
 <body>
 
+  <!-- ══════════════════════════ INITIAL LOADING (shown until we know
+       whether you're signed in — avoids flashing landing or app
+       incorrectly while that's still being resolved) ══════════════════════════ -->
+  <div id="initial-loading"></div>
+
   <!-- ══════════════════════════ LANDING SCREEN ══════════════════════════ -->
-  <div id="landing-screen">
+  <div id="landing-screen" style="display:none;">
     <div class="landing-inner">
       <div class="landing-logo">coachsessionplan</div>
       <h1 class="landing-headline">Design and animate soccer drills, right in your browser.</h1>
@@ -791,7 +797,7 @@
 
       <div id="clerk-auth-slot" style="display:flex; align-items:center; gap:8px; margin-right:6px;">
         <button class="btn btn-ghost" id="clerk-signin-btn" style="display:none;">Sign In</button>
-        <div id="clerk-user-button" style="display:none;"></div>
+        <span id="clerk-user-label" style="display:none; font-size:13px; color:var(--ink-soft);"></span>
         <button class="btn btn-ghost" id="clerk-signout-btn" style="display:none;" title="Sign out">Sign Out</button>
       </div>
 
@@ -4913,6 +4919,7 @@ function loadAppState(data) {
 let currentScreen = null;
 function showScreen(name) {
   currentScreen = name;
+  document.getElementById("initial-loading").style.display = "none";
   document.getElementById("landing-screen").style.display = name === "landing" ? "flex" : "none";
   document.getElementById("signin-screen").style.display = name === "signin" ? "flex" : "none";
   document.getElementById("app-shell").style.display = name === "app" ? "block" : "none";
@@ -4968,20 +4975,17 @@ async function initClerkAuth() {
 }
 function refreshAuthUI() {
   const signInBtn = document.getElementById("clerk-signin-btn");
-  const userButtonEl = document.getElementById("clerk-user-button");
+  const userLabel = document.getElementById("clerk-user-label");
   const signOutBtn = document.getElementById("clerk-signout-btn");
   if (Clerk.user) {
     signInBtn.style.display = "none";
-    userButtonEl.style.display = "block";
+    userLabel.style.display = "inline";
+    userLabel.textContent = "Signed in as " + (Clerk.user.firstName || Clerk.user.primaryEmailAddress?.emailAddress || "you");
     signOutBtn.style.display = "inline-flex";
-    if (!userButtonEl.dataset.mounted) {
-      Clerk.mountUserButton(userButtonEl);
-      userButtonEl.dataset.mounted = "1";
-    }
     showScreen("app");
   } else {
     signInBtn.style.display = "inline-flex";
-    userButtonEl.style.display = "none";
+    userLabel.style.display = "none";
     signOutBtn.style.display = "none";
     // don't bounce off the sign-in screen mid-flow just because Clerk.user
     // is still momentarily null — only land on the landing page from a
