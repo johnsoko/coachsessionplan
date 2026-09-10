@@ -859,7 +859,7 @@
       </div>
     </div>
 
-    <input id="title-input" value="Overload to finish" placeholder="Session Title" />
+    <input id="title-input" value="Overload to finish" placeholder="Enter Session Title" />
 
     <div class="topbar-right">
       <button class="icon-btn" id="undo-btn" title="Undo">
@@ -1358,7 +1358,7 @@
     <!-- ══════════════════════════ NOTES VIEW ══════════════════════════ -->
     <div class="view" id="view-notes" style="display:none;">
       <div class="notes-page">
-        <input class="notes-title-input" id="notes-title-input" value="Overload to finish" placeholder="Session Title" />
+        <input class="notes-title-input" id="notes-title-input" value="Overload to finish" placeholder="Enter Session Title" />
 
         <div class="notes-field" style="display:flex; gap:16px;">
           <div style="flex:1;">
@@ -5174,6 +5174,11 @@ async function saveDrill() {
     toast("Sign in to save your drill");
     return;
   }
+  if (!document.getElementById("title-input").value.trim()) {
+    toast("Enter a session title before saving");
+    document.getElementById("title-input").focus();
+    return;
+  }
   const payload = serializeAppState();
   try {
     const token = await getAuthToken();
@@ -5360,9 +5365,14 @@ function closeEditDetailsModal() {
 }
 async function saveEditDetailsModal() {
   if (!editDetailsTargetId || !editDetailsFullData) return;
+  if (!document.getElementById("plan-modal-title").value.trim()) {
+    toast("Enter a session title before saving");
+    document.getElementById("plan-modal-title").focus();
+    return;
+  }
   const merged = {
     ...editDetailsFullData,
-    title: document.getElementById("plan-modal-title").value || "Untitled Play",
+    title: document.getElementById("plan-modal-title").value.trim(),
     practiceDate: document.getElementById("plan-modal-date").value,
     duration: document.getElementById("plan-modal-duration").value,
   };
