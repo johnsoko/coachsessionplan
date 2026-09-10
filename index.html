@@ -656,6 +656,11 @@
     background: var(--paper); padding: 24px;
   }
   #initial-loading { min-height: 100vh; background: var(--paper); }
+  .clerk-avatar-btn {
+    width: 30px; height: 30px; border-radius: 50%; border: none; padding: 0; overflow: hidden;
+    background: var(--paper-raised); flex-shrink: 0;
+  }
+  .clerk-avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
   /* hide landing content until the real fonts are loaded, instead of
      briefly showing fallback-font text that then visibly swaps */
   #landing-screen { opacity: 0; transition: opacity 0.2s ease; }
@@ -800,9 +805,21 @@
 
       <div id="clerk-auth-slot" style="display:flex; align-items:center; gap:8px; margin-right:6px;">
         <button class="btn btn-ghost" id="clerk-signin-btn" style="display:none;">Sign In</button>
-        <span id="clerk-user-label" style="display:none; font-size:13px; color:var(--ink-soft);"></span>
-        <button class="btn btn-ghost" id="clerk-manage-btn" style="display:none;" title="Manage account">Manage Account</button>
-        <button class="btn btn-ghost" id="clerk-signout-btn" style="display:none;" title="Sign out">Sign Out</button>
+        <div class="dd-wrap" id="clerk-account-wrap" style="display:none;">
+          <button class="clerk-avatar-btn" id="clerk-avatar-btn" title="Account">
+            <img id="clerk-avatar-img" alt="" />
+          </button>
+          <div class="dropdown-menu" id="clerk-account-menu" style="right:0;">
+            <div class="dropdown-item" id="clerk-manage-item">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M2.5 12.5c0-2.5 2.2-4 5-4s5 1.5 5 4" stroke="currentColor" stroke-width="1.2"/></svg>
+              Manage Account
+            </div>
+            <div class="dropdown-item" id="clerk-signout-item">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M6 2.5H3.5v10H6M10 10.5l3-3-3-3M13 7.5H6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Sign Out
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="dd-wrap save-split" id="save-menu-wrap">
@@ -4964,13 +4981,18 @@ async function initClerkAuth() {
   refreshAuthUI();
   Clerk.addListener(refreshAuthUI);
   document.getElementById("clerk-signin-btn").addEventListener("click", () => Clerk.openSignIn());
-  document.getElementById("clerk-manage-btn").addEventListener("click", () => Clerk.openUserProfile());
+  document.getElementById("clerk-avatar-btn").addEventListener("click", e => toggleMenu("clerk-account-menu", e));
+  document.getElementById("clerk-manage-item").addEventListener("click", () => {
+    document.getElementById("clerk-account-menu").classList.remove("open");
+    Clerk.openUserProfile();
+  });
   document.getElementById("signedout-signin-btn").addEventListener("click", () => Clerk.openSignIn());
   // calls signOut() directly with an explicit redirect, rather than
-  // relying on the "Sign out" item inside the UserButton dropdown — that
-  // one still bounces through Clerk's hosted accounts.dev domain on a
+  // relying on the "Sign out" item inside Clerk's own dropdown — that one
+  // still bounces through Clerk's hosted accounts.dev domain on a
   // Development instance even with afterSignOutUrl set at load time
-  document.getElementById("clerk-signout-btn").addEventListener("click", () => {
+  document.getElementById("clerk-signout-item").addEventListener("click", () => {
+    document.getElementById("clerk-account-menu").classList.remove("open");
     justSignedOut = true;
     Clerk.signOut({ redirectUrl: window.location.origin + window.location.pathname });
   });
@@ -4983,21 +5005,17 @@ async function initClerkAuth() {
 let justSignedOut = false;
 function refreshAuthUI() {
   const signInBtn = document.getElementById("clerk-signin-btn");
-  const userLabel = document.getElementById("clerk-user-label");
-  const manageBtn = document.getElementById("clerk-manage-btn");
-  const signOutBtn = document.getElementById("clerk-signout-btn");
+  const accountWrap = document.getElementById("clerk-account-wrap");
+  const avatarImg = document.getElementById("clerk-avatar-img");
   if (Clerk.user) {
     signInBtn.style.display = "none";
-    userLabel.style.display = "inline";
-    userLabel.textContent = "Signed in as " + (Clerk.user.firstName || Clerk.user.primaryEmailAddress?.emailAddress || "you");
-    manageBtn.style.display = "inline-flex";
-    signOutBtn.style.display = "inline-flex";
+    accountWrap.style.display = "block";
+    avatarImg.src = Clerk.user.imageUrl || "";
+    avatarImg.alt = Clerk.user.firstName || "Account";
     showScreen("app");
   } else {
     signInBtn.style.display = "inline-flex";
-    userLabel.style.display = "none";
-    manageBtn.style.display = "none";
-    signOutBtn.style.display = "none";
+    accountWrap.style.display = "none";
     // after an explicit sign-out, show the "you've been signed out" prompt
     // instead of the marketing landing page — but don't bounce off that
     // screen (or the marketing landing page) mid-sign-in-flow just because
