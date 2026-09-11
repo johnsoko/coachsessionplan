@@ -143,6 +143,10 @@
   .phase-thumb.active { border-color: var(--bib); }
   .phase-thumb.dragging { opacity: 0.55; transform: scale(0.97); }
   .phase-thumb-dot { position: absolute; aspect-ratio: 1 / 1; border-radius: 50%; transform: translate(-50%,-50%); }
+  .phase-thumb-library-check {
+    position: absolute; bottom: 7px; right: 7px; z-index: 4; width: 17px; height: 17px; cursor: pointer;
+    accent-color: var(--bib);
+  }
 
   .phase-thumb-bar {
     position: absolute; top: 0; left: 0; right: 0; z-index: 3; cursor: grab;
@@ -384,6 +388,7 @@
     padding: 4px 7px; background: none; margin-top: 2px;
   }
   .phase-note-row-actions { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+  .phase-note-library-check { width: 15px; height: 15px; cursor: pointer; accent-color: var(--bib); margin-bottom: 2px; }
   .phase-note-row-actions button {
     width: 24px; height: 24px; border-radius: 5px; border: none; background: transparent; color: var(--ink-faint);
     display: flex; align-items: center; justify-content: center;
@@ -3574,6 +3579,11 @@ let activePhaseId = null;
 let phaseNextId = 1;
 let sceneNextId = 1;
 let draggedPhaseId = null;
+// which drills (phases) the user has manually flagged as candidates for
+// the future Drill Library — deliberately never auto-populated, since
+// creating the same drill repeatedly would otherwise flood the library
+// with duplicates. Not yet wired to an actual "add to library" action.
+let selectedForLibraryPhaseIds = new Set();
 
 // contentSrc supplies the tokens/shapes to copy (or null for blank);
 // token ids are preserved on the copy (not reassigned) so scene-to-scene
@@ -3932,7 +3942,8 @@ function renderPhaseList() {
     div.draggable = false;
     div.dataset.phaseId = ph.id;
     div.innerHTML = phaseThumbHTML(ph) +
-      `<div class="phase-thumb-bar">
+      `<input type="checkbox" class="phase-thumb-library-check" title="Select for Drill Library" ${selectedForLibraryPhaseIds.has(ph.id) ? "checked" : ""}>
+      <div class="phase-thumb-bar">
         <div class="phase-thumb-grip">
           <span class="phase-thumb-grip-dots"><span></span><span></span><span></span><span></span><span></span><span></span></span>
         </div>
@@ -3940,6 +3951,13 @@ function renderPhaseList() {
         <button class="phase-thumb-del" title="Delete phase"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 3.5h7M4.5 3.5V2h3v1.5M3.3 3.5l.5 7h4.4l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>`;
     div.addEventListener("click", () => loadPhase(ph.id));
+    const libCheck = div.querySelector(".phase-thumb-library-check");
+    libCheck.addEventListener("click", e => e.stopPropagation());
+    libCheck.addEventListener("change", () => {
+      if (libCheck.checked) selectedForLibraryPhaseIds.add(ph.id); else selectedForLibraryPhaseIds.delete(ph.id);
+      const notesCheck = document.querySelector(`.phase-note-card[data-phase-id="${ph.id}"] .phase-note-library-check`);
+      if (notesCheck) notesCheck.checked = libCheck.checked;
+    });
     const labelInput = div.querySelector(".phase-thumb-label-input");
     // clicking/typing in the name field should never arm dragging or get
     // swallowed by the card's own "select this phase" click handler
@@ -4428,6 +4446,16 @@ function renderPhaseNotes() {
 
     const actions = document.createElement("div");
     actions.className = "phase-note-row-actions";
+    const libCheck = document.createElement("input");
+    libCheck.type = "checkbox";
+    libCheck.className = "phase-note-library-check";
+    libCheck.title = "Select for Drill Library";
+    libCheck.checked = selectedForLibraryPhaseIds.has(ph.id);
+    libCheck.addEventListener("change", () => {
+      if (libCheck.checked) selectedForLibraryPhaseIds.add(ph.id); else selectedForLibraryPhaseIds.delete(ph.id);
+      const thumbCheck = document.querySelector(`.phase-thumb[data-phase-id="${ph.id}"] .phase-thumb-library-check`);
+      if (thumbCheck) thumbCheck.checked = libCheck.checked;
+    });
     const dupBtn = document.createElement("button");
     dupBtn.title = "Duplicate";
     dupBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="4.5" width="7.5" height="8.5" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 4.5V3a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H11" stroke="currentColor" stroke-width="1.2"/></svg>`;
@@ -4448,7 +4476,7 @@ function renderPhaseNotes() {
       deletePhase(ph.id);
       renderPhaseNotes();
     });
-    actions.appendChild(dupBtn); actions.appendChild(delBtn);
+    actions.appendChild(libCheck); actions.appendChild(dupBtn); actions.appendChild(delBtn);
 
     card.appendChild(handle); card.appendChild(timeWrap); card.appendChild(exerciseWrap); card.appendChild(notesWrap); card.appendChild(actions);
 
