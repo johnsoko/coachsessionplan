@@ -4394,7 +4394,7 @@ function renderPhaseNotes() {
 
     const card = document.createElement("div");
     card.className = "phase-note-card";
-    card.draggable = true;
+    card.draggable = false;
     card.dataset.phaseId = ph.id;
 
     const handle = document.createElement("div");
@@ -4452,8 +4452,13 @@ function renderPhaseNotes() {
 
     card.appendChild(handle); card.appendChild(timeWrap); card.appendChild(exerciseWrap); card.appendChild(notesWrap); card.appendChild(actions);
 
+    // only the grip handle arms dragging — otherwise a draggable=true row
+    // can swallow clicks/typing in its inputs, textareas, and buttons as
+    // micro-drags, which is exactly the glitchiness this fixes (same issue
+    // we'd already fixed for the Create tab's phase list)
+    handle.addEventListener("mousedown", () => { card.draggable = true; });
     card.addEventListener("dragstart", e => { draggedPhaseId = ph.id; e.dataTransfer.effectAllowed = "move"; setTimeout(() => card.classList.add("dragging"), 0); });
-    card.addEventListener("dragend", () => { draggedPhaseId = null; card.classList.remove("dragging"); });
+    card.addEventListener("dragend", () => { draggedPhaseId = null; card.draggable = false; card.classList.remove("dragging"); });
     card.addEventListener("dragover", e => {
       e.preventDefault();
       if (draggedPhaseId === null || draggedPhaseId === ph.id) return;
