@@ -133,6 +133,7 @@
   .phase-action-btn:hover { background: var(--paper-raised); color: var(--ink); }
 
   .phase-list { display: flex; flex-direction: column; gap: 10px; }
+  .phase-list.phase-list-hidden-animate { display: none !important; }
   .phase-thumb {
     position: relative; border-radius: 9px; overflow: hidden; cursor: grab;
     border: 2.5px solid transparent; background: var(--pitch); aspect-ratio: 4/2.7;
@@ -5005,6 +5006,10 @@ document.getElementById("draw-panel-toggle").addEventListener("click", e => {
   // keep phase management (Next/Clone/Mirror/More) as a Draw-only set of
   // tools — Animate's left panel is just for browsing/selecting phases
   document.querySelector(".phase-actions").classList.toggle("phase-actions-hidden", showTimeline);
+  // In Animate mode, only the single phase being animated should be
+  // visible anywhere on screen — showing the other phases' thumbnails
+  // alongside it made it unclear which drill was actually being animated
+  document.getElementById("phase-list").classList.toggle("phase-list-hidden-animate", showTimeline);
   // Animate is for moving existing objects, not adding new ones — if a
   // placement tool (arrow, player, etc.) was left armed from Draw Tools,
   // switching to Animate would otherwise keep drawing/placing with it
