@@ -4923,7 +4923,19 @@ document.querySelectorAll(".left-tab").forEach(tab => {
 /* ═════════════════════════════════════════════════════════════════════
    TOPBAR — mode switching, title sync, dropdown menus
 ═════════════════════════════════════════════════════════════════════ */
+let currentMode = "draw";
+function renderModeContent(mode) {
+  if (mode === "output") {
+    saveActivePhase();
+    renderAnimateOutputPhaseLists();
+    document.getElementById("output-title").textContent = document.getElementById("title-input").value;
+  }
+  if (mode === "notes") { renderPhaseNotes(); renderDrillDescriptionBlocks(); }
+  if (mode === "draw") { renderPhaseList(); renderObjectsList(); refreshAnimatePanel(); }
+}
 function switchMode(mode) {
+  currentMode = mode;
+  sessionStorage.setItem("lastMode", mode); // survives a refresh so we can reopen on the same tab
   document.querySelectorAll(".mode-tab").forEach(t => t.classList.toggle("active", t.dataset.mode === mode));
   const modeLabels = { draw: "Create", notes: "Details", output: "Output" };
   const mobileLabel = document.getElementById("mobile-mode-label");
@@ -4932,13 +4944,7 @@ function switchMode(mode) {
     const el = document.getElementById("view-" + m);
     if (el) el.style.display = (m === mode) ? "flex" : "none";
   });
-  if (mode === "output") {
-    saveActivePhase();
-    renderAnimateOutputPhaseLists();
-    document.getElementById("output-title").textContent = document.getElementById("title-input").value;
-  }
-  if (mode === "notes") { renderPhaseNotes(); renderDrillDescriptionBlocks(); }
-  if (mode === "draw") { renderPhaseList(); renderObjectsList(); refreshAnimatePanel(); }
+  renderModeContent(mode);
 }
 document.querySelectorAll(".mode-tab").forEach(tab => {
   tab.addEventListener("click", () => switchMode(tab.dataset.mode));
@@ -5279,6 +5285,7 @@ function loadAppState(data) {
   const first = phases[0];
   if (first) loadPhase(first.id);
   renderPhaseList();
+  renderModeContent(currentMode); // whichever tab is already visible needs to reflect the just-loaded data
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -5392,6 +5399,7 @@ function refreshAuthUI() {
       // that would need separate autosave/draft support.)
       if (new URLSearchParams(location.search).get("id")) {
         showScreen("app");
+        switchMode(sessionStorage.getItem("lastMode") || "draw");
         requestAnimationFrame(() => resizeCanvas());
       } else if (sessionStorage.getItem("lastScreen") === "app") {
         seedFreshDrill();
