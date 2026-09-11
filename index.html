@@ -155,7 +155,14 @@
   .phase-thumb-grip { display: flex; align-items: center; gap: 11px; color: rgba(255,255,255,0.92); }
   .phase-thumb-grip-dots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px; flex-shrink: 0; }
   .phase-thumb-grip-dots span { width: 3px; height: 3px; border-radius: 50%; background: currentColor; display: block; }
-  .phase-thumb-label { font-family: var(--display); font-size: 14.5px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+  .phase-thumb-label-input {
+    font-family: var(--display); font-size: 14.5px; font-weight: 700; letter-spacing: 0.02em;
+    border: none; background: transparent; padding: 2px 4px; border-radius: 4px; color: rgba(255,255,255,0.92);
+    flex: 1; min-width: 0;
+  }
+  .phase-thumb-label-input::placeholder { color: rgba(255,255,255,0.75); }
+  .phase-thumb-label-input:hover { background: rgba(255,255,255,0.12); }
+  .phase-thumb-label-input:focus { background: rgba(255,255,255,0.16); outline: 1.5px solid rgba(255,255,255,0.6); color: #fff; }
   .phase-thumb-del {
     width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0;
     background: rgba(255,255,255,0.14); color: #F7F8F3; border: none; display: flex; align-items: center; justify-content: center;
@@ -3763,8 +3770,8 @@ function livePositionPhase(draggedId, targetId) {
 function updatePhaseLabelsOnly() {
   const list = document.getElementById("phase-list");
   Array.from(list.children).forEach((el, i) => {
-    const label = el.querySelector(".phase-thumb-label");
-    if (label) label.textContent = "Phase " + (i + 1);
+    const labelInput = el.querySelector(".phase-thumb-label-input");
+    if (labelInput) labelInput.placeholder = "Phase " + (i + 1);
     el.classList.toggle("active", Number(el.dataset.phaseId) === activePhaseId);
   });
   document.getElementById("phase-count").textContent = `PHASE ${phases.findIndex(p=>p.id===activePhaseId)+1}/${phases.length}`;
@@ -3928,11 +3935,17 @@ function renderPhaseList() {
       `<div class="phase-thumb-bar">
         <div class="phase-thumb-grip">
           <span class="phase-thumb-grip-dots"><span></span><span></span><span></span><span></span><span></span><span></span></span>
-          <span class="phase-thumb-label">Phase ${i + 1}</span>
         </div>
+        <input type="text" class="phase-thumb-label-input" placeholder="Phase ${i + 1}" value="${escapeHtml(ph.title || "")}">
         <button class="phase-thumb-del" title="Delete phase"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 3.5h7M4.5 3.5V2h3v1.5M3.3 3.5l.5 7h4.4l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>`;
     div.addEventListener("click", () => loadPhase(ph.id));
+    const labelInput = div.querySelector(".phase-thumb-label-input");
+    // clicking/typing in the name field should never arm dragging or get
+    // swallowed by the card's own "select this phase" click handler
+    labelInput.addEventListener("click", e => e.stopPropagation());
+    labelInput.addEventListener("mousedown", e => e.stopPropagation());
+    labelInput.addEventListener("input", () => { ph.title = labelInput.value; });
     div.querySelector(".phase-thumb-del").addEventListener("click", e => {
       e.stopPropagation();
       deletePhase(ph.id);
