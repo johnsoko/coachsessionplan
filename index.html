@@ -4567,7 +4567,7 @@ function renderPhaseNotes() {
     const importBtn = document.createElement("button");
     importBtn.className = "phase-note-add-exercise";
     importBtn.textContent = "+ Add Exercise";
-    importBtn.addEventListener("click", () => toast("Drill Library is coming soon"));
+    importBtn.addEventListener("click", () => { loadPhase(ph.id); openImportPhaseModal(); });
     exerciseWrap.appendChild(titleInput); exerciseWrap.appendChild(thumb); exerciseWrap.appendChild(importBtn);
 
     const notesWrap = document.createElement("div");
@@ -5108,6 +5108,7 @@ async function importDrillIntoPhases(id, title) {
     phases.splice(insertAt === -1 ? phases.length : insertAt + 1, 0, newPhase);
     loadPhase(newPhase.id);
     renderPhaseList();
+    renderPhaseNotes(); // keep the Details/Timetable view in sync too, since Add Exercise can trigger this from there
     closeImportPhaseModal();
     toast(`Imported "${title || "drill"}"`);
   } catch {
