@@ -40,7 +40,11 @@ async function handleApi(request, env, url) {
   const parts = url.pathname.split("/").filter(Boolean); // ["api","drills", maybe ":id"]
 
   // GET /api/drill-library — list every library drill the signed-in user
-  // owns, for the Drill Library page.
+  // owns, for the Drill Library page. Includes surface/scenes directly so
+  // the grid can render thumbnails in one request instead of a separate
+  // fetch per card (that N+1 pattern got slower as the library grew, and
+  // the resulting network/CPU contention was likely also behind choppy
+  // playback on the detail page).
   if (request.method === "GET" && parts.length === 2 && parts[1] === "drill-library") {
     const userId = await getUserId(request, env);
     if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
@@ -49,7 +53,9 @@ async function handleApi(request, env, url) {
               json_extract(data, '$.notes') as notes,
               json_extract(data, '$.description') as description,
               json_extract(data, '$.tags') as tags,
-              json_extract(data, '$.creatorName') as creator_name
+              json_extract(data, '$.creatorName') as creator_name,
+              json_extract(data, '$.surface') as surface,
+              json_extract(data, '$.scenes') as scenes
        FROM drill_library WHERE user_id = ? ORDER BY updated_at DESC`
     ).bind(userId).all();
     return jsonResponse({ drills: results });
