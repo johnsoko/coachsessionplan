@@ -5610,12 +5610,12 @@ async function syncPhasesToLibrary() {
   const headers = { "content-type": "application/json" };
   if (token) headers["authorization"] = "Bearer " + token;
   for (const ph of toSync) {
-    const description = (ph.noteBlocks || []).filter(t => t.trim()).join(" ");
+    const notes = (ph.noteBlocks || []).filter(t => t.trim()).join(" ");
     const creatorName = (typeof Clerk !== "undefined" && Clerk.user)
       ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
     const payload = {
       title: ph.title || "Untitled Drill",
-      data: { surface: ph.surface, scenes: ph.scenes, description, tags: getTags(), creatorName }
+      data: { surface: ph.surface, scenes: ph.scenes, notes, tags: getTags(), creatorName }
     };
     try {
       if (ph.libraryDrillId) {
@@ -5983,7 +5983,7 @@ function applyLibraryFilters() {
       <div class="lib-card-body">
         <div class="lib-card-title">${escapeHtml(d.title || "Untitled Drill")}</div>
         <div class="lib-card-meta">${escapeHtml(d.creator_name || "Coach")} &middot; ${updated}</div>
-        <div class="lib-card-desc">${escapeHtml(d.description || "")}</div>
+        <div class="lib-card-desc">${escapeHtml(d.notes || "")}</div>
         <div class="lib-card-tags">${tagsHTML}</div>
       </div>
     `;
@@ -6044,7 +6044,7 @@ async function openLibraryDrillDetail(id) {
       <div class="lib-detail-title">${escapeHtml(d.title || "Untitled Drill")}</div>
       <div class="lib-detail-meta">${escapeHtml(d.creatorName || "Coach")} &middot; Saved ${updated}</div>
       <div class="lib-card-tags" style="margin-bottom:16px;">${tagsHTML}</div>
-      <div class="lib-detail-desc">${escapeHtml(d.description || "No description yet.")}</div>
+      <div class="lib-detail-desc">${escapeHtml(d.notes || "No notes yet.")}</div>
     `;
     document.getElementById("lib-detail-thumb").appendChild(createAnimatedThumb({ surface: d.surface, scenes: d.scenes }, "lib-detail-thumb-inner"));
   } catch {

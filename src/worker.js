@@ -46,7 +46,7 @@ async function handleApi(request, env, url) {
     if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
     const { results } = await env.DB.prepare(
       `SELECT id, title, created_at, updated_at,
-              json_extract(data, '$.description') as description,
+              json_extract(data, '$.notes') as notes,
               json_extract(data, '$.tags') as tags,
               json_extract(data, '$.creatorName') as creator_name
        FROM drill_library WHERE user_id = ? ORDER BY updated_at DESC`
@@ -55,7 +55,7 @@ async function handleApi(request, env, url) {
   }
 
   // GET /api/drill-library/:id — full detail for a single library drill
-  // (surface/scenes for the preview, plus description/tags/creator).
+  // (surface/scenes for the preview, plus notes/tags/creator).
   if (request.method === "GET" && parts.length === 3 && parts[1] === "drill-library") {
     const id = parts[2];
     const row = await env.DB.prepare("SELECT id, title, created_at, updated_at, data FROM drill_library WHERE id = ?")
