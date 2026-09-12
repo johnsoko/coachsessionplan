@@ -1611,11 +1611,6 @@
           </div>
         </div>
 
-        <div class="notes-field" id="drill-dimensions-row" style="display:none;">
-          <label>Activity Dimensions</label>
-          <input type="text" id="drill-dimensions-input" class="field-input" placeholder="e.g. 20x30 yds">
-        </div>
-
         <div id="category-section-anchor"></div>
         <div class="notes-field" id="category-section">
           <label>Tags</label>
@@ -3746,7 +3741,8 @@ function newPhaseObj(contentSrc, surfaceSrc) {
   const scene = newSceneObj(contentSrc ? contentSrc.scenes[0] : null);
   return {
     id: phaseNextId++, surface: surfaceSrc || "full", scenes: [scene], activeSceneId: scene.id,
-    noteBlocks: [""], title: contentSrc ? (contentSrc.title || "") : "", duration: contentSrc ? (contentSrc.duration || "") : ""
+    noteBlocks: [""], title: contentSrc ? (contentSrc.title || "") : "", duration: contentSrc ? (contentSrc.duration || "") : "",
+    dimensions: contentSrc ? (contentSrc.dimensions || "") : ""
   };
 }
 function saveActiveScene() {
@@ -3863,7 +3859,7 @@ function mirrorCurrentPhase() {
     });
     return clone;
   });
-  const ph = { id: phaseNextId++, surface: current.surface, scenes: newScenes, activeSceneId: newScenes[Math.max(0, current.scenes.findIndex(s=>s.id===current.activeSceneId))].id, noteBlocks: [""], title: current.title || "", duration: current.duration || "" };
+  const ph = { id: phaseNextId++, surface: current.surface, scenes: newScenes, activeSceneId: newScenes[Math.max(0, current.scenes.findIndex(s=>s.id===current.activeSceneId))].id, noteBlocks: [""], title: current.title || "", duration: current.duration || "", dimensions: current.dimensions || "" };
   const idx = phases.findIndex(p => p.id === activePhaseId);
   phases.splice(idx + 1, 0, ph);
   loadPhase(ph.id);
@@ -4566,7 +4562,6 @@ function renderPhaseNotes() {
   saveActivePhase();
   list.innerHTML = "";
   document.getElementById("scheduling-fields-row").style.display = isStandaloneDrillMode ? "none" : "flex";
-  document.getElementById("drill-dimensions-row").style.display = isStandaloneDrillMode ? "block" : "none";
   document.getElementById("timetable-summary-banner").style.display = isStandaloneDrillMode ? "none" : "flex";
   document.getElementById("timetable-header-row").classList.toggle("drill-mode", isStandaloneDrillMode);
   document.getElementById("timetable-header-duration").style.display = isStandaloneDrillMode ? "none" : "inline";
@@ -4599,36 +4594,25 @@ function renderPhaseNotes() {
     const exerciseWrap = document.createElement("div");
     exerciseWrap.className = "phase-note-exercise";
     const thumb = createAnimatedThumb(ph, "phase-note-thumb");
-    if (isStandaloneDrillMode) {
-      // drill creator keeps the editable title right above its own preview
-      const titleInput = document.createElement("input");
-      titleInput.type = "text";
-      titleInput.className = "field-input phase-note-drill-title";
-      titleInput.placeholder = "Drill Title";
-      titleInput.value = ph.title || "";
-      titleInput.addEventListener("input", () => { ph.title = titleInput.value; });
-      exerciseWrap.appendChild(titleInput);
-      exerciseWrap.appendChild(thumb);
-    } else {
-      // practice plans: the title itself isn't edited here anymore (it
-      // comes from the source drill, or wherever it was set) — instead
-      // this slot is for the activity's physical dimensions, prefilled
-      // from the drill it was imported from when available, and always
-      // editable manually. The title still shows, just as a hover
-      // overlay on the preview rather than a separate input.
-      const dimensionsInput = document.createElement("input");
-      dimensionsInput.type = "text";
-      dimensionsInput.className = "field-input phase-note-drill-title";
-      dimensionsInput.placeholder = "Activity Dimensions";
-      dimensionsInput.value = ph.dimensions || "";
-      dimensionsInput.addEventListener("input", () => { ph.dimensions = dimensionsInput.value; });
-      const titleOverlay = document.createElement("div");
-      titleOverlay.className = "phase-note-thumb-title-overlay";
-      titleOverlay.textContent = ph.title || "Untitled Drill";
-      thumb.appendChild(titleOverlay);
-      exerciseWrap.appendChild(dimensionsInput);
-      exerciseWrap.appendChild(thumb);
-    }
+    // This field used to be linked to the drill's title (ph.title) here,
+    // shared with the Create tab's phase-thumb label — editing either one
+    // changed the same value. Deliberately unlinked now: this is always
+    // Dimensions (ph.dimensions), in both the drill creator and practice
+    // plans. The title still shows, just as a hover overlay on the
+    // preview instead of a separate editable field — it's still set from
+    // the Create tab thumbnail (and the topbar, in the drill creator).
+    const dimensionsInput = document.createElement("input");
+    dimensionsInput.type = "text";
+    dimensionsInput.className = "field-input phase-note-drill-title";
+    dimensionsInput.placeholder = "Activity Dimensions";
+    dimensionsInput.value = ph.dimensions || "";
+    dimensionsInput.addEventListener("input", () => { ph.dimensions = dimensionsInput.value; });
+    const titleOverlay = document.createElement("div");
+    titleOverlay.className = "phase-note-thumb-title-overlay";
+    titleOverlay.textContent = ph.title || "Untitled Drill";
+    thumb.appendChild(titleOverlay);
+    exerciseWrap.appendChild(dimensionsInput);
+    exerciseWrap.appendChild(thumb);
     const importBtn = document.createElement("button");
     importBtn.className = "phase-note-add-exercise";
     importBtn.textContent = "+ Add Exercise";
@@ -5874,7 +5858,7 @@ async function saveStandaloneDrill() {
       surface: ph.surface, scenes: ph.scenes,
       notes: (ph.noteBlocks || []).filter(t => t.trim()).join(" "),
       description: (drillDescriptionBlocks || []).filter(t => t.trim()).join(" "),
-      dimensions: document.getElementById("drill-dimensions-input").value.trim(),
+      dimensions: ph.dimensions || "",
       tags: getTags(), creatorName
     }
   };
@@ -6019,7 +6003,6 @@ function seedFreshDrill() {
   document.getElementById("practice-date-input").value = "";
   document.getElementById("practice-duration-input").value = "";
   document.getElementById("practice-starttime-input").value = "09:00";
-  document.getElementById("drill-dimensions-input").value = "";
   // clear any category tags left over from a previous plan
   document.querySelectorAll("#tag-field .chip").forEach(chip => chip.remove());
   if (typeof updateAddTagVisibility === "function") updateAddTagVisibility();
