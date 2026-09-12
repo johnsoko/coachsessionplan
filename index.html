@@ -4541,18 +4541,6 @@ function renderPhaseNotes() {
   document.getElementById("timetable-header-duration").style.display = isStandaloneDrillMode ? "none" : "inline";
   document.getElementById("notes-title-input").style.display = isStandaloneDrillMode ? "none" : "block";
   document.getElementById("add-timeslot-btn").style.display = isStandaloneDrillMode ? "none" : "inline-flex";
-  // Tags section moves to the very bottom of the page in standalone drill
-  // mode (a single drill's tags matter less than its content up top);
-  // otherwise it stays anchored where it started, right after the
-  // scheduling fields, for practice plans
-  const categorySection = document.getElementById("category-section");
-  const notesPage = document.querySelector(".notes-page");
-  if (isStandaloneDrillMode) {
-    notesPage.appendChild(categorySection);
-  } else {
-    const anchor = document.getElementById("category-section-anchor");
-    anchor.after(categorySection);
-  }
   const [sh, sm] = (document.getElementById("practice-starttime-input").value || "09:00").split(":").map(Number);
   let cursor = sh * 60 + sm;
   document.getElementById("timetable-total-duration").textContent = "Total Practice Duration: " + timetableTotalDuration() + " min";
