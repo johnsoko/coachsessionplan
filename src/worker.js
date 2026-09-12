@@ -47,6 +47,7 @@ async function handleApi(request, env, url) {
     const { results } = await env.DB.prepare(
       `SELECT id, title, created_at, updated_at,
               json_extract(data, '$.notes') as notes,
+              json_extract(data, '$.description') as description,
               json_extract(data, '$.tags') as tags,
               json_extract(data, '$.creatorName') as creator_name
        FROM drill_library WHERE user_id = ? ORDER BY updated_at DESC`

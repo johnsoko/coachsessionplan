@@ -885,6 +885,7 @@
   .lib-detail-title { font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
   .lib-detail-meta { font-size: 13px; color: var(--ink-faint); margin-bottom: 14px; }
   .lib-detail-desc { font-size: 14.5px; line-height: 1.6; color: var(--ink); margin-bottom: 16px; white-space: pre-wrap; }
+  .lib-detail-label { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
 </style>
 </head>
 <body>
@@ -5814,7 +5815,12 @@ async function saveStandaloneDrill() {
   const creatorName = (typeof Clerk !== "undefined" && Clerk.user) ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
   const payload = {
     title: ph.title.trim(),
-    data: { surface: ph.surface, scenes: ph.scenes, notes: (ph.noteBlocks || []).filter(t => t.trim()).join(" "), tags: getTags(), creatorName }
+    data: {
+      surface: ph.surface, scenes: ph.scenes,
+      notes: (ph.noteBlocks || []).filter(t => t.trim()).join(" "),
+      description: (drillDescriptionBlocks || []).filter(t => t.trim()).join(" "),
+      tags: getTags(), creatorName
+    }
   };
   try {
     const token = await getAuthToken();
@@ -5888,11 +5894,12 @@ async function syncPhasesToLibrary() {
   if (token) headers["authorization"] = "Bearer " + token;
   for (const ph of toSync) {
     const notes = (ph.noteBlocks || []).filter(t => t.trim()).join(" ");
+    const description = (drillDescriptionBlocks || []).filter(t => t.trim()).join(" ");
     const creatorName = (typeof Clerk !== "undefined" && Clerk.user)
       ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
     const payload = {
       title: ph.title || "Untitled Drill",
-      data: { surface: ph.surface, scenes: ph.scenes, notes, tags: getTags(), creatorName }
+      data: { surface: ph.surface, scenes: ph.scenes, notes, description, tags: getTags(), creatorName }
     };
     try {
       if (ph.libraryDrillId) {
@@ -6400,8 +6407,11 @@ async function openLibraryDrillDetail(id) {
     bodyEl.innerHTML = `
       <div class="lib-detail-title">${escapeHtml(d.title || "Untitled Drill")}</div>
       <div class="lib-detail-meta">${escapeHtml(d.creatorName || "Coach")} &middot; Saved ${updated}</div>
-      <div class="lib-detail-desc">${escapeHtml(d.notes || "No notes yet.")}</div>
+      <div class="lib-detail-label">Description</div>
+      <div class="lib-detail-desc">${escapeHtml(d.description || "No description yet.")}</div>
       <div class="lib-detail-thumb" id="lib-detail-thumb"></div>
+      <div class="lib-detail-label">Notes</div>
+      <div class="lib-detail-desc">${escapeHtml(d.notes || "No notes yet.")}</div>
       <div class="lib-card-tags" style="margin-bottom:16px;">${tagsHTML}</div>
       <div style="display:flex; gap:10px;">
         <button class="btn btn-primary" id="lib-detail-edit-btn">Edit Drill</button>
