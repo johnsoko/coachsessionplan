@@ -52,6 +52,7 @@ async function handleApi(request, env, url) {
       `SELECT id, title, created_at, updated_at,
               json_extract(data, '$.notes') as notes,
               json_extract(data, '$.description') as description,
+              json_extract(data, '$.dimensions') as dimensions,
               json_extract(data, '$.tags') as tags,
               json_extract(data, '$.creatorName') as creator_name,
               json_extract(data, '$.surface') as surface,
