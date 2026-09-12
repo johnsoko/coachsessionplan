@@ -605,6 +605,28 @@
   }
   .modal-card h4 { font-family: var(--display); font-size: 18px; font-weight: 600; margin-bottom: 14px; }
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .modal-card-wide { width: 720px; max-width: 92vw; }
+  .import-phase-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .import-phase-header button { border: none; background: transparent; font-size: 22px; color: var(--ink-faint); }
+  .import-phase-toolbar { margin-bottom: 10px; }
+  .import-phase-tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .import-phase-table-header {
+    display: grid; grid-template-columns: 1fr 1fr 130px; gap: 12px; padding: 0 10px 8px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint);
+    border-bottom: 1px solid var(--line);
+  }
+  .import-phase-rows { max-height: 360px; overflow-y: auto; }
+  .import-phase-row {
+    display: grid; grid-template-columns: 1fr 1fr 130px; gap: 12px; align-items: center;
+    padding: 10px; border-bottom: 1px solid var(--line); cursor: pointer;
+  }
+  .import-phase-row:hover { background: var(--paper-raised); }
+  .import-phase-row-title { display: flex; align-items: center; gap: 10px; }
+  .import-phase-row-thumb { width: 56px; aspect-ratio: 4/2.7; border-radius: 5px; background: var(--pitch); flex-shrink: 0; overflow: hidden; position: relative; }
+  .import-phase-row-title-text { font-weight: 600; font-size: 13.5px; color: var(--ink); }
+  .import-phase-row-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .import-phase-row-date { font-size: 12.5px; color: var(--ink-faint); }
+  .import-phase-pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-size: 12.5px; color: var(--ink-faint); }
 
   .player-name-label {
     position: absolute; pointer-events: none; z-index: 6; transform: translate(-50%, 0);
@@ -949,6 +971,33 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" id="plan-modal-cancel">Cancel</button>
         <button class="btn btn-primary" id="plan-modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="import-phase-modal-overlay">
+    <div class="modal-card modal-card-wide">
+      <div class="import-phase-header">
+        <h4 style="margin-bottom:0;">Import Drill</h4>
+        <button id="import-phase-close-x">&times;</button>
+      </div>
+      <div class="import-phase-toolbar">
+        <input type="text" id="import-phase-search" class="field-input" placeholder="Search drill…">
+      </div>
+      <div class="import-phase-tag-row" id="import-phase-tag-row"></div>
+      <div class="import-phase-table-header">
+        <span>Title</span><span>Tags</span><span>Last Edit</span>
+      </div>
+      <div class="import-phase-rows" id="import-phase-rows"><p class="dash-empty">Loading…</p></div>
+      <div class="import-phase-pagination">
+        <span id="import-phase-page-info"></span>
+        <div>
+          <button id="import-phase-prev" class="btn btn-ghost" style="padding:5px 10px;">&lsaquo;</button>
+          <button id="import-phase-next" class="btn btn-ghost" style="padding:5px 10px;">&rsaquo;</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="import-phase-cancel">Cancel</button>
       </div>
     </div>
   </div>
@@ -4928,13 +4977,154 @@ document.getElementById("phase-more").addEventListener("click", e => {
   menu.style.top  = (btnRect.bottom + 4) + "px";
   menu.classList.toggle("open");
 });
-document.getElementById("phase-import").addEventListener("click", () => {
+/* ─────────────────────────────────────────────────────────
+   IMPORT DRILL (from the Drill Library into the current phase list)
+───────────────────────────────────────────────────────── */
+let importPhaseDrills = [];
+let importPhaseSelectedTags = new Set();
+let importPhasePage = 0;
+const IMPORT_PHASE_PAGE_SIZE = 8;
+
+async function openImportPhaseModal() {
   document.getElementById("phase-more-menu").classList.remove("open");
-  toast("Field variations coming soon");
+  document.getElementById("import-phase-modal-overlay").classList.add("open");
+  document.getElementById("import-phase-search").value = "";
+  importPhaseSelectedTags.clear();
+  importPhasePage = 0;
+  const rowsEl = document.getElementById("import-phase-rows");
+  rowsEl.innerHTML = '<p class="dash-empty">Loading…</p>';
+  try {
+    const token = await getAuthToken();
+    const headers = token ? { authorization: "Bearer " + token } : {};
+    const res = await fetch("/api/drill-library", { headers });
+    if (!res.ok) { rowsEl.innerHTML = '<p class="dash-empty">Could not load your Drill Library.</p>'; return; }
+    const { drills } = await res.json();
+    importPhaseDrills = drills.map(d => {
+      let tags = [];
+      try { tags = JSON.parse(d.tags || "[]"); } catch {}
+      return { ...d, tags: Array.isArray(tags) ? tags : [] };
+    });
+    renderImportPhaseTagRow();
+    renderImportPhaseRows();
+  } catch {
+    rowsEl.innerHTML = '<p class="dash-empty">Could not load your Drill Library — check your connection.</p>';
+  }
+}
+function closeImportPhaseModal() {
+  document.getElementById("import-phase-modal-overlay").classList.remove("open");
+}
+function renderImportPhaseTagRow() {
+  const counts = new Map();
+  importPhaseDrills.forEach(d => d.tags.forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
+  const tagRow = document.getElementById("import-phase-tag-row");
+  const tags = Array.from(counts.keys()).sort();
+  if (!tags.length) { tagRow.innerHTML = ""; return; }
+  tagRow.innerHTML = tags.map(t =>
+    `<button class="dash-filter-tag-chip${importPhaseSelectedTags.has(t) ? " selected" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)} (${counts.get(t)})</button>`
+  ).join("");
+  tagRow.querySelectorAll(".dash-filter-tag-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const tag = chip.dataset.tag;
+      if (importPhaseSelectedTags.has(tag)) importPhaseSelectedTags.delete(tag); else importPhaseSelectedTags.add(tag);
+      importPhasePage = 0;
+      renderImportPhaseTagRow();
+      renderImportPhaseRows();
+    });
+  });
+}
+function getFilteredImportPhaseDrills() {
+  const search = (document.getElementById("import-phase-search").value || "").trim().toLowerCase();
+  return importPhaseDrills.filter(d => {
+    if (search && !(d.title || "").toLowerCase().includes(search)) return false;
+    if (importPhaseSelectedTags.size && !d.tags.some(t => importPhaseSelectedTags.has(t))) return false;
+    return true;
+  });
+}
+function renderImportPhaseRows() {
+  const filtered = getFilteredImportPhaseDrills();
+  const rowsEl = document.getElementById("import-phase-rows");
+  const totalPages = Math.max(1, Math.ceil(filtered.length / IMPORT_PHASE_PAGE_SIZE));
+  importPhasePage = Math.min(importPhasePage, totalPages - 1);
+  const start = importPhasePage * IMPORT_PHASE_PAGE_SIZE;
+  const pageItems = filtered.slice(start, start + IMPORT_PHASE_PAGE_SIZE);
+  if (!importPhaseDrills.length) {
+    rowsEl.innerHTML = '<p class="dash-empty">No drills saved yet — check a drill\'s box and save its practice plan to add it to your library.</p>';
+  } else if (!filtered.length) {
+    rowsEl.innerHTML = '<p class="dash-empty">No drills match your search/filter.</p>';
+  } else {
+    rowsEl.innerHTML = "";
+    pageItems.forEach(d => {
+      const updated = new Date(d.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+      const tagsHTML = d.tags.map(t => `<span class="lib-card-tag">${escapeHtml(t)}</span>`).join("");
+      const row = document.createElement("div");
+      row.className = "import-phase-row";
+      row.innerHTML = `
+        <div class="import-phase-row-title">
+          <div class="import-phase-row-thumb" id="import-phase-thumb-${d.id}"></div>
+          <span class="import-phase-row-title-text">${escapeHtml(d.title || "Untitled Drill")}</span>
+        </div>
+        <div class="import-phase-row-tags">${tagsHTML}</div>
+        <span class="import-phase-row-date">${updated}</span>
+      `;
+      row.addEventListener("click", () => importDrillIntoPhases(d.id, d.title));
+      rowsEl.appendChild(row);
+      hydrateImportPhaseThumb(d.id);
+    });
+  }
+  const count = filtered.length;
+  document.getElementById("import-phase-page-info").textContent =
+    count ? `${start + 1}–${Math.min(start + IMPORT_PHASE_PAGE_SIZE, count)} of ${count}` : "0 of 0";
+  document.getElementById("import-phase-prev").disabled = importPhasePage === 0;
+  document.getElementById("import-phase-next").disabled = importPhasePage >= totalPages - 1;
+}
+async function hydrateImportPhaseThumb(id) {
+  const el = document.getElementById("import-phase-thumb-" + id);
+  if (!el) return;
+  try {
+    const res = await fetch(`/api/drill-library/${id}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (document.getElementById("import-phase-thumb-" + id)) el.innerHTML = phaseThumbHTML({ surface: data.surface, scenes: data.scenes });
+  } catch {}
+}
+async function importDrillIntoPhases(id, title) {
+  try {
+    const res = await fetch(`/api/drill-library/${id}`);
+    if (!res.ok) { toast("Could not load that drill"); return; }
+    const data = await res.json();
+    // fresh ids for every token/shape/scene — this is a new phase in this
+    // session's own drill, not a live link back to the library entry
+    const scenes = (data.scenes && data.scenes.length ? data.scenes : [{ tokens: [], shapes: [] }]).map(sc => ({
+      id: sceneNextId++,
+      tokens: (sc.tokens || []).map(t => ({ ...t, id: nextId++ })),
+      shapes: (sc.shapes || []).map(s => ({ ...s, id: nextId++ }))
+    }));
+    const newPhase = {
+      id: phaseNextId++, surface: data.surface || "full", scenes, activeSceneId: scenes[0].id,
+      noteBlocks: [data.notes || ""], title: title || "", duration: ""
+    };
+    saveActivePhase();
+    const insertAt = phases.findIndex(p => p.id === activePhaseId);
+    phases.splice(insertAt === -1 ? phases.length : insertAt + 1, 0, newPhase);
+    loadPhase(newPhase.id);
+    renderPhaseList();
+    closeImportPhaseModal();
+    toast(`Imported "${title || "drill"}"`);
+  } catch {
+    toast("Could not import that drill — check your connection");
+  }
+}
+document.getElementById("import-phase-search").addEventListener("input", () => { importPhasePage = 0; renderImportPhaseRows(); });
+document.getElementById("import-phase-prev").addEventListener("click", () => { importPhasePage--; renderImportPhaseRows(); });
+document.getElementById("import-phase-next").addEventListener("click", () => { importPhasePage++; renderImportPhaseRows(); });
+document.getElementById("import-phase-cancel").addEventListener("click", closeImportPhaseModal);
+document.getElementById("import-phase-close-x").addEventListener("click", closeImportPhaseModal);
+document.getElementById("import-phase-modal-overlay").addEventListener("click", e => {
+  if (e.target.id === "import-phase-modal-overlay") closeImportPhaseModal();
 });
-document.getElementById("phase-import-mobile").addEventListener("click", () => {
-  toast("Field variations coming soon");
-});
+
+document.getElementById("phase-import").addEventListener("click", openImportPhaseModal);
+document.getElementById("phase-import-mobile").addEventListener("click", openImportPhaseModal);
 
 /* ─────────────────────────────────────────────────────────
    OBJECTS LIST
