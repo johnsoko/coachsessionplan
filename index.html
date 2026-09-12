@@ -5612,7 +5612,11 @@ let currentStandaloneDrillId = null;
 function applyStandaloneDrillModeUI() {
   // Session title stays visible in both the topbar and the Details tab
   // for the standalone drill creator too — previously hidden here, but
-  // brought back per request.
+  // brought back per request. The placeholder just reads differently
+  // since there's no "session" here, only a single drill.
+  const placeholder = isStandaloneDrillMode ? "Enter Drill Title" : "Enter Session Title";
+  document.getElementById("title-input").placeholder = placeholder;
+  document.getElementById("notes-title-input").placeholder = placeholder;
 }
 
 function getTags() {
