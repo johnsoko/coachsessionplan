@@ -4063,7 +4063,9 @@ function renderPhaseList() {
     div.className = "phase-thumb" + (ph.id === activePhaseId ? " active" : "");
     div.draggable = false;
     div.dataset.phaseId = ph.id;
-    const libraryControlHTML = ph.libraryDrillId
+    const libraryControlHTML = isStandaloneDrillMode
+      ? "" // every drill saved from the standalone drill creator already goes to the library — no need to ask
+      : ph.libraryDrillId
       ? `<button class="phase-thumb-library-badge" title="In Drill Library">${LIBRARY_BADGE_SVG}</button>`
       : `<input type="checkbox" class="phase-thumb-library-check" title="Select for Drill Library" ${selectedForLibraryPhaseIds.has(ph.id) ? "checked" : ""}>`;
     div.innerHTML = phaseThumbHTML(ph) +
@@ -4587,24 +4589,26 @@ function renderPhaseNotes() {
 
     const actions = document.createElement("div");
     actions.className = "phase-note-row-actions";
-    let libControl;
-    if (ph.libraryDrillId) {
-      libControl = document.createElement("button");
-      libControl.className = "phase-note-library-badge";
-      libControl.title = "In Drill Library";
-      libControl.innerHTML = LIBRARY_BADGE_SVG;
-      libControl.addEventListener("click", () => toast("Already in your Drill Library")); // opening it directly is coming later
-    } else {
-      libControl = document.createElement("input");
-      libControl.type = "checkbox";
-      libControl.className = "phase-note-library-check";
-      libControl.title = "Select for Drill Library";
-      libControl.checked = selectedForLibraryPhaseIds.has(ph.id);
-      libControl.addEventListener("change", () => {
-        if (libControl.checked) selectedForLibraryPhaseIds.add(ph.id); else selectedForLibraryPhaseIds.delete(ph.id);
-        const thumbCheck = document.querySelector(`.phase-thumb[data-phase-id="${ph.id}"] .phase-thumb-library-check`);
-        if (thumbCheck) thumbCheck.checked = libControl.checked;
-      });
+    let libControl = null;
+    if (!isStandaloneDrillMode) {
+      if (ph.libraryDrillId) {
+        libControl = document.createElement("button");
+        libControl.className = "phase-note-library-badge";
+        libControl.title = "In Drill Library";
+        libControl.innerHTML = LIBRARY_BADGE_SVG;
+        libControl.addEventListener("click", () => toast("Already in your Drill Library")); // opening it directly is coming later
+      } else {
+        libControl = document.createElement("input");
+        libControl.type = "checkbox";
+        libControl.className = "phase-note-library-check";
+        libControl.title = "Select for Drill Library";
+        libControl.checked = selectedForLibraryPhaseIds.has(ph.id);
+        libControl.addEventListener("change", () => {
+          if (libControl.checked) selectedForLibraryPhaseIds.add(ph.id); else selectedForLibraryPhaseIds.delete(ph.id);
+          const thumbCheck = document.querySelector(`.phase-thumb[data-phase-id="${ph.id}"] .phase-thumb-library-check`);
+          if (thumbCheck) thumbCheck.checked = libControl.checked;
+        });
+      }
     }
     const dupBtn = document.createElement("button");
     dupBtn.title = "Duplicate";
@@ -4626,7 +4630,8 @@ function renderPhaseNotes() {
       deletePhase(ph.id);
       renderPhaseNotes();
     });
-    actions.appendChild(libControl); actions.appendChild(dupBtn); actions.appendChild(delBtn);
+    if (libControl) actions.appendChild(libControl);
+    actions.appendChild(dupBtn); actions.appendChild(delBtn);
 
     card.appendChild(handle);
     if (!isStandaloneDrillMode) card.appendChild(timeWrap);
@@ -6212,6 +6217,7 @@ function openStandaloneDrillEditorBlank() {
   isStandaloneDrillMode = true;
   currentStandaloneDrillId = null;
   applyStandaloneDrillModeUI();
+  renderPhaseList(); // seedFreshDrill() already rendered this once, but before the flag flipped — redo it now
   renderPhaseNotes(); // refresh Details in case it's revisited — hides scheduling fields immediately
 }
 
