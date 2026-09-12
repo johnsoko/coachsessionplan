@@ -5281,7 +5281,11 @@ function renderModeContent(mode) {
 }
 function switchMode(mode) {
   currentMode = mode;
-  sessionStorage.setItem("lastMode", mode); // survives a refresh so we can reopen on the same tab
+  // survives a refresh so a practice plan reopens on the same tab — but
+  // skipped in the standalone drill creator, which should always start
+  // fresh on Create each time, and shouldn't leave behind a stale tab
+  // that would otherwise leak into the next *practice plan* session
+  if (!isStandaloneDrillMode) sessionStorage.setItem("lastMode", mode);
   document.querySelectorAll(".mode-tab").forEach(t => t.classList.toggle("active", t.dataset.mode === mode));
   const modeLabels = { draw: "Create", notes: "Details", output: "Output" };
   const mobileLabel = document.getElementById("mobile-mode-label");
@@ -5663,7 +5667,7 @@ function showScreen(name) {
   // remembers which of the two "real" app screens was last active, so a
   // refresh lands back on the editor rather than bouncing to the
   // dashboard just because there's no ?id= for an unsaved new plan yet
-  if (name === "app" || name === "dashboard") sessionStorage.setItem("lastScreen", name);
+  if (["app", "dashboard", "library", "library-detail"].includes(name)) sessionStorage.setItem("lastScreen", name);
   document.getElementById("initial-loading").style.display = "none";
   document.getElementById("landing-screen").style.display = name === "landing" ? "flex" : "none";
   document.getElementById("signin-screen").style.display = name === "signin" ? "flex" : "none";
@@ -5768,11 +5772,19 @@ function refreshAuthUI() {
         showScreen("app");
         switchMode(sessionStorage.getItem("lastMode") || "draw");
         requestAnimationFrame(() => resizeCanvas());
-      } else if (sessionStorage.getItem("lastScreen") === "app") {
-        seedFreshDrill();
       } else {
-        showScreen("dashboard");
-        renderDashboardPlans();
+        const lastScreen = sessionStorage.getItem("lastScreen");
+        if (lastScreen === "app") {
+          seedFreshDrill();
+        } else if (lastScreen === "library") {
+          showScreen("library");
+          renderLibraryGrid();
+        } else if (lastScreen === "library-detail" && sessionStorage.getItem("lastLibraryDetailId")) {
+          openLibraryDrillDetail(sessionStorage.getItem("lastLibraryDetailId"));
+        } else {
+          showScreen("dashboard");
+          renderDashboardPlans();
+        }
       }
     }
   } else {
@@ -6375,6 +6387,7 @@ function renderLibraryTagList() {
 }
 
 async function openLibraryDrillDetail(id) {
+  sessionStorage.setItem("lastLibraryDetailId", id);
   showScreen("library-detail");
   const bodyEl = document.getElementById("lib-detail-body");
   bodyEl.innerHTML = '<p class="dash-empty">Loading…</p>';
