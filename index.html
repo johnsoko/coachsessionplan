@@ -758,7 +758,7 @@
      update reads as a transition rather than a hard jump (landing-screen
      has its own separate fonts-ready fade, handled above, so it's left
      out here to avoid the two competing) */
-  #signin-screen.screen-enter, #dashboard-screen.screen-enter, #drills-page-screen.screen-enter, #library-screen.screen-enter, #library-detail-screen.screen-enter, #app-shell.screen-enter {
+  #signin-screen.screen-enter, #dashboard-screen.screen-enter, #library-screen.screen-enter, #library-detail-screen.screen-enter, #app-shell.screen-enter {
     animation: screenFadeIn 0.25s ease;
   }
   .landing-inner { max-width: 560px; text-align: center; }
@@ -1021,24 +1021,6 @@
   </div>
 
   <!-- ══════════════════════════ DRILL LIBRARY ══════════════════════════ -->
-  <!-- ══════════════════════════ DRILLS (standalone) ══════════════════════════ -->
-  <div id="drills-page-screen" style="display:none;">
-    <div class="dash-sidebar">
-      <div class="dash-logo">coachsessionplan</div>
-      <div class="dash-section-label">Practice Planning</div>
-      <button class="dash-nav-item active" id="drills-page-nav-drills">Drills</button>
-      <button class="dash-nav-item" id="drills-page-nav-plans">Practice Plans</button>
-      <button class="dash-nav-item" id="drills-page-nav-library">Drill Library</button>
-    </div>
-    <div class="dash-main">
-      <div class="dash-header">
-        <h1>Drills</h1>
-        <button class="btn btn-primary" id="drills-page-new-btn">+ New Drill</button>
-      </div>
-      <div class="lib-grid" id="drills-page-grid"><p class="dash-empty">Loading…</p></div>
-    </div>
-  </div>
-
   <div id="library-screen" style="display:none;">
     <div class="dash-sidebar">
       <div class="dash-logo">coachsessionplan</div>
@@ -5671,7 +5653,6 @@ function showScreen(name) {
   document.getElementById("landing-screen").style.display = name === "landing" ? "flex" : "none";
   document.getElementById("signin-screen").style.display = name === "signin" ? "flex" : "none";
   document.getElementById("dashboard-screen").style.display = name === "dashboard" ? "flex" : "none";
-  document.getElementById("drills-page-screen").style.display = name === "drills-page" ? "flex" : "none";
   document.getElementById("library-screen").style.display = name === "library" ? "flex" : "none";
   document.getElementById("library-detail-screen").style.display = name === "library-detail" ? "block" : "none";
   document.getElementById("app-shell").style.display = name === "app" ? "block" : "none";
@@ -5680,7 +5661,6 @@ function showScreen(name) {
   // re-adding the class (forcing a reflow in between so it re-triggers)
   const el = name === "signin" ? document.getElementById("signin-screen")
     : name === "dashboard" ? document.getElementById("dashboard-screen")
-    : name === "drills-page" ? document.getElementById("drills-page-screen")
     : name === "library" ? document.getElementById("library-screen")
     : name === "library-detail" ? document.getElementById("library-detail-screen")
     : name === "app" ? document.getElementById("app-shell") : null;
@@ -6207,52 +6187,10 @@ async function openPracticePlan(id) {
    DRILL LIBRARY
 ═════════════════════════════════════════════════════════════════════ */
 /* ═════════════════════════════════════════════════════════════════════
-   DRILLS PAGE (standalone drill creation/management)
+   STANDALONE DRILL EDITOR (from the "Drills" nav item — a shortcut
+   straight into the editor for a new drill; editing an existing one only
+   happens from the Drill Library's detail page)
 ═════════════════════════════════════════════════════════════════════ */
-async function renderDrillsPageGrid() {
-  const gridEl = document.getElementById("drills-page-grid");
-  gridEl.innerHTML = '<p class="dash-empty">Loading…</p>';
-  try {
-    const token = await getAuthToken();
-    const headers = token ? { authorization: "Bearer " + token } : {};
-    const res = await fetch("/api/drill-library", { headers });
-    if (!res.ok) { gridEl.innerHTML = '<p class="dash-empty">Could not load your drills.</p>'; return; }
-    const { drills } = await res.json();
-    if (!drills.length) {
-      gridEl.innerHTML = '<p class="dash-empty">No drills yet — click "+ New Drill" to create your first one.</p>';
-      return;
-    }
-    gridEl.innerHTML = "";
-    drills.forEach(d => {
-      const updated = new Date(d.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
-      let tags = [];
-      try { tags = JSON.parse(d.tags || "[]"); } catch {}
-      const tagsHTML = (Array.isArray(tags) ? tags : []).map(t => `<span class="lib-card-tag">${escapeHtml(t)}</span>`).join("");
-      const card = document.createElement("div");
-      card.className = "lib-card";
-      card.innerHTML = `
-        <div class="lib-card-thumb" id="lib-thumb-${d.id}"></div>
-        <button class="lib-card-del" title="Delete drill"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 3.5h7M4.5 3.5V2h3v1.5M3.3 3.5l.5 7h4.4l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        <div class="lib-card-body">
-          <div class="lib-card-title">${escapeHtml(d.title || "Untitled Drill")}</div>
-          <div class="lib-card-meta">Last edited ${updated}</div>
-          <div class="lib-card-desc">${escapeHtml(d.notes || "")}</div>
-          <div class="lib-card-tags">${tagsHTML}</div>
-        </div>
-      `;
-      card.addEventListener("click", () => openStandaloneDrillEditorExisting(d.id));
-      card.querySelector(".lib-card-del").addEventListener("click", e => {
-        e.stopPropagation();
-        deleteLibraryDrill(d.id, d.title, renderDrillsPageGrid);
-      });
-      gridEl.appendChild(card);
-      hydrateLibraryCardThumb(d.id);
-    });
-  } catch {
-    gridEl.innerHTML = '<p class="dash-empty">Could not load your drills — check your connection.</p>';
-  }
-}
-
 function openStandaloneDrillEditorBlank() {
   seedFreshDrill(); // resets to one blank phase, "draw" mode, isStandaloneDrillMode=false by default
   isStandaloneDrillMode = true;
@@ -6294,20 +6232,7 @@ async function openStandaloneDrillEditorExisting(id) {
   }
 }
 
-document.getElementById("drills-page-new-btn").addEventListener("click", openStandaloneDrillEditorBlank);
-document.getElementById("dash-nav-drills").addEventListener("click", () => {
-  showScreen("drills-page");
-  renderDrillsPageGrid();
-});
-document.getElementById("drills-page-nav-plans").addEventListener("click", () => {
-  showScreen("dashboard");
-  renderDashboardPlans();
-});
-document.getElementById("drills-page-nav-library").addEventListener("click", () => {
-  showScreen("library");
-  renderLibraryGrid();
-});
-document.getElementById("drills-page-nav-drills").addEventListener("click", () => {}); // already here
+document.getElementById("dash-nav-drills").addEventListener("click", openStandaloneDrillEditorBlank);
 
 let allLibraryDrills = [];
 let selectedLibraryTags = new Set();
@@ -6441,9 +6366,13 @@ async function openLibraryDrillDetail(id) {
       <div class="lib-detail-meta">${escapeHtml(d.creatorName || "Coach")} &middot; Saved ${updated}</div>
       <div class="lib-card-tags" style="margin-bottom:16px;">${tagsHTML}</div>
       <div class="lib-detail-desc">${escapeHtml(d.notes || "No notes yet.")}</div>
-      <button class="btn btn-ghost" id="lib-detail-del-btn" style="color:#B3452C;">Delete from Library</button>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-primary" id="lib-detail-edit-btn">Edit Drill</button>
+        <button class="btn btn-ghost" id="lib-detail-del-btn" style="color:#B3452C;">Delete from Library</button>
+      </div>
     `;
     document.getElementById("lib-detail-thumb").appendChild(createAnimatedThumb({ surface: d.surface, scenes: d.scenes }, "lib-detail-thumb-inner"));
+    document.getElementById("lib-detail-edit-btn").addEventListener("click", () => openStandaloneDrillEditorExisting(d.id));
     document.getElementById("lib-detail-del-btn").addEventListener("click", () => {
       deleteLibraryDrill(d.id, d.title, () => { showScreen("library"); renderLibraryGrid(); });
     });
@@ -6479,8 +6408,8 @@ document.getElementById("close-btn").addEventListener("click", () => {
   // dashboard visually
   history.replaceState(null, "", location.pathname);
   if (isStandaloneDrillMode) {
-    showScreen("drills-page");
-    renderDrillsPageGrid();
+    showScreen("library");
+    renderLibraryGrid();
   } else {
     showScreen("dashboard");
     renderDashboardPlans();
