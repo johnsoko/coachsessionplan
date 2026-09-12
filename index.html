@@ -4604,7 +4604,7 @@ function renderPhaseNotes() {
     const dimensionsInput = document.createElement("input");
     dimensionsInput.type = "text";
     dimensionsInput.className = "field-input phase-note-drill-title";
-    dimensionsInput.placeholder = "Activity Dimensions";
+    dimensionsInput.placeholder = "Dimensions";
     dimensionsInput.value = ph.dimensions || "";
     dimensionsInput.addEventListener("input", () => { ph.dimensions = dimensionsInput.value; });
     const titleOverlay = document.createElement("div");
