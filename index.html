@@ -4613,11 +4613,6 @@ function renderPhaseNotes() {
     thumb.appendChild(titleOverlay);
     exerciseWrap.appendChild(dimensionsInput);
     exerciseWrap.appendChild(thumb);
-    const importBtn = document.createElement("button");
-    importBtn.className = "phase-note-add-exercise";
-    importBtn.textContent = "+ Add Exercise";
-    importBtn.addEventListener("click", () => { loadPhase(ph.id); openImportPhaseModal(); });
-    if (!isStandaloneDrillMode) exerciseWrap.appendChild(importBtn);
 
     const notesWrap = document.createElement("div");
     notesWrap.className = "phase-note-notes note-blocks";
