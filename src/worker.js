@@ -39,6 +39,39 @@ async function getUserId(request, env) {
 async function handleApi(request, env, url) {
   const parts = url.pathname.split("/").filter(Boolean); // ["api","drills", maybe ":id"]
 
+  // POST /api/drill-library — create a new library drill from a phase's
+  // saved data. Requires sign-in. Returns the new id.
+  if (request.method === "POST" && parts.length === 2 && parts[1] === "drill-library") {
+    const userId = await getUserId(request, env);
+    if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
+    const body = await request.json();
+    const id = newId();
+    const now = Date.now();
+    await env.DB.prepare(
+      "INSERT INTO drill_library (id, user_id, title, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(id, userId, body.title || "Untitled Drill", JSON.stringify(body.data || {}), now, now).run();
+    return jsonResponse({ id });
+  }
+
+  // PUT /api/drill-library/:id — update an existing library drill (keeps
+  // it in sync with its source phase on later saves). Requires sign-in
+  // and ownership.
+  if (request.method === "PUT" && parts.length === 3 && parts[1] === "drill-library") {
+    const userId = await getUserId(request, env);
+    if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
+    const id = parts[2];
+    const existing = await env.DB.prepare("SELECT user_id FROM drill_library WHERE id = ?").bind(id).first();
+    if (!existing) return jsonResponse({ error: "Not found" }, 404);
+    if (existing.user_id && existing.user_id !== userId) {
+      return jsonResponse({ error: "You don't own this drill" }, 403);
+    }
+    const body = await request.json();
+    await env.DB.prepare(
+      "UPDATE drill_library SET title = ?, data = ?, updated_at = ? WHERE id = ?"
+    ).bind(body.title || "Untitled Drill", JSON.stringify(body.data || {}), Date.now(), id).run();
+    return jsonResponse({ ok: true });
+  }
+
   // GET /api/drills — list every practice plan the signed-in user owns,
   // for the dashboard. Requires sign-in.
   if (request.method === "GET" && parts.length === 2 && parts[1] === "drills") {

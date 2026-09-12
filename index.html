@@ -147,6 +147,11 @@
     position: absolute; bottom: 7px; right: 7px; z-index: 4; width: 17px; height: 17px; cursor: pointer;
     accent-color: var(--bib);
   }
+  .phase-thumb-library-badge {
+    position: absolute; top: 7px; left: 7px; z-index: 4; width: 20px; height: 20px; border-radius: 5px;
+    border: none; background: rgba(27,33,28,0.55); color: var(--bib); display: flex; align-items: center; justify-content: center;
+  }
+  .phase-thumb-library-badge:hover { background: rgba(27,33,28,0.75); }
 
   .phase-thumb-bar {
     position: absolute; top: 0; left: 0; right: 0; z-index: 3; cursor: grab;
@@ -389,6 +394,11 @@
   }
   .phase-note-row-actions { display: flex; flex-direction: column; gap: 4px; align-items: center; }
   .phase-note-library-check { width: 15px; height: 15px; cursor: pointer; accent-color: var(--bib); margin-bottom: 2px; }
+  .phase-note-library-badge {
+    width: 24px; height: 24px; border-radius: 5px; border: none; background: transparent; color: var(--bib);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 2px;
+  }
+  .phase-note-library-badge:hover { background: var(--paper-raised); }
   .phase-note-row-actions button {
     width: 24px; height: 24px; border-radius: 5px; border: none; background: transparent; color: var(--ink-faint);
     display: flex; align-items: center; justify-content: center;
@@ -3584,6 +3594,7 @@ let draggedPhaseId = null;
 // creating the same drill repeatedly would otherwise flood the library
 // with duplicates. Not yet wired to an actual "add to library" action.
 let selectedForLibraryPhaseIds = new Set();
+const LIBRARY_BADGE_SVG = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 1.5h6a.5.5 0 0 1 .5.5v9l-3.5-2-3.5 2v-9a.5.5 0 0 1 .5-.5z" fill="currentColor"/></svg>`;
 
 // contentSrc supplies the tokens/shapes to copy (or null for blank);
 // token ids are preserved on the copy (not reassigned) so scene-to-scene
@@ -3941,9 +3952,12 @@ function renderPhaseList() {
     div.className = "phase-thumb" + (ph.id === activePhaseId ? " active" : "");
     div.draggable = false;
     div.dataset.phaseId = ph.id;
+    const libraryControlHTML = ph.libraryDrillId
+      ? `<button class="phase-thumb-library-badge" title="In Drill Library">${LIBRARY_BADGE_SVG}</button>`
+      : `<input type="checkbox" class="phase-thumb-library-check" title="Select for Drill Library" ${selectedForLibraryPhaseIds.has(ph.id) ? "checked" : ""}>`;
     div.innerHTML = phaseThumbHTML(ph) +
-      `<input type="checkbox" class="phase-thumb-library-check" title="Select for Drill Library" ${selectedForLibraryPhaseIds.has(ph.id) ? "checked" : ""}>
-      <div class="phase-thumb-bar">
+      libraryControlHTML +
+      `<div class="phase-thumb-bar">
         <div class="phase-thumb-grip">
           <span class="phase-thumb-grip-dots"><span></span><span></span><span></span><span></span><span></span><span></span></span>
         </div>
@@ -3952,12 +3966,21 @@ function renderPhaseList() {
       </div>`;
     div.addEventListener("click", () => loadPhase(ph.id));
     const libCheck = div.querySelector(".phase-thumb-library-check");
-    libCheck.addEventListener("click", e => e.stopPropagation());
-    libCheck.addEventListener("change", () => {
-      if (libCheck.checked) selectedForLibraryPhaseIds.add(ph.id); else selectedForLibraryPhaseIds.delete(ph.id);
-      const notesCheck = document.querySelector(`.phase-note-card[data-phase-id="${ph.id}"] .phase-note-library-check`);
-      if (notesCheck) notesCheck.checked = libCheck.checked;
-    });
+    if (libCheck) {
+      libCheck.addEventListener("click", e => e.stopPropagation());
+      libCheck.addEventListener("change", () => {
+        if (libCheck.checked) selectedForLibraryPhaseIds.add(ph.id); else selectedForLibraryPhaseIds.delete(ph.id);
+        const notesCheck = document.querySelector(`.phase-note-card[data-phase-id="${ph.id}"] .phase-note-library-check`);
+        if (notesCheck) notesCheck.checked = libCheck.checked;
+      });
+    }
+    const libBadge = div.querySelector(".phase-thumb-library-badge");
+    if (libBadge) {
+      libBadge.addEventListener("click", e => {
+        e.stopPropagation();
+        toast("Saved to your Drill Library"); // opening the library entry directly is coming later
+      });
+    }
     const labelInput = div.querySelector(".phase-thumb-label-input");
     // clicking/typing in the name field should never arm dragging or get
     // swallowed by the card's own "select this phase" click handler
@@ -4446,16 +4469,25 @@ function renderPhaseNotes() {
 
     const actions = document.createElement("div");
     actions.className = "phase-note-row-actions";
-    const libCheck = document.createElement("input");
-    libCheck.type = "checkbox";
-    libCheck.className = "phase-note-library-check";
-    libCheck.title = "Select for Drill Library";
-    libCheck.checked = selectedForLibraryPhaseIds.has(ph.id);
-    libCheck.addEventListener("change", () => {
-      if (libCheck.checked) selectedForLibraryPhaseIds.add(ph.id); else selectedForLibraryPhaseIds.delete(ph.id);
-      const thumbCheck = document.querySelector(`.phase-thumb[data-phase-id="${ph.id}"] .phase-thumb-library-check`);
-      if (thumbCheck) thumbCheck.checked = libCheck.checked;
-    });
+    let libControl;
+    if (ph.libraryDrillId) {
+      libControl = document.createElement("button");
+      libControl.className = "phase-note-library-badge";
+      libControl.title = "In Drill Library";
+      libControl.innerHTML = LIBRARY_BADGE_SVG;
+      libControl.addEventListener("click", () => toast("Saved to your Drill Library")); // opening it directly is coming later
+    } else {
+      libControl = document.createElement("input");
+      libControl.type = "checkbox";
+      libControl.className = "phase-note-library-check";
+      libControl.title = "Select for Drill Library";
+      libControl.checked = selectedForLibraryPhaseIds.has(ph.id);
+      libControl.addEventListener("change", () => {
+        if (libControl.checked) selectedForLibraryPhaseIds.add(ph.id); else selectedForLibraryPhaseIds.delete(ph.id);
+        const thumbCheck = document.querySelector(`.phase-thumb[data-phase-id="${ph.id}"] .phase-thumb-library-check`);
+        if (thumbCheck) thumbCheck.checked = libControl.checked;
+      });
+    }
     const dupBtn = document.createElement("button");
     dupBtn.title = "Duplicate";
     dupBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="4.5" width="7.5" height="8.5" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 4.5V3a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H11" stroke="currentColor" stroke-width="1.2"/></svg>`;
@@ -4476,7 +4508,7 @@ function renderPhaseNotes() {
       deletePhase(ph.id);
       renderPhaseNotes();
     });
-    actions.appendChild(libCheck); actions.appendChild(dupBtn); actions.appendChild(delBtn);
+    actions.appendChild(libControl); actions.appendChild(dupBtn); actions.appendChild(delBtn);
 
     card.appendChild(handle); card.appendChild(timeWrap); card.appendChild(exerciseWrap); card.appendChild(notesWrap); card.appendChild(actions);
 
@@ -5503,10 +5535,40 @@ async function saveDrill() {
     history.replaceState(null, "", "?id=" + json.id);
     const shareUrl = location.origin + location.pathname + "?id=" + json.id;
     try { await navigator.clipboard.writeText(shareUrl); } catch {}
+    await syncPhasesToLibrary();
     toast("Session saved");
   } catch (err) {
     toast("Save failed — check your connection and try again");
   }
+}
+
+// Syncs any phase that's either newly checked for the library, or was
+// already linked to a library drill from a previous save, so edits keep
+// flowing to the library copy automatically without creating duplicates.
+// Unchecking a phase never deletes its library copy — it just stops
+// further updates; removal is a deliberate action from elsewhere.
+async function syncPhasesToLibrary() {
+  const toSync = phases.filter(ph => selectedForLibraryPhaseIds.has(ph.id) || ph.libraryDrillId);
+  if (!toSync.length) return;
+  const token = await getAuthToken();
+  const headers = { "content-type": "application/json" };
+  if (token) headers["authorization"] = "Bearer " + token;
+  for (const ph of toSync) {
+    const payload = { title: ph.title || "Untitled Drill", data: { surface: ph.surface, scenes: ph.scenes } };
+    try {
+      if (ph.libraryDrillId) {
+        await fetch(`/api/drill-library/${ph.libraryDrillId}`, { method: "PUT", headers, body: JSON.stringify(payload) });
+      } else {
+        const res = await fetch("/api/drill-library", { method: "POST", headers, body: JSON.stringify(payload) });
+        if (res.ok) {
+          const json = await res.json();
+          ph.libraryDrillId = json.id;
+        }
+      }
+    } catch {}
+    selectedForLibraryPhaseIds.delete(ph.id);
+  }
+  renderModeContent(currentMode);
 }
 
 async function loadDrillFromUrl() {
