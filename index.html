@@ -6398,11 +6398,11 @@ async function openLibraryDrillDetail(id) {
     const updated = new Date(d.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
     const tagsHTML = (d.tags || []).map(t => `<span class="lib-card-tag">${escapeHtml(t)}</span>`).join("");
     bodyEl.innerHTML = `
-      <div class="lib-detail-thumb" id="lib-detail-thumb"></div>
       <div class="lib-detail-title">${escapeHtml(d.title || "Untitled Drill")}</div>
       <div class="lib-detail-meta">${escapeHtml(d.creatorName || "Coach")} &middot; Saved ${updated}</div>
-      <div class="lib-card-tags" style="margin-bottom:16px;">${tagsHTML}</div>
       <div class="lib-detail-desc">${escapeHtml(d.notes || "No notes yet.")}</div>
+      <div class="lib-detail-thumb" id="lib-detail-thumb"></div>
+      <div class="lib-card-tags" style="margin-bottom:16px;">${tagsHTML}</div>
       <div style="display:flex; gap:10px;">
         <button class="btn btn-primary" id="lib-detail-edit-btn">Edit Drill</button>
         <button class="btn btn-ghost" id="lib-detail-del-btn" style="color:#B3452C;">Delete from Library</button>
