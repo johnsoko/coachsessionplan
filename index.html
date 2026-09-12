@@ -4391,6 +4391,16 @@ async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
   baseOpts = baseOpts || {};
   if (activeThumbAnimations.has(containerEl)) { activeThumbAnimations.get(containerEl).stop(); return; }
   let stopped = false;
+  // isConnected catches the case a manual stop() never will: the container
+  // gets removed from the DOM entirely (navigating away, a parent list
+  // re-rendering) while this animation is still mid-flight. Without this,
+  // the requestAnimationFrame loop below just runs forever in the
+  // background — every scene, every wait — since nothing ever calls
+  // stop() for it. Play a handful of thumbnails across a long session
+  // without explicitly stopping each one and these pile up, each still
+  // competing for frame time, which is enough to make other animations
+  // (including the main editor's own scene transitions) visibly choppy.
+  const isDone = () => stopped || !containerEl.isConnected;
   activeThumbAnimations.set(containerEl, { stop: () => { stopped = true; } });
   if (playBtnEl) playBtnEl.classList.add("playing");
 
@@ -4400,7 +4410,7 @@ async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
   function wait(ms) {
     return new Promise(resolve => {
       const start = performance.now();
-      function check(now) { if (stopped || now - start >= ms) { resolve(); return; } requestAnimationFrame(check); }
+      function check(now) { if (isDone() || now - start >= ms) { resolve(); return; } requestAnimationFrame(check); }
       requestAnimationFrame(check);
     });
   }
@@ -4408,7 +4418,7 @@ async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
     return new Promise(resolve => {
       const start = performance.now();
       function frame(now) {
-        if (stopped) { resolve(); return; }
+        if (isDone()) { resolve(); return; }
         const t = Math.min(1, (now - start) / duration);
         const e = easeInOutThumb(t);
         const interpolated = toTokens.map(tok => {
@@ -4428,7 +4438,7 @@ async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
       const start = performance.now();
       const ids = shapes.map(s => s.id);
       function frame(now) {
-        if (stopped) { resolve(); return; }
+        if (isDone()) { resolve(); return; }
         const t = Math.min(1, (now - start) / duration);
         const prog = {}; ids.forEach(id => prog[id] = t);
         render({ tokens: tokensSnapshot, shapes }, prog);
@@ -4438,7 +4448,7 @@ async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
     });
   }
 
-  for (let i = 0; i < ph.scenes.length && !stopped; i++) {
+  for (let i = 0; i < ph.scenes.length && !isDone(); i++) {
     const scene = ph.scenes[i];
     const hideProg = Object.fromEntries(scene.shapes.map(s => [s.id, 0]));
     if (i === 0) {
@@ -4448,16 +4458,16 @@ async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
       const prev = ph.scenes[i - 1];
       render({ tokens: prev.tokens, shapes: scene.shapes }, hideProg);
       await tweenTokens(prev.tokens, scene.tokens, scene.shapes, 700, hideProg);
-      if (stopped) break;
+      if (isDone()) break;
       await wipeInShapesThumb(scene.tokens, scene.shapes, 500);
     }
-    if (stopped) break;
+    if (isDone()) break;
     await wait(650);
   }
 
   activeThumbAnimations.delete(containerEl);
   if (playBtnEl) playBtnEl.classList.remove("playing");
-  render(null, null); // settle back to the static Scene 1 identity frame
+  if (containerEl.isConnected) render(null, null); // settle back to the static Scene 1 identity frame
 }
 
 // used by Notes and Output previews — the play button sits as a sibling
@@ -5021,7 +5031,9 @@ async function openImportPhaseModal() {
     importPhaseDrills = drills.map(d => {
       let tags = [];
       try { tags = JSON.parse(d.tags || "[]"); } catch {}
-      return { ...d, tags: Array.isArray(tags) ? tags : [] };
+      let scenes = [];
+      try { scenes = JSON.parse(d.scenes || "[]"); } catch {}
+      return { ...d, tags: Array.isArray(tags) ? tags : [], scenes: Array.isArray(scenes) ? scenes : [] };
     });
     renderImportPhaseTagRow();
     renderImportPhaseRows();
@@ -5087,7 +5099,9 @@ function renderImportPhaseRows() {
       `;
       row.addEventListener("click", () => importDrillIntoPhases(d.id, d.title));
       rowsEl.appendChild(row);
-      hydrateImportPhaseThumb(d.id);
+      // surface/scenes come straight from the list response now — no
+      // per-row follow-up fetch needed
+      document.getElementById("import-phase-thumb-" + d.id).innerHTML = phaseThumbHTML({ surface: d.surface, scenes: d.scenes });
     });
   }
   const count = filtered.length;
@@ -5095,16 +5109,6 @@ function renderImportPhaseRows() {
     count ? `${start + 1}–${Math.min(start + IMPORT_PHASE_PAGE_SIZE, count)} of ${count}` : "0 of 0";
   document.getElementById("import-phase-prev").disabled = importPhasePage === 0;
   document.getElementById("import-phase-next").disabled = importPhasePage >= totalPages - 1;
-}
-async function hydrateImportPhaseThumb(id) {
-  const el = document.getElementById("import-phase-thumb-" + id);
-  if (!el) return;
-  try {
-    const res = await fetch(`/api/drill-library/${id}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    if (document.getElementById("import-phase-thumb-" + id)) el.innerHTML = phaseThumbHTML({ surface: data.surface, scenes: data.scenes });
-  } catch {}
 }
 async function importDrillIntoPhases(id, title) {
   try {
@@ -6292,7 +6296,9 @@ async function renderLibraryGrid() {
     allLibraryDrills = drills.map(d => {
       let tags = [];
       try { tags = JSON.parse(d.tags || "[]"); } catch {}
-      return { ...d, tags: Array.isArray(tags) ? tags : [] };
+      let scenes = [];
+      try { scenes = JSON.parse(d.scenes || "[]"); } catch {}
+      return { ...d, tags: Array.isArray(tags) ? tags : [], scenes: Array.isArray(scenes) ? scenes : [] };
     });
     renderLibraryTagList();
     applyLibraryFilters();
@@ -6339,11 +6345,10 @@ function applyLibraryFilters() {
       deleteLibraryDrill(d.id, d.title);
     });
     gridEl.appendChild(card);
+    // surface/scenes now come straight from the list response — no more
+    // per-card follow-up fetch needed to render the thumbnail
+    document.getElementById("lib-thumb-" + d.id).appendChild(createAnimatedThumb({ surface: d.surface, scenes: d.scenes }, "lib-card-thumb-inner"));
   });
-  // thumbnails need the drill's actual surface/scenes, which the list
-  // endpoint doesn't return (kept light for the grid) — fetch each
-  // card's full detail lazily just for its preview
-  filtered.forEach(d => hydrateLibraryCardThumb(d.id));
 }
 
 async function deleteLibraryDrill(id, title, onDone) {
@@ -6358,19 +6363,6 @@ async function deleteLibraryDrill(id, title, onDone) {
   } catch {
     toast("Could not remove that drill — check your connection");
   }
-}
-
-async function hydrateLibraryCardThumb(id) {
-  const thumbEl = document.getElementById("lib-thumb-" + id);
-  if (!thumbEl) return;
-  try {
-    const res = await fetch(`/api/drill-library/${id}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    if (document.getElementById("lib-thumb-" + id)) {
-      thumbEl.appendChild(createAnimatedThumb({ surface: data.surface, scenes: data.scenes }, "lib-card-thumb-inner"));
-    }
-  } catch {}
 }
 
 function renderLibraryTagList() {
