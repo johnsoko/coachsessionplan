@@ -148,7 +148,7 @@
     accent-color: var(--bib);
   }
   .phase-thumb-library-badge {
-    position: absolute; top: 7px; left: 7px; z-index: 4; width: 20px; height: 20px; border-radius: 5px;
+    position: absolute; bottom: 7px; right: 7px; z-index: 4; width: 20px; height: 20px; border-radius: 5px;
     border: none; background: rgba(27,33,28,0.55); color: var(--bib); display: flex; align-items: center; justify-content: center;
   }
   .phase-thumb-library-badge:hover { background: rgba(27,33,28,0.75); }
@@ -4036,7 +4036,7 @@ function renderPhaseList() {
     if (libBadge) {
       libBadge.addEventListener("click", e => {
         e.stopPropagation();
-        toast("Saved to your Drill Library"); // opening the library entry directly is coming later
+        toast("Already in your Drill Library"); // opening the library entry directly is coming later
       });
     }
     const labelInput = div.querySelector(".phase-thumb-label-input");
@@ -4533,7 +4533,7 @@ function renderPhaseNotes() {
       libControl.className = "phase-note-library-badge";
       libControl.title = "In Drill Library";
       libControl.innerHTML = LIBRARY_BADGE_SVG;
-      libControl.addEventListener("click", () => toast("Saved to your Drill Library")); // opening it directly is coming later
+      libControl.addEventListener("click", () => toast("Already in your Drill Library")); // opening it directly is coming later
     } else {
       libControl = document.createElement("input");
       libControl.type = "checkbox";
