@@ -3929,7 +3929,7 @@ function phaseThumbHTML(ph, opts) {
   // scene happens to be active, so previews stay stable no matter what
   // you're doing in Animate mode. A caller animating this thumbnail can
   // override which token/shape snapshot to actually draw via opts.sceneOverride.
-  const sc = opts.sceneOverride || ph.scenes[0];
+  const sc = opts.sceneOverride || (ph.scenes && ph.scenes[0]) || { tokens: [], shapes: [] };
   const pxAt = (xPct, yPct) => ({ x: (xPct / 100) * vbW, y: (yPct / 100) * vbH });
   // the real canvas always renders at up to 640 CSS px wide regardless of
   // which surface is active; converting real pixel sizes (arrow width,
