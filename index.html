@@ -835,10 +835,15 @@
   .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
   .lib-card {
     display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
-    background: var(--paper-card); cursor: pointer;
+    background: var(--paper-card); cursor: pointer; position: relative;
   }
   .lib-card:hover { border-color: var(--pitch); }
   .lib-card-thumb { position: relative; width: 100%; aspect-ratio: 4/2.7; background: var(--pitch); }
+  .lib-card-del {
+    position: absolute; top: 9px; right: 9px; z-index: 5; width: 24px; height: 24px; border-radius: 6px;
+    border: none; background: rgba(27,33,28,0.55); color: #F7F8F3; display: flex; align-items: center; justify-content: center;
+  }
+  .lib-card-del:hover { background: #B3452C; }
   .lib-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
   .lib-card-title { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--ink); }
   .lib-card-meta { font-size: 12px; color: var(--ink-faint); }
@@ -5575,8 +5580,17 @@ async function saveDrill() {
     document.getElementById("title-input").focus();
     return;
   }
-  const payload = serializeAppState();
   try {
+    // sync to the Drill Library FIRST — this sets ph.libraryDrillId on any
+    // checked/linked phases, and serializeAppState() below needs to pick
+    // that up so it actually gets persisted with the practice plan. Doing
+    // this the other way around (as it was before) meant the id only ever
+    // existed in memory for the current session — it looked right until
+    // the next reload, when it silently vanished and the checkbox came
+    // back, and a later save would create a duplicate library entry
+    // instead of updating the original.
+    await syncPhasesToLibrary();
+    const payload = serializeAppState();
     const token = await getAuthToken();
     const headers = { "content-type": "application/json" };
     if (token) headers["authorization"] = "Bearer " + token;
@@ -5591,7 +5605,6 @@ async function saveDrill() {
     history.replaceState(null, "", "?id=" + json.id);
     const shareUrl = location.origin + location.pathname + "?id=" + json.id;
     try { await navigator.clipboard.writeText(shareUrl); } catch {}
-    await syncPhasesToLibrary();
     toast("Session saved");
   } catch (err) {
     toast("Save failed — check your connection and try again");
@@ -5630,7 +5643,11 @@ async function syncPhasesToLibrary() {
     } catch {}
     selectedForLibraryPhaseIds.delete(ph.id);
   }
-  renderModeContent(currentMode);
+  // refresh both places this control appears — not just whichever tab is
+  // currently visible — so a checkbox never lingers stale in one view
+  // after the badge has already replaced it in the other
+  renderPhaseList();
+  renderPhaseNotes();
 }
 
 async function loadDrillFromUrl() {
@@ -5980,6 +5997,7 @@ function applyLibraryFilters() {
     const tagsHTML = d.tags.map(t => `<span class="lib-card-tag">${escapeHtml(t)}</span>`).join("");
     card.innerHTML = `
       <div class="lib-card-thumb" id="lib-thumb-${d.id}"></div>
+      <button class="lib-card-del" title="Delete from library"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 3.5h7M4.5 3.5V2h3v1.5M3.3 3.5l.5 7h4.4l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="lib-card-body">
         <div class="lib-card-title">${escapeHtml(d.title || "Untitled Drill")}</div>
         <div class="lib-card-meta">${escapeHtml(d.creator_name || "Coach")} &middot; ${updated}</div>
@@ -5988,12 +6006,30 @@ function applyLibraryFilters() {
       </div>
     `;
     card.addEventListener("click", () => openLibraryDrillDetail(d.id));
+    card.querySelector(".lib-card-del").addEventListener("click", e => {
+      e.stopPropagation();
+      deleteLibraryDrill(d.id, d.title);
+    });
     gridEl.appendChild(card);
   });
   // thumbnails need the drill's actual surface/scenes, which the list
   // endpoint doesn't return (kept light for the grid) — fetch each
   // card's full detail lazily just for its preview
   filtered.forEach(d => hydrateLibraryCardThumb(d.id));
+}
+
+async function deleteLibraryDrill(id, title, onDone) {
+  if (!confirm(`Remove "${title || "this drill"}" from your Drill Library? This won't affect any practice plan it was originally saved from.`)) return;
+  try {
+    const token = await getAuthToken();
+    const headers = token ? { authorization: "Bearer " + token } : {};
+    const res = await fetch(`/api/drill-library/${id}`, { method: "DELETE", headers });
+    if (!res.ok) { toast("Could not remove that drill"); return; }
+    toast("Removed from Drill Library");
+    if (onDone) onDone(); else renderLibraryGrid();
+  } catch {
+    toast("Could not remove that drill — check your connection");
+  }
 }
 
 async function hydrateLibraryCardThumb(id) {
@@ -6045,8 +6081,12 @@ async function openLibraryDrillDetail(id) {
       <div class="lib-detail-meta">${escapeHtml(d.creatorName || "Coach")} &middot; Saved ${updated}</div>
       <div class="lib-card-tags" style="margin-bottom:16px;">${tagsHTML}</div>
       <div class="lib-detail-desc">${escapeHtml(d.notes || "No notes yet.")}</div>
+      <button class="btn btn-ghost" id="lib-detail-del-btn" style="color:#B3452C;">Delete from Library</button>
     `;
     document.getElementById("lib-detail-thumb").appendChild(createAnimatedThumb({ surface: d.surface, scenes: d.scenes }, "lib-detail-thumb-inner"));
+    document.getElementById("lib-detail-del-btn").addEventListener("click", () => {
+      deleteLibraryDrill(d.id, d.title, () => { showScreen("library"); renderLibraryGrid(); });
+    });
   } catch {
     bodyEl.innerHTML = '<p class="dash-empty">Could not load this drill — check your connection.</p>';
   }

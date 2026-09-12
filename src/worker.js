@@ -97,6 +97,24 @@ async function handleApi(request, env, url) {
     return jsonResponse({ ok: true });
   }
 
+  // DELETE /api/drill-library/:id — removes a drill from the library only.
+  // Practice plans that reference it via a phase's libraryDrillId are
+  // completely unaffected — each phase carries its own full drill data
+  // (surface/scenes) independently, it's never fetched from the library
+  // at use time, so there's nothing in any saved practice plan to break.
+  if (request.method === "DELETE" && parts.length === 3 && parts[1] === "drill-library") {
+    const userId = await getUserId(request, env);
+    if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
+    const id = parts[2];
+    const existing = await env.DB.prepare("SELECT user_id FROM drill_library WHERE id = ?").bind(id).first();
+    if (!existing) return jsonResponse({ error: "Not found" }, 404);
+    if (existing.user_id && existing.user_id !== userId) {
+      return jsonResponse({ error: "You don't own this drill" }, 403);
+    }
+    await env.DB.prepare("DELETE FROM drill_library WHERE id = ?").bind(id).run();
+    return jsonResponse({ ok: true });
+  }
+
   // GET /api/drills — list every practice plan the signed-in user owns,
   // for the dashboard. Requires sign-in.
   if (request.method === "GET" && parts.length === 2 && parts[1] === "drills") {
