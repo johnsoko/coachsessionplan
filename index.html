@@ -733,7 +733,7 @@
      update reads as a transition rather than a hard jump (landing-screen
      has its own separate fonts-ready fade, handled above, so it's left
      out here to avoid the two competing) */
-  #signin-screen.screen-enter, #dashboard-screen.screen-enter, #app-shell.screen-enter {
+  #signin-screen.screen-enter, #dashboard-screen.screen-enter, #library-screen.screen-enter, #library-detail-screen.screen-enter, #app-shell.screen-enter {
     animation: screenFadeIn 0.25s ease;
   }
   .landing-inner { max-width: 560px; text-align: center; }
@@ -827,6 +827,33 @@
   .dash-plan-menu-btn:hover { background: var(--paper-raised); }
   .dash-plan-menu { min-width: 150px; }
   .dash-plan-menu .dropdown-item.danger { color: #B3452C; }
+
+  /* ═════════════════════════════════════════════════════════════════════
+     DRILL LIBRARY
+  ═════════════════════════════════════════════════════════════════════ */
+  #library-screen { display: flex; min-height: 100vh; }
+  .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+  .lib-card {
+    display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    background: var(--paper-card); cursor: pointer;
+  }
+  .lib-card:hover { border-color: var(--pitch); }
+  .lib-card-thumb { position: relative; width: 100%; aspect-ratio: 4/2.7; background: var(--pitch); }
+  .lib-card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .lib-card-title { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--ink); }
+  .lib-card-meta { font-size: 12px; color: var(--ink-faint); }
+  .lib-card-desc { font-size: 12.5px; color: var(--ink-soft); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; flex: 1; }
+  .lib-card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  .lib-card-tag { font-size: 11px; font-weight: 600; background: var(--pitch-tint); color: var(--pitch-deep); border-radius: 5px; padding: 3px 8px; }
+
+  #library-detail-screen { min-height: 100vh; }
+  .lib-detail-topbar { padding: 18px 30px; border-bottom: 1px solid var(--line); }
+  .lib-detail-body { max-width: 760px; margin: 0 auto; padding: 30px; }
+  .lib-detail-thumb { margin-bottom: 20px; }
+  .lib-detail-thumb-inner { position: relative; width: 100%; aspect-ratio: 4/2.7; background: var(--pitch); border-radius: 12px; overflow: hidden; }
+  .lib-detail-title { font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+  .lib-detail-meta { font-size: 13px; color: var(--ink-faint); margin-bottom: 14px; }
+  .lib-detail-desc { font-size: 14.5px; line-height: 1.6; color: var(--ink); margin-bottom: 16px; white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -876,7 +903,7 @@
       <button class="dash-nav-item active" id="dash-nav-plans">
         Practice Plans
       </button>
-      <button class="dash-nav-item" id="dash-nav-library" disabled title="Coming soon — shared library for team accounts">
+      <button class="dash-nav-item" id="dash-nav-library" title="Drills you've saved for reuse">
         Drill Library
       </button>
     </div>
@@ -933,6 +960,31 @@
       <div class="dash-filter-tag-list" id="dash-filter-tag-list"></div>
     </div>
     <button class="btn btn-primary" id="dash-filter-apply-btn" style="width:100%; margin-top:16px;">Show all Practice Plans</button>
+  </div>
+
+  <!-- ══════════════════════════ DRILL LIBRARY ══════════════════════════ -->
+  <div id="library-screen" style="display:none;">
+    <div class="dash-sidebar">
+      <div class="dash-logo">coachsessionplan</div>
+      <button class="dash-nav-item" id="lib-back-to-dashboard-btn" style="margin-bottom:14px;">&larr; Practice Plans</button>
+      <div class="dash-section-label">Search</div>
+      <input type="text" id="lib-search-input" class="field-input" placeholder="Search drill…" style="margin-bottom:16px;">
+      <div class="dash-section-label">Tags</div>
+      <input type="text" id="lib-tag-search-input" class="field-input" placeholder="Search in tags…" style="margin-bottom:10px;">
+      <div class="dash-filter-tag-list" id="lib-tag-list"></div>
+    </div>
+    <div class="dash-main">
+      <div class="dash-header"><h1>Drill Library</h1></div>
+      <div class="lib-grid" id="lib-grid"><p class="dash-empty">Loading…</p></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ DRILL LIBRARY DETAIL ══════════════════════════ -->
+  <div id="library-detail-screen" style="display:none;">
+    <div class="lib-detail-topbar">
+      <button id="lib-detail-back-btn" class="btn btn-ghost">&larr; Back to Library</button>
+    </div>
+    <div class="lib-detail-body" id="lib-detail-body"></div>
   </div>
 
   <div id="app-shell" style="display:none;">
@@ -5388,12 +5440,16 @@ function showScreen(name) {
   document.getElementById("landing-screen").style.display = name === "landing" ? "flex" : "none";
   document.getElementById("signin-screen").style.display = name === "signin" ? "flex" : "none";
   document.getElementById("dashboard-screen").style.display = name === "dashboard" ? "flex" : "none";
+  document.getElementById("library-screen").style.display = name === "library" ? "flex" : "none";
+  document.getElementById("library-detail-screen").style.display = name === "library-detail" ? "block" : "none";
   document.getElementById("app-shell").style.display = name === "app" ? "block" : "none";
   // crossfade whichever screen just became visible in, rather than an
   // instant hard cut — restart the animation each time by removing and
   // re-adding the class (forcing a reflow in between so it re-triggers)
   const el = name === "signin" ? document.getElementById("signin-screen")
     : name === "dashboard" ? document.getElementById("dashboard-screen")
+    : name === "library" ? document.getElementById("library-screen")
+    : name === "library-detail" ? document.getElementById("library-detail-screen")
     : name === "app" ? document.getElementById("app-shell") : null;
   if (el) {
     el.classList.remove("screen-enter");
@@ -5554,7 +5610,13 @@ async function syncPhasesToLibrary() {
   const headers = { "content-type": "application/json" };
   if (token) headers["authorization"] = "Bearer " + token;
   for (const ph of toSync) {
-    const payload = { title: ph.title || "Untitled Drill", data: { surface: ph.surface, scenes: ph.scenes } };
+    const description = (ph.noteBlocks || []).filter(t => t.trim()).join(" ");
+    const creatorName = (typeof Clerk !== "undefined" && Clerk.user)
+      ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
+    const payload = {
+      title: ph.title || "Untitled Drill",
+      data: { surface: ph.surface, scenes: ph.scenes, description, tags: getTags(), creatorName }
+    };
     try {
       if (ph.libraryDrillId) {
         await fetch(`/api/drill-library/${ph.libraryDrillId}`, { method: "PUT", headers, body: JSON.stringify(payload) });
@@ -5867,6 +5929,143 @@ async function openPracticePlan(id) {
   if (!ok) renderDashboardPlans();
   else requestAnimationFrame(() => resizeCanvas());
 }
+/* ═════════════════════════════════════════════════════════════════════
+   DRILL LIBRARY
+═════════════════════════════════════════════════════════════════════ */
+let allLibraryDrills = [];
+let selectedLibraryTags = new Set();
+
+async function renderLibraryGrid() {
+  const gridEl = document.getElementById("lib-grid");
+  gridEl.innerHTML = '<p class="dash-empty">Loading…</p>';
+  try {
+    const token = await getAuthToken();
+    const headers = token ? { authorization: "Bearer " + token } : {};
+    const res = await fetch("/api/drill-library", { headers });
+    if (!res.ok) { gridEl.innerHTML = '<p class="dash-empty">Could not load your drill library.</p>'; return; }
+    const { drills } = await res.json();
+    allLibraryDrills = drills.map(d => {
+      let tags = [];
+      try { tags = JSON.parse(d.tags || "[]"); } catch {}
+      return { ...d, tags: Array.isArray(tags) ? tags : [] };
+    });
+    renderLibraryTagList();
+    applyLibraryFilters();
+  } catch {
+    gridEl.innerHTML = '<p class="dash-empty">Could not load your drill library.</p>';
+  }
+}
+
+function applyLibraryFilters() {
+  const search = (document.getElementById("lib-search-input").value || "").trim().toLowerCase();
+  const filtered = allLibraryDrills.filter(d => {
+    if (search && !(d.title || "").toLowerCase().includes(search)) return false;
+    if (selectedLibraryTags.size && !d.tags.some(t => selectedLibraryTags.has(t))) return false;
+    return true;
+  });
+  const gridEl = document.getElementById("lib-grid");
+  if (!allLibraryDrills.length) {
+    gridEl.innerHTML = '<p class="dash-empty">No drills saved yet — check a drill\'s box and save its practice plan to add it here.</p>';
+    return;
+  }
+  if (!filtered.length) {
+    gridEl.innerHTML = '<p class="dash-empty">No drills match your search/filter.</p>';
+    return;
+  }
+  gridEl.innerHTML = "";
+  filtered.forEach(d => {
+    const card = document.createElement("div");
+    card.className = "lib-card";
+    const updated = new Date(d.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
+    const tagsHTML = d.tags.map(t => `<span class="lib-card-tag">${escapeHtml(t)}</span>`).join("");
+    card.innerHTML = `
+      <div class="lib-card-thumb" id="lib-thumb-${d.id}"></div>
+      <div class="lib-card-body">
+        <div class="lib-card-title">${escapeHtml(d.title || "Untitled Drill")}</div>
+        <div class="lib-card-meta">${escapeHtml(d.creator_name || "Coach")} &middot; ${updated}</div>
+        <div class="lib-card-desc">${escapeHtml(d.description || "")}</div>
+        <div class="lib-card-tags">${tagsHTML}</div>
+      </div>
+    `;
+    card.addEventListener("click", () => openLibraryDrillDetail(d.id));
+    gridEl.appendChild(card);
+  });
+  // thumbnails need the drill's actual surface/scenes, which the list
+  // endpoint doesn't return (kept light for the grid) — fetch each
+  // card's full detail lazily just for its preview
+  filtered.forEach(d => hydrateLibraryCardThumb(d.id));
+}
+
+async function hydrateLibraryCardThumb(id) {
+  const thumbEl = document.getElementById("lib-thumb-" + id);
+  if (!thumbEl) return;
+  try {
+    const res = await fetch(`/api/drill-library/${id}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (document.getElementById("lib-thumb-" + id)) {
+      thumbEl.innerHTML = phaseThumbHTML({ surface: data.surface, scenes: data.scenes });
+    }
+  } catch {}
+}
+
+function renderLibraryTagList() {
+  const tagSearch = (document.getElementById("lib-tag-search-input").value || "").trim().toLowerCase();
+  const counts = new Map();
+  allLibraryDrills.forEach(d => d.tags.forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
+  const listEl = document.getElementById("lib-tag-list");
+  const tags = Array.from(counts.keys()).filter(t => t.toLowerCase().includes(tagSearch)).sort();
+  if (!tags.length) { listEl.innerHTML = '<p class="dash-empty" style="padding:4px 0;">No tags yet.</p>'; return; }
+  listEl.innerHTML = tags.map(t =>
+    `<button class="dash-filter-tag-chip${selectedLibraryTags.has(t) ? " selected" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)} (${counts.get(t)})</button>`
+  ).join("");
+  listEl.querySelectorAll(".dash-filter-tag-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const tag = chip.dataset.tag;
+      if (selectedLibraryTags.has(tag)) selectedLibraryTags.delete(tag); else selectedLibraryTags.add(tag);
+      renderLibraryTagList();
+      applyLibraryFilters();
+    });
+  });
+}
+
+async function openLibraryDrillDetail(id) {
+  showScreen("library-detail");
+  const bodyEl = document.getElementById("lib-detail-body");
+  bodyEl.innerHTML = '<p class="dash-empty">Loading…</p>';
+  try {
+    const res = await fetch(`/api/drill-library/${id}`);
+    if (!res.ok) { bodyEl.innerHTML = '<p class="dash-empty">Could not load this drill.</p>'; return; }
+    const d = await res.json();
+    const updated = new Date(d.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
+    const tagsHTML = (d.tags || []).map(t => `<span class="lib-card-tag">${escapeHtml(t)}</span>`).join("");
+    bodyEl.innerHTML = `
+      <div class="lib-detail-thumb" id="lib-detail-thumb"></div>
+      <div class="lib-detail-title">${escapeHtml(d.title || "Untitled Drill")}</div>
+      <div class="lib-detail-meta">${escapeHtml(d.creatorName || "Coach")} &middot; Saved ${updated}</div>
+      <div class="lib-card-tags" style="margin-bottom:16px;">${tagsHTML}</div>
+      <div class="lib-detail-desc">${escapeHtml(d.description || "No description yet.")}</div>
+    `;
+    document.getElementById("lib-detail-thumb").appendChild(createAnimatedThumb({ surface: d.surface, scenes: d.scenes }, "lib-detail-thumb-inner"));
+  } catch {
+    bodyEl.innerHTML = '<p class="dash-empty">Could not load this drill — check your connection.</p>';
+  }
+}
+
+document.getElementById("dash-nav-library").addEventListener("click", () => {
+  showScreen("library");
+  renderLibraryGrid();
+});
+document.getElementById("lib-back-to-dashboard-btn").addEventListener("click", () => {
+  showScreen("dashboard");
+  renderDashboardPlans();
+});
+document.getElementById("lib-detail-back-btn").addEventListener("click", () => {
+  showScreen("library");
+});
+document.getElementById("lib-search-input").addEventListener("input", applyLibraryFilters);
+document.getElementById("lib-tag-search-input").addEventListener("input", renderLibraryTagList);
+
 document.getElementById("dash-new-plan-btn").addEventListener("click", seedFreshDrill);
 document.getElementById("add-timeslot-btn").addEventListener("click", () => {
   addPhase(false);

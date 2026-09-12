@@ -39,6 +39,31 @@ async function getUserId(request, env) {
 async function handleApi(request, env, url) {
   const parts = url.pathname.split("/").filter(Boolean); // ["api","drills", maybe ":id"]
 
+  // GET /api/drill-library — list every library drill the signed-in user
+  // owns, for the Drill Library page.
+  if (request.method === "GET" && parts.length === 2 && parts[1] === "drill-library") {
+    const userId = await getUserId(request, env);
+    if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
+    const { results } = await env.DB.prepare(
+      `SELECT id, title, created_at, updated_at,
+              json_extract(data, '$.description') as description,
+              json_extract(data, '$.tags') as tags,
+              json_extract(data, '$.creatorName') as creator_name
+       FROM drill_library WHERE user_id = ? ORDER BY updated_at DESC`
+    ).bind(userId).all();
+    return jsonResponse({ drills: results });
+  }
+
+  // GET /api/drill-library/:id — full detail for a single library drill
+  // (surface/scenes for the preview, plus description/tags/creator).
+  if (request.method === "GET" && parts.length === 3 && parts[1] === "drill-library") {
+    const id = parts[2];
+    const row = await env.DB.prepare("SELECT id, title, created_at, updated_at, data FROM drill_library WHERE id = ?")
+      .bind(id).first();
+    if (!row) return jsonResponse({ error: "Not found" }, 404);
+    return jsonResponse({ id: row.id, title: row.title, created_at: row.created_at, updated_at: row.updated_at, ...JSON.parse(row.data) });
+  }
+
   // POST /api/drill-library — create a new library drill from a phase's
   // saved data. Requires sign-in. Returns the new id.
   if (request.method === "POST" && parts.length === 2 && parts[1] === "drill-library") {
