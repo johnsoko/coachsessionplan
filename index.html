@@ -62,6 +62,12 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   #title-input:focus { outline: 2px solid var(--pitch); background: var(--paper-card); }
+  @media (min-width: 769px) {
+    /* true center relative to the whole topbar, not just whatever space
+       is left between the (differently-sized) left and right button
+       groups — flex-grow alone left it looking off-center */
+    #title-input { position: absolute; left: 50%; transform: translateX(-50%); }
+  }
 
   #close-btn, .mode-tabs, .mobile-mode-wrap { flex-shrink: 0; }
   .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
