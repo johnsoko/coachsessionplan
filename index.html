@@ -4570,7 +4570,7 @@ function renderPhaseNotes() {
   const [sh, sm] = (document.getElementById("practice-starttime-input").value || "09:00").split(":").map(Number);
   let cursor = sh * 60 + sm;
   document.getElementById("timetable-total-duration").textContent = "Total Practice Duration: " + timetableTotalDuration() + " min";
-  phases.forEach((ph) => {
+  phases.forEach((ph, phIdx) => {
     if (!ph.noteBlocks || !ph.noteBlocks.length) ph.noteBlocks = [""];
     const dur = parseInt(ph.duration, 10) || 0;
     const startEnd = dur ? `${formatClockTime(cursor)} - ${formatClockTime(cursor + dur)}` : "";
@@ -4609,7 +4609,7 @@ function renderPhaseNotes() {
     dimensionsInput.addEventListener("input", () => { ph.dimensions = dimensionsInput.value; });
     const titleOverlay = document.createElement("div");
     titleOverlay.className = "phase-note-thumb-title-overlay";
-    titleOverlay.textContent = ph.title || "Untitled Drill";
+    titleOverlay.textContent = ph.title || (phaseNoun() + " " + (phIdx + 1));
     thumb.appendChild(titleOverlay);
     exerciseWrap.appendChild(dimensionsInput);
     exerciseWrap.appendChild(thumb);
