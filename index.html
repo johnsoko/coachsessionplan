@@ -1191,7 +1191,7 @@
 
       <div id="left-panel">
         <div class="left-tabs">
-          <button class="left-tab active" data-lefttab="phases">Phases</button>
+          <button class="left-tab active" data-lefttab="phases" id="phases-tab-label">Activities</button>
           <button class="left-tab" data-lefttab="objects">Objects</button>
         </div>
 
@@ -3910,10 +3910,10 @@ function updatePhaseLabelsOnly() {
   const list = document.getElementById("phase-list");
   Array.from(list.children).forEach((el, i) => {
     const labelInput = el.querySelector(".phase-thumb-label-input");
-    if (labelInput) labelInput.placeholder = "Phase " + (i + 1);
+    if (labelInput) labelInput.placeholder = phaseNoun() + " " + (i + 1);
     el.classList.toggle("active", Number(el.dataset.phaseId) === activePhaseId);
   });
-  document.getElementById("phase-count").textContent = `PHASE ${phases.findIndex(p=>p.id===activePhaseId)+1}/${phases.length}`;
+  document.getElementById("phase-count").textContent = `${phaseNoun().toUpperCase()} ${phases.findIndex(p=>p.id===activePhaseId)+1}/${phases.length}`;
 }
 function renderPhaseThumbActive() {
   saveActivePhase();
@@ -4059,7 +4059,7 @@ function phaseThumbHTML(ph, opts) {
 }
 function renderPhaseList() {
   const idx = phases.findIndex(p=>p.id===activePhaseId);
-  document.getElementById("phase-count").textContent = `PHASE ${idx+1}/${phases.length}`;
+  document.getElementById("phase-count").textContent = `${phaseNoun().toUpperCase()} ${idx+1}/${phases.length}`;
   const prevBtn = document.getElementById("mobile-phase-prev"), nextBtn = document.getElementById("mobile-phase-next");
   if (prevBtn) prevBtn.disabled = idx <= 0;
   if (nextBtn) nextBtn.disabled = idx >= phases.length - 1;
@@ -4081,7 +4081,7 @@ function renderPhaseList() {
         <div class="phase-thumb-grip">
           <span class="phase-thumb-grip-dots"><span></span><span></span><span></span><span></span><span></span><span></span></span>
         </div>
-        <input type="text" class="phase-thumb-label-input" placeholder="Phase ${i + 1}" value="${escapeHtml(ph.title || "")}">
+        <input type="text" class="phase-thumb-label-input" placeholder="${phaseNoun()} ${i + 1}" value="${escapeHtml(ph.title || "")}">
         <button class="phase-thumb-del" title="Delete phase"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 3.5h7M4.5 3.5V2h3v1.5M3.3 3.5l.5 7h4.4l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>`;
     div.addEventListener("click", () => loadPhase(ph.id));
@@ -4205,7 +4205,7 @@ function renderOutputContent() {
     const label = outputSettings.showPhaseTitles ? (() => {
       const l = document.createElement("div");
       l.className = "output-phase-label";
-      l.textContent = "Phase " + (idx + 1);
+      l.textContent = phaseNoun() + " " + (idx + 1);
       return l;
     })() : null;
 
@@ -4751,7 +4751,7 @@ function renderNoteBlocks(blocks, wrap) {
 function refreshAnimatePanel() {
   const ph = phases.find(p => p.id === activePhaseId);
   const idx = phases.findIndex(p => p.id === activePhaseId);
-  document.getElementById("animate-phase-title").textContent = "Phase " + (idx + 1);
+  document.getElementById("animate-phase-title").textContent = phaseNoun() + " " + (idx + 1);
   const overlay = document.getElementById("animate-title-overlay");
   if (overlay) overlay.textContent = document.getElementById("title-input").value;
   renderSceneTimeline();
@@ -4896,7 +4896,7 @@ function switchPhaseForPlayback(id) {
   applySurface(ph.surface || "full");
   renderAnimateOutputPhaseLists();
   renderPhaseList();
-  document.getElementById("animate-phase-title").textContent = "Phase " + (phases.findIndex(p=>p.id===id) + 1);
+  document.getElementById("animate-phase-title").textContent = phaseNoun() + " " + (phases.findIndex(p=>p.id===id) + 1);
   renderSceneTimeline();
 }
 // Scene 1 is a phase's canonical drill setup — the thing every preview
@@ -5608,6 +5608,11 @@ let currentDrillId = new URLSearchParams(location.search).get("id") || null;
 // drills). Hides scheduling fields/timetable extras that only make sense
 // for a practice plan, and redirects Save/Close accordingly.
 let isStandaloneDrillMode = false;
+// Practice plans call each phase an "Activity" in the UI; the standalone
+// drill creator (which only ever has one) keeps calling it a "Phase" —
+// same underlying data structure either way, just different user-facing
+// wording depending on context.
+function phaseNoun() { return isStandaloneDrillMode ? "Phase" : "Activity"; }
 let currentStandaloneDrillId = null;
 function applyStandaloneDrillModeUI() {
   // Session title stays visible in both the topbar and the Details tab
@@ -5617,6 +5622,7 @@ function applyStandaloneDrillModeUI() {
   const placeholder = isStandaloneDrillMode ? "Enter Drill Title" : "Enter Session Title";
   document.getElementById("title-input").placeholder = placeholder;
   document.getElementById("notes-title-input").placeholder = placeholder;
+  document.getElementById("phases-tab-label").textContent = isStandaloneDrillMode ? "Phases" : "Activities";
 }
 
 function getTags() {
