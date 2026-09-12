@@ -1598,8 +1598,9 @@
           </div>
         </div>
 
-        <div class="notes-field">
-          <label>Category</label>
+        <div id="category-section-anchor"></div>
+        <div class="notes-field" id="category-section">
+          <label>Tags</label>
           <div class="chip-field" id="tag-field">
             <span class="chip">Finishing <button>×</button></span>
             <button class="chip-add" id="add-tag-btn">+ add</button>
@@ -4538,6 +4539,20 @@ function renderPhaseNotes() {
   document.getElementById("timetable-summary-banner").style.display = isStandaloneDrillMode ? "none" : "flex";
   document.getElementById("timetable-header-row").classList.toggle("drill-mode", isStandaloneDrillMode);
   document.getElementById("timetable-header-duration").style.display = isStandaloneDrillMode ? "none" : "inline";
+  document.getElementById("notes-title-input").style.display = isStandaloneDrillMode ? "none" : "block";
+  document.getElementById("add-timeslot-btn").style.display = isStandaloneDrillMode ? "none" : "inline-flex";
+  // Tags section moves to the very bottom of the page in standalone drill
+  // mode (a single drill's tags matter less than its content up top);
+  // otherwise it stays anchored where it started, right after the
+  // scheduling fields, for practice plans
+  const categorySection = document.getElementById("category-section");
+  const notesPage = document.querySelector(".notes-page");
+  if (isStandaloneDrillMode) {
+    notesPage.appendChild(categorySection);
+  } else {
+    const anchor = document.getElementById("category-section-anchor");
+    anchor.after(categorySection);
+  }
   const [sh, sm] = (document.getElementById("practice-starttime-input").value || "09:00").split(":").map(Number);
   let cursor = sh * 60 + sm;
   document.getElementById("timetable-total-duration").textContent = "Total Practice Duration: " + timetableTotalDuration() + " min";
@@ -5586,6 +5601,13 @@ let currentDrillId = new URLSearchParams(location.search).get("id") || null;
 // for a practice plan, and redirects Save/Close accordingly.
 let isStandaloneDrillMode = false;
 let currentStandaloneDrillId = null;
+function applyStandaloneDrillModeUI() {
+  // #title-input lives in the topbar, visible on every tab (Create/Details/
+  // Output) — unlike the Details-page-only toggles in renderPhaseNotes(),
+  // this needs to apply globally whenever the mode changes, not just when
+  // the Details tab happens to be the one rendering
+  document.getElementById("title-input").style.display = isStandaloneDrillMode ? "none" : "block";
+}
 
 function getTags() {
   return Array.from(document.querySelectorAll("#tag-field .chip")).map(chip => {
@@ -5780,9 +5802,13 @@ async function getAuthToken() {
 async function saveStandaloneDrill() {
   saveActivePhase();
   const ph = phases[0];
+  if (!ph.title || !ph.title.trim()) {
+    toast("Enter a drill title before saving");
+    return;
+  }
   const creatorName = (typeof Clerk !== "undefined" && Clerk.user) ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
   const payload = {
-    title: document.getElementById("title-input").value.trim(),
+    title: ph.title.trim(),
     data: { surface: ph.surface, scenes: ph.scenes, notes: (ph.noteBlocks || []).filter(t => t.trim()).join(" "), tags: getTags(), creatorName }
   };
   try {
@@ -5807,12 +5833,12 @@ async function saveDrill() {
     toast("Sign in to save your drill");
     return;
   }
+  if (isStandaloneDrillMode) { await saveStandaloneDrill(); return; }
   if (!document.getElementById("title-input").value.trim()) {
     toast("Enter a session title before saving");
     document.getElementById("title-input").focus();
     return;
   }
-  if (isStandaloneDrillMode) { await saveStandaloneDrill(); return; }
   try {
     // sync to the Drill Library FIRST — this sets ph.libraryDrillId on any
     // checked/linked phases, and serializeAppState() below needs to pick
@@ -5916,6 +5942,7 @@ function seedFreshDrill() {
   currentDrillId = null;
   isStandaloneDrillMode = false;
   currentStandaloneDrillId = null;
+  applyStandaloneDrillModeUI();
   history.replaceState(null, "", location.pathname);
   tokens = []; shapes = []; phases = []; phaseNextId = 1; sceneNextId = 1; nextId = 1;
   drillDescriptionBlocks = [""];
@@ -6177,6 +6204,7 @@ document.getElementById("plan-details-modal-overlay").addEventListener("click", 
 async function openPracticePlan(id) {
   isStandaloneDrillMode = false;
   currentStandaloneDrillId = null;
+  applyStandaloneDrillModeUI();
   history.pushState(null, "", "?id=" + id);
   const ok = await loadDrillFromUrl();
   showScreen(ok ? "app" : "dashboard");
@@ -6195,6 +6223,7 @@ function openStandaloneDrillEditorBlank() {
   seedFreshDrill(); // resets to one blank phase, "draw" mode, isStandaloneDrillMode=false by default
   isStandaloneDrillMode = true;
   currentStandaloneDrillId = null;
+  applyStandaloneDrillModeUI();
   renderPhaseNotes(); // refresh Details in case it's revisited — hides scheduling fields immediately
 }
 
@@ -6210,17 +6239,18 @@ async function openStandaloneDrillEditorExisting(id) {
     }));
     const ph = {
       id: phaseNextId++, surface: data.surface || "full", scenes, activeSceneId: scenes[0].id,
-      noteBlocks: [data.notes || ""], title: "", duration: ""
+      noteBlocks: [data.notes || ""], title: data.title || "", duration: ""
     };
     tokens = []; shapes = [];
     phases = [ph];
     activePhaseId = null;
-    document.getElementById("title-input").value = data.title || "";
-    document.getElementById("notes-title-input").value = data.title || "";
+    document.getElementById("title-input").value = "";
+    document.getElementById("notes-title-input").value = "";
     setTags(Array.isArray(data.tags) ? data.tags : []);
     isStandaloneDrillMode = true;
     currentStandaloneDrillId = id;
     currentDrillId = null;
+    applyStandaloneDrillModeUI();
     history.replaceState(null, "", location.pathname);
     loadPhase(ph.id);
     renderPhaseList();
