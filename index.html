@@ -4552,7 +4552,7 @@ function renderPhaseNotes() {
   document.getElementById("timetable-summary-banner").style.display = isStandaloneDrillMode ? "none" : "flex";
   document.getElementById("timetable-header-row").classList.toggle("drill-mode", isStandaloneDrillMode);
   document.getElementById("timetable-header-duration").style.display = isStandaloneDrillMode ? "none" : "inline";
-  document.getElementById("notes-title-input").style.display = isStandaloneDrillMode ? "none" : "block";
+  // session title stays visible here in drill mode too — restored per request
   document.getElementById("add-timeslot-btn").style.display = isStandaloneDrillMode ? "none" : "inline-flex";
   const [sh, sm] = (document.getElementById("practice-starttime-input").value || "09:00").split(":").map(Number);
   let cursor = sh * 60 + sm;
@@ -5604,11 +5604,9 @@ let currentDrillId = new URLSearchParams(location.search).get("id") || null;
 let isStandaloneDrillMode = false;
 let currentStandaloneDrillId = null;
 function applyStandaloneDrillModeUI() {
-  // #title-input lives in the topbar, visible on every tab (Create/Details/
-  // Output) — unlike the Details-page-only toggles in renderPhaseNotes(),
-  // this needs to apply globally whenever the mode changes, not just when
-  // the Details tab happens to be the one rendering
-  document.getElementById("title-input").style.display = isStandaloneDrillMode ? "none" : "block";
+  // Session title stays visible in both the topbar and the Details tab
+  // for the standalone drill creator too — previously hidden here, but
+  // brought back per request.
 }
 
 function getTags() {
@@ -5812,13 +5810,15 @@ async function getAuthToken() {
 async function saveStandaloneDrill() {
   saveActivePhase();
   const ph = phases[0];
-  if (!ph.title || !ph.title.trim()) {
+  const title = document.getElementById("title-input").value.trim();
+  if (!title) {
     toast("Enter a drill title before saving");
+    document.getElementById("title-input").focus();
     return;
   }
   const creatorName = (typeof Clerk !== "undefined" && Clerk.user) ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
   const payload = {
-    title: ph.title.trim(),
+    title,
     data: {
       surface: ph.surface, scenes: ph.scenes,
       notes: (ph.noteBlocks || []).filter(t => t.trim()).join(" "),
@@ -6261,8 +6261,8 @@ async function openStandaloneDrillEditorExisting(id) {
     tokens = []; shapes = [];
     phases = [ph];
     activePhaseId = null;
-    document.getElementById("title-input").value = "";
-    document.getElementById("notes-title-input").value = "";
+    document.getElementById("title-input").value = data.title || "";
+    document.getElementById("notes-title-input").value = data.title || "";
     setTags(Array.isArray(data.tags) ? data.tags : []);
     isStandaloneDrillMode = true;
     currentStandaloneDrillId = id;
