@@ -1074,12 +1074,7 @@
   <div id="library-screen" style="display:none;">
     <div class="dash-sidebar">
       <div class="dash-logo">coachsessionplan</div>
-      <button class="dash-nav-item" id="lib-nav-home">Dashboard</button>
-      <div class="dash-section-label">Practice Planning</div>
-      <button class="dash-nav-item" id="lib-nav-drills" title="Create and manage individual drills">Drill Creator</button>
-      <button class="dash-nav-item" id="lib-nav-plans">Practice Plans</button>
-      <button class="dash-nav-item active" id="lib-nav-library">Drill Library</button>
-      <div class="dash-sidebar-divider"></div>
+      <button class="dash-nav-item" id="lib-nav-home" style="margin-bottom:14px;">&larr; Dashboard</button>
       <div class="dash-section-label" style="margin-top:0;">Search</div>
       <input type="text" id="lib-search-input" class="field-input" placeholder="Search drill…" style="margin-bottom:16px;">
       <div class="dash-section-label">Tags</div>
@@ -6598,11 +6593,6 @@ document.getElementById("dash-nav-library").addEventListener("click", () => {
 document.getElementById("lib-nav-home").addEventListener("click", () => {
   showScreen("home");
   renderHomeDashboard();
-});
-document.getElementById("lib-nav-drills").addEventListener("click", openStandaloneDrillEditorBlank);
-document.getElementById("lib-nav-plans").addEventListener("click", () => {
-  showScreen("dashboard");
-  renderDashboardPlans();
 });
 document.getElementById("lib-detail-back-btn").addEventListener("click", () => {
   showScreen("library");
