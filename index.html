@@ -254,7 +254,7 @@
   .rotation-handle-dot {
     position: absolute; width: 12px; height: 12px; border-radius: 50%;
     background: var(--bib); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.35);
-    cursor: grab; z-index: 8;
+    cursor: grab; z-index: 8; pointer-events: auto;
   }
   .rotation-handle-dot:active { cursor: grabbing; }
   .token.light { background: var(--paper-card); color: var(--ink); }
@@ -2768,11 +2768,21 @@ function refreshTokenSelectionClasses() {
     el.classList.toggle("selected", id === selectedTokenId || multiTokenIds.includes(id));
   });
 }
+function equipmentHalfHeightPx(t) {
+  // half-height of the actual rendered shape for each kind (matches
+  // applyEquipmentStyle()'s ratios) — a fixed offset looked fine for
+  // small items like cones, but put the handle right on top of (or even
+  // inside) anything tall, like the goals
+  const s = t.size || equipmentDefaults.size;
+  const ratios = { cone: 1, flatcone: 0.42, minigoal: 1.15, largegoal: 1.7, dummy: 1.1, ladder: 0.45 };
+  return (s * (ratios[t.kind] || 1)) / 2;
+}
 function buildRotationHandle(t, pos) {
   const dot = document.createElement("div");
   dot.className = "rotation-handle-dot";
   const angleRad = ((t.rotation || 0) - 90) * Math.PI / 180; // -90 so 0° points straight up
-  const dist = 28;
+  const halfHeight = t.type === "equipment" ? equipmentHalfHeightPx(t) : (t.size || textDefaults.size) / 2;
+  const dist = halfHeight + 16;
   const dx = Math.cos(angleRad) * dist;
   const dy = Math.sin(angleRad) * dist;
   dot.style.left = pos.x + "%";
