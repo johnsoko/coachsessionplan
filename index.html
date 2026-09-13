@@ -808,6 +808,7 @@
     margin-bottom: 2px;
   }
   .dash-nav-item.active { background: var(--pitch-tint); color: var(--pitch-deep); font-weight: 600; }
+  .dash-sidebar-divider { height: 1px; background: var(--line); margin: 20px 6px 4px; }
   .dash-nav-item:disabled { opacity: 0.45; cursor: not-allowed; }
   .dash-main { flex: 1; padding: 36px 44px; overflow-y: auto; }
   .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
@@ -1078,7 +1079,8 @@
       <button class="dash-nav-item" id="lib-nav-drills" title="Create and manage individual drills">Drill Creator</button>
       <button class="dash-nav-item" id="lib-nav-plans">Practice Plans</button>
       <button class="dash-nav-item active" id="lib-nav-library">Drill Library</button>
-      <div class="dash-section-label" style="margin-top:16px;">Search</div>
+      <div class="dash-sidebar-divider"></div>
+      <div class="dash-section-label" style="margin-top:0;">Search</div>
       <input type="text" id="lib-search-input" class="field-input" placeholder="Search drill…" style="margin-bottom:16px;">
       <div class="dash-section-label">Tags</div>
       <input type="text" id="lib-tag-search-input" class="field-input" placeholder="Search in tags…" style="margin-bottom:10px;">
