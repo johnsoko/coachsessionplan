@@ -1756,7 +1756,7 @@ let isPlaying = false;
 let multiTokenIds = [];
 let multiShapeIds = [];
 
-const PLAYER_COLORS = ["#F7F8F3", "#1B211C", "#F4921B", "#0000FF", "#FF0037", "#FFDC00", "#1DEB1D", "#F045D2", "#00FFFF"];
+const PLAYER_COLORS = ["#F7F8F3", "#1B211C", "#F4921B", "#0000FF", "#DE2D2D", "#FFDC00", "#1DEB1D", "#F045D2", "#00FFFF"];
 const teamDefaults = {
   light: { color: "#F7F8F3", size: 30, labelMode: "number", showNames: false, presetNum: null, presetPos: "", presetName: "" },
   dark: { color: "#1B211C", size: 30, labelMode: "number", showNames: false, presetNum: null, presetPos: "", presetName: "" }
@@ -1792,7 +1792,7 @@ function textColorFor(hex) {
   // well for a few specific bright/saturated colors — these three read as
   // needing black text even though the formula's weighted brightness
   // score puts them under the threshold
-  const forceBlackText = ["#1DEB1D", "#F045D2", "#FF0037"];
+  const forceBlackText = ["#1DEB1D", "#F045D2"];
   if (forceBlackText.includes(hex.toUpperCase())) return "#1B211C";
   const c = hex.replace("#", "");
   const r = parseInt(c.substr(0,2),16), g = parseInt(c.substr(2,2),16), b = parseInt(c.substr(4,2),16);
