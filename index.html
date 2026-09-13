@@ -5698,6 +5698,56 @@ let isStandaloneDrillMode = false;
 // wording depending on context.
 function phaseNoun() { return isStandaloneDrillMode ? "Phase" : "Activity"; }
 let currentStandaloneDrillId = null;
+
+/* ═════════════════════════════════════════════════════════════════════
+   DRAFT RECOVERY — a periodic local snapshot of whatever's being edited,
+   so an accidental refresh (or closed tab) before Save doesn't lose the
+   work. Only one draft slot at a time; keyed to whichever plan/drill is
+   currently open so it's never restored into the wrong one.
+═════════════════════════════════════════════════════════════════════ */
+const DRAFT_STORAGE_KEY = "csp_draft";
+function currentDraftKey() {
+  return isStandaloneDrillMode ? "drill:" + (currentStandaloneDrillId || "new") : "plan:" + (currentDrillId || "new");
+}
+function saveDraftSnapshot() {
+  if (currentScreen !== "app") return;
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({
+      contextKey: currentDraftKey(),
+      appState: serializeAppState(),
+      isStandaloneDrillMode, currentDrillId, currentStandaloneDrillId,
+      savedAt: Date.now()
+    }));
+  } catch {}
+}
+function clearDraftSnapshot() {
+  try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch {}
+}
+function readDraftSnapshot() {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function applyDraft(draft) {
+  isStandaloneDrillMode = draft.isStandaloneDrillMode;
+  currentDrillId = draft.currentDrillId;
+  currentStandaloneDrillId = draft.currentStandaloneDrillId;
+  loadAppState(draft.appState);
+  applyStandaloneDrillModeUI();
+  toast("Restored your unsaved changes");
+}
+// Restores a draft only if its contextKey matches exactly what's expected
+// right now — an existing plan being reopened by id. Never silently
+// overlays a draft from something else the user might have been working
+// on.
+function tryRestoreDraft(expectedKey) {
+  const draft = readDraftSnapshot();
+  if (!draft || draft.contextKey !== expectedKey) return false;
+  applyDraft(draft);
+  return true;
+}
+setInterval(saveDraftSnapshot, 4000);
 function applyStandaloneDrillModeUI() {
   // Session title stays visible in both the topbar and the Details tab
   // for the standalone drill creator too — previously hidden here, but
@@ -5880,7 +5930,17 @@ function refreshAuthUI() {
       } else {
         const lastScreen = sessionStorage.getItem("lastScreen");
         if (lastScreen === "app") {
-          seedFreshDrill();
+          // no ?id= in the URL to disambiguate which plan/drill a draft
+          // belongs to — but since there's only ever one draft slot, and
+          // we know we were in the editor, trust it directly rather than
+          // requiring an exact key match
+          const draft = readDraftSnapshot();
+          if (draft) {
+            if (draft.isStandaloneDrillMode) openStandaloneDrillEditorBlank(); else seedFreshDrill();
+            applyDraft(draft);
+          } else {
+            seedFreshDrill();
+          }
         } else if (lastScreen === "library") {
           showScreen("library");
           renderLibraryGrid();
@@ -5947,6 +6007,7 @@ async function saveStandaloneDrill() {
     const json = await res.json();
     if (json.id) currentStandaloneDrillId = json.id;
     toast("Drill saved");
+    clearDraftSnapshot();
   } catch {
     toast("Save failed — check your connection and try again");
   }
@@ -5989,6 +6050,7 @@ async function saveDrill() {
     const shareUrl = location.origin + location.pathname + "?id=" + json.id;
     try { await navigator.clipboard.writeText(shareUrl); } catch {}
     toast("Session saved");
+    clearDraftSnapshot();
   } catch (err) {
     toast("Save failed — check your connection and try again");
   }
@@ -6043,6 +6105,7 @@ async function loadDrillFromUrl() {
     const data = await res.json();
     currentDrillId = id;
     loadAppState(data);
+    tryRestoreDraft("plan:" + id); // any unsaved edits from before a refresh take precedence over the last-saved version
     return true;
   } catch {
     toast("Could not load that drill — check your connection");
@@ -6634,6 +6697,9 @@ document.getElementById("add-timeslot-btn").addEventListener("click", () => {
 });
 document.getElementById("practice-starttime-input").addEventListener("input", updateTimetableTimeRanges);
 document.getElementById("close-btn").addEventListener("click", () => {
+  // closing is a deliberate choice to leave, unlike an accidental refresh
+  // — any draft snapshot for this session is no longer needed
+  clearDraftSnapshot();
   // clear ?id= from the URL — otherwise a refresh (or the next deploy
   // reloading the page) would read the stale URL and jump right back
   // into whatever plan was last open, regardless of being back on the
