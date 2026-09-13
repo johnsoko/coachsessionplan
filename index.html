@@ -4630,16 +4630,16 @@ async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
       requestAnimationFrame(frame);
     });
   }
-  function wipeInShapesThumb(tokensSnapshot, shapes, duration) {
-    if (!shapes.length) return Promise.resolve();
+  function wipeInShapesThumb(tokensSnapshot, allShapes, wipeShapes, duration) {
+    if (!wipeShapes.length) return Promise.resolve();
     return new Promise(resolve => {
       const start = performance.now();
-      const ids = shapes.map(s => s.id);
+      const ids = wipeShapes.map(s => s.id);
       function frame(now) {
         if (isDone()) { resolve(); return; }
         const t = Math.min(1, (now - start) / duration);
         const prog = {}; ids.forEach(id => prog[id] = t);
-        render({ tokens: tokensSnapshot, shapes }, prog);
+        render({ tokens: tokensSnapshot, shapes: allShapes }, prog);
         if (t < 1) requestAnimationFrame(frame); else resolve();
       }
       requestAnimationFrame(frame);
@@ -4648,16 +4648,24 @@ async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
 
   for (let i = 0; i < ph.scenes.length && !isDone(); i++) {
     const scene = ph.scenes[i];
-    const hideProg = Object.fromEntries(scene.shapes.map(s => [s.id, 0]));
     if (i === 0) {
+      const hideProg = Object.fromEntries(scene.shapes.map(s => [s.id, 0]));
       render({ tokens: scene.tokens, shapes: scene.shapes }, hideProg);
-      await wipeInShapesThumb(scene.tokens, scene.shapes, 500);
+      await wipeInShapesThumb(scene.tokens, scene.shapes, scene.shapes, 500);
     } else {
       const prev = ph.scenes[i - 1];
+      // only shapes that are new to this scene or actually differ from
+      // the previous one get wiped in — one that carried over unchanged
+      // just stays visible the whole time, matching the main editor
+      const shapesToWipe = scene.shapes.filter(s => {
+        const prevShape = prev.shapes.find(ps => ps.id === s.id);
+        return !prevShape || JSON.stringify(prevShape) !== JSON.stringify(s);
+      });
+      const hideProg = Object.fromEntries(shapesToWipe.map(s => [s.id, 0]));
       render({ tokens: prev.tokens, shapes: scene.shapes }, hideProg);
       await tweenTokens(prev.tokens, scene.tokens, scene.shapes, 700, hideProg);
       if (isDone()) break;
-      await wipeInShapesThumb(scene.tokens, scene.shapes, 500);
+      await wipeInShapesThumb(scene.tokens, scene.shapes, shapesToWipe, 500);
     }
     if (isDone()) break;
     await wait(650);
