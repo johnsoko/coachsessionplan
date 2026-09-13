@@ -1028,6 +1028,17 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="unsaved-changes-modal-overlay">
+    <div class="modal-card">
+      <h4>You have unsaved changes</h4>
+      <p style="font-size:13.5px; color:var(--ink-soft); margin-bottom:4px;">If you leave now, whatever you've changed since your last save will be lost.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="unsaved-changes-go-back-btn">Go Back</button>
+        <button class="btn btn-primary" id="unsaved-changes-leave-btn" style="background:#B3452C;">Leave Without Saving</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="import-phase-modal-overlay">
     <div class="modal-card modal-card-wide">
       <div class="import-phase-header">
@@ -5705,6 +5716,18 @@ let currentStandaloneDrillId = null;
    work. Only one draft slot at a time; keyed to whichever plan/drill is
    currently open so it's never restored into the wrong one.
 ═════════════════════════════════════════════════════════════════════ */
+// tracks what was actually saved (or freshly loaded) so Close can tell
+// whether there are genuinely unsaved changes to warn about — separate
+// from the draft system, which is purely for surviving an accidental
+// refresh, not for deciding whether to interrupt a deliberate Close
+let lastSavedSnapshotJSON = null;
+function markSavedSnapshot() {
+  try { lastSavedSnapshotJSON = JSON.stringify(serializeAppState()); } catch { lastSavedSnapshotJSON = null; }
+}
+function hasUnsavedChanges() {
+  if (lastSavedSnapshotJSON === null || currentScreen !== "app") return false;
+  try { return JSON.stringify(serializeAppState()) !== lastSavedSnapshotJSON; } catch { return false; }
+}
 const DRAFT_STORAGE_KEY = "csp_draft";
 function currentDraftKey() {
   return isStandaloneDrillMode ? "drill:" + (currentStandaloneDrillId || "new") : "plan:" + (currentDrillId || "new");
@@ -6008,6 +6031,7 @@ async function saveStandaloneDrill() {
     if (json.id) currentStandaloneDrillId = json.id;
     toast("Drill saved");
     clearDraftSnapshot();
+    markSavedSnapshot();
   } catch {
     toast("Save failed — check your connection and try again");
   }
@@ -6051,6 +6075,7 @@ async function saveDrill() {
     try { await navigator.clipboard.writeText(shareUrl); } catch {}
     toast("Session saved");
     clearDraftSnapshot();
+    markSavedSnapshot();
   } catch (err) {
     toast("Save failed — check your connection and try again");
   }
@@ -6105,6 +6130,7 @@ async function loadDrillFromUrl() {
     const data = await res.json();
     currentDrillId = id;
     loadAppState(data);
+    markSavedSnapshot(); // baseline is the server's last-saved version, BEFORE any draft gets overlaid
     tryRestoreDraft("plan:" + id); // any unsaved edits from before a refresh take precedence over the last-saved version
     return true;
   } catch {
@@ -6154,6 +6180,7 @@ function seedFreshDrill() {
   switchMode("draw");
   showScreen("app");
   requestAnimationFrame(() => resizeCanvas());
+  markSavedSnapshot(); // fresh blank state is the baseline — any edit from here counts as unsaved
 }
 
 let allDashboardPlans = [];
@@ -6517,6 +6544,7 @@ async function openStandaloneDrillEditorExisting(id) {
     switchMode("draw");
     showScreen("app");
     requestAnimationFrame(() => resizeCanvas());
+    markSavedSnapshot(); // baseline is the loaded drill's saved state
   } catch {
     toast("Could not load that drill — check your connection");
   }
@@ -6696,7 +6724,7 @@ document.getElementById("add-timeslot-btn").addEventListener("click", () => {
   renderPhaseNotes();
 });
 document.getElementById("practice-starttime-input").addEventListener("input", updateTimetableTimeRanges);
-document.getElementById("close-btn").addEventListener("click", () => {
+function proceedWithClose() {
   // closing is a deliberate choice to leave, unlike an accidental refresh
   // — any draft snapshot for this session is no longer needed
   clearDraftSnapshot();
@@ -6710,6 +6738,23 @@ document.getElementById("close-btn").addEventListener("click", () => {
   // nav has one-click access to any of the three
   showScreen("home");
   renderHomeDashboard();
+}
+document.getElementById("close-btn").addEventListener("click", () => {
+  if (hasUnsavedChanges()) {
+    document.getElementById("unsaved-changes-modal-overlay").classList.add("open");
+  } else {
+    proceedWithClose();
+  }
+});
+document.getElementById("unsaved-changes-go-back-btn").addEventListener("click", () => {
+  document.getElementById("unsaved-changes-modal-overlay").classList.remove("open");
+});
+document.getElementById("unsaved-changes-leave-btn").addEventListener("click", () => {
+  document.getElementById("unsaved-changes-modal-overlay").classList.remove("open");
+  proceedWithClose();
+});
+document.getElementById("unsaved-changes-modal-overlay").addEventListener("click", e => {
+  if (e.target.id === "unsaved-changes-modal-overlay") document.getElementById("unsaved-changes-modal-overlay").classList.remove("open");
 });
 
 loadDrillFromUrl();
