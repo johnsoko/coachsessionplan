@@ -4587,7 +4587,7 @@ function updateSceneLabelsOnly(ph) {
 const activeThumbAnimations = new WeakMap();
 function easeInOutThumb(t) { return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2; }
 const THUMB_PLAY_ICON = `<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4 2.5v9l8-4.5z" fill="currentColor"/></svg>`;
-const THUMB_PAUSE_ICON = `<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="3.5" y="2.5" width="2.6" height="9" fill="currentColor"/><rect x="7.9" y="2.5" width="2.6" height="9" fill="currentColor"/></svg>`;
+const THUMB_STOP_ICON = `<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="3.5" y="3.5" width="7" height="7" fill="currentColor"/></svg>`;
 async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
   baseOpts = baseOpts || {};
   if (activeThumbAnimations.has(containerEl)) { activeThumbAnimations.get(containerEl).stop(); return; }
@@ -4603,7 +4603,7 @@ async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
   // (including the main editor's own scene transitions) visibly choppy.
   const isDone = () => stopped || !containerEl.isConnected;
   activeThumbAnimations.set(containerEl, { stop: () => { stopped = true; } });
-  if (playBtnEl) { playBtnEl.classList.add("playing"); playBtnEl.innerHTML = THUMB_PAUSE_ICON; playBtnEl.title = "Pause this phase's animation"; }
+  if (playBtnEl) { playBtnEl.classList.add("playing"); playBtnEl.innerHTML = THUMB_STOP_ICON; playBtnEl.title = "Stop this phase's animation"; }
 
   function render(sceneOverride, shapeProgress) {
     containerEl.innerHTML = phaseThumbHTML(ph, { ...baseOpts, sceneOverride, shapeProgress });
