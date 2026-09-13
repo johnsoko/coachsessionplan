@@ -3654,10 +3654,23 @@ function revealedShapeAt(s, progress) {
   // snaps to the true curve once fully drawn, which reads fine at speed
   return { ...s, x2: s.x1 + (s.x2 - s.x1) * progress, y2: s.y1 + (s.y2 - s.y1) * progress, curved: false };
 }
+// mirrors renderShapes()'s draw order (zone-marker shapes underneath,
+// everything else on top) so clicking always hits whatever's visually
+// on top at that point, not a zone rectangle sitting underneath it
+function shapesInHitTestOrder() {
+  const nonZone = shapes.filter(s => !SHAPE_KINDS.includes(s.style)).slice().reverse();
+  const zone = shapes.filter(s => SHAPE_KINDS.includes(s.style)).slice().reverse();
+  return nonZone.concat(zone);
+}
 function renderShapes() {
   if (!rectW) return;
   ctx.clearRect(0, 0, rectW, rectH);
-  shapes.forEach(s => {
+  // zone-marker shapes (rectangle/circle/triangle/diamond) act as a
+  // backdrop, not an annotation on top of everything else — they always
+  // draw first/underneath, regardless of creation order, so arrows and
+  // paths drawn earlier still stay fully visible on top of them
+  const ordered = shapes.filter(s => SHAPE_KINDS.includes(s.style)).concat(shapes.filter(s => !SHAPE_KINDS.includes(s.style)));
+  ordered.forEach(s => {
     const prog = playbackProgress[s.id];
     if (prog !== undefined) {
       if (prog > 0.01) drawShape(revealedShapeAt(s, prog), false);
@@ -3758,10 +3771,8 @@ function onStageDown(e) {
   }
   if (currentTool === "arrow" || currentTool === "shape") {
     e.preventDefault();
-    const hitIdx = shapes.slice().reverse().findIndex(s => hitTestShape(s, p.x, p.y));
-    if (hitIdx >= 0) {
-      const real = shapes.length - 1 - hitIdx;
-      const clicked = shapes[real];
+    const clicked = shapesInHitTestOrder().find(s => hitTestShape(s, p.x, p.y));
+    if (clicked) {
       if (multiShapeIds.includes(clicked.id) && (multiTokenIds.length + multiShapeIds.length > 1)) { startGroupDrag(p); return; }
       selectAndMaybeMoveShape(clicked, p);
       return;
@@ -3775,10 +3786,8 @@ function onStageDown(e) {
     return;
   }
 
-  const hitIdx = shapes.slice().reverse().findIndex(s => hitTestShape(s, p.x, p.y));
-  if (hitIdx >= 0) {
-    const real = shapes.length - 1 - hitIdx;
-    const clicked = shapes[real];
+  const clicked = shapesInHitTestOrder().find(s => hitTestShape(s, p.x, p.y));
+  if (clicked) {
     if (multiShapeIds.includes(clicked.id) && (multiTokenIds.length + multiShapeIds.length > 1)) { startGroupDrag(p); return; }
     selectAndMaybeMoveShape(clicked, p);
   } else {
@@ -4123,7 +4132,11 @@ function phaseThumbHTML(ph, opts) {
   const toVB = (px) => (px / REAL_W) * vbW * scaleMult;
   const fieldMarkup = opts.fieldColor ? surf.markup.split("#2E6B3F").join(opts.fieldColor) : surf.markup;
 
-  const shapeMarkup = (sc.shapes || []).map(s => {
+  // zone-marker shapes draw first/underneath here too, matching the
+  // live canvas — otherwise a zone rectangle would show up covering any
+  // arrows in the thumbnail even though it doesn't on the real canvas
+  const shapesInOrder = (sc.shapes || []).filter(s => SHAPE_KINDS.includes(s.style)).concat((sc.shapes || []).filter(s => !SHAPE_KINDS.includes(s.style)));
+  const shapeMarkup = shapesInOrder.map(s => {
     const color = s.color || "#F7F8F3";
     const width = Math.max(toVB(1), toVB(s.width || 2.4));
     // matches revealedShapeAt() in the main engine exactly: a dribble
