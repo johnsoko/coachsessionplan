@@ -1842,6 +1842,7 @@ const textDefaults  = { color: "#F7F8F3", size: 18 };
 const SHAPE_KINDS = ["circle", "square", "triangle"];
 const ARROW_KINDS = ["run", "pass", "dribble"];
 function textColorFor(hex) {
+  hex = hex || "#F7F8F3"; // some older saved tokens have no explicit color — fall back to the default light player color rather than throwing
   // the generic luminance formula below doesn't match perceived contrast
   // well for a few specific bright/saturated colors — these three read as
   // needing black text even though the formula's weighted brightness
@@ -6653,7 +6654,6 @@ async function openStandaloneDrillEditorExisting(id) {
     activePhaseId = null;
     document.getElementById("title-input").value = data.title || "";
     document.getElementById("notes-title-input").value = data.title || "";
-    document.getElementById("drill-dimensions-input").value = data.dimensions || "";
     setTags(Array.isArray(data.tags) ? data.tags : []);
     isStandaloneDrillMode = true;
     currentStandaloneDrillId = id;
