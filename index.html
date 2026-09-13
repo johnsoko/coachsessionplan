@@ -3141,7 +3141,7 @@ function showPopoverForToken(t) {
 function showArrowPopoverForSelection() {
   closeAllPopovers();
   if (!toolsPanelVisible()) return;
-  const s = activeShape();
+  const s = shapes.find(sh => sh.id === selectedShapeId);
   if (s && SHAPE_KINDS.includes(s.style)) { document.getElementById("shape-popover").classList.add("open"); syncShapePopover(); focusOpenPanel("shape-popover"); }
   else { document.getElementById("arrow-popover").classList.add("open"); syncArrowPopover(); focusOpenPanel("arrow-popover"); }
 }
