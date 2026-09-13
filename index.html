@@ -5932,9 +5932,49 @@ function serializeAppState() {
   };
 }
 
+// Repairs scene-to-scene id continuity for drills/phases saved by an
+// earlier version of the app that assigned an independent new id per
+// scene instead of reusing the same id for the same logical object
+// across scenes — without this, the tween/wipe animation logic (which
+// matches objects between scenes by id to tell "moved" from "brand
+// new") treats everything as brand-new every scene, causing jump-cuts
+// instead of tweens and every shape re-wiping in instead of staying
+// put. Fixing the loading code stops NEW corruption, but can't repair
+// data that was already saved wrong — this does that repair on load.
+//
+// Detection is conservative on purpose: only triggers when NONE of a
+// scene's tokens (or shapes) match anything in the previous scene by
+// id AND the counts line up exactly — a strong signal this is the
+// exact "everything got a fresh id" corruption, not a scene that
+// legitimately swapped in different objects. Matching is purely
+// positional within same-kind groups (type+team for tokens, style for
+// shapes), since scenes are always created by cloning the previous
+// one, which preserves relative array order.
+function repairPhaseSceneIdContinuity(ph) {
+  function groupBy(list, keyFn) {
+    const map = new Map();
+    list.forEach(item => { const k = keyFn(item); if (!map.has(k)) map.set(k, []); map.get(k).push(item); });
+    return map;
+  }
+  function reconcile(prevList, curList, keyFn) {
+    if (!curList.length || curList.length !== prevList.length) return;
+    const prevIds = new Set(prevList.map(x => x.id));
+    if (!curList.every(x => !prevIds.has(x.id))) return; // some already matched — leave alone
+    const prevGroups = groupBy(prevList, keyFn), curGroups = groupBy(curList, keyFn);
+    let ok = true;
+    curGroups.forEach((list, k) => { if (!prevGroups.has(k) || prevGroups.get(k).length !== list.length) ok = false; });
+    if (!ok) return;
+    curGroups.forEach((list, k) => { const pl = prevGroups.get(k); list.forEach((item, idx) => { item.id = pl[idx].id; }); });
+  }
+  for (let i = 1; i < ph.scenes.length; i++) {
+    reconcile(ph.scenes[i-1].tokens, ph.scenes[i].tokens, t => t.type + ":" + (t.team || ""));
+    reconcile(ph.scenes[i-1].shapes, ph.scenes[i].shapes, s => s.style);
+  }
+}
 function loadAppState(data) {
   if (data.title != null) document.getElementById("title-input").value = data.title;
   if (Array.isArray(data.phases) && data.phases.length) phases = data.phases;
+  phases.forEach(repairPhaseSceneIdContinuity);
   if (data.phaseNextId) phaseNextId = data.phaseNextId;
   if (data.sceneNextId) sceneNextId = data.sceneNextId;
   if (data.nextId) nextId = data.nextId;
@@ -6665,6 +6705,7 @@ async function openStandaloneDrillEditorExisting(id) {
       id: phaseNextId++, surface: data.surface || "full", scenes, activeSceneId: scenes[0].id,
       noteBlocks: [data.notes || ""], title: data.title || "", duration: "", dimensions: data.dimensions || ""
     };
+    repairPhaseSceneIdContinuity(ph); // in case this specific drill was saved with the id-mismatch corruption before the underlying bug was fixed
     tokens = []; shapes = [];
     phases = [ph];
     activePhaseId = null;
