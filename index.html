@@ -770,7 +770,7 @@
      update reads as a transition rather than a hard jump (landing-screen
      has its own separate fonts-ready fade, handled above, so it's left
      out here to avoid the two competing) */
-  #signin-screen.screen-enter, #dashboard-screen.screen-enter, #library-screen.screen-enter, #library-detail-screen.screen-enter, #app-shell.screen-enter {
+  #signin-screen.screen-enter, #home-screen.screen-enter, #dashboard-screen.screen-enter, #library-screen.screen-enter, #library-detail-screen.screen-enter, #app-shell.screen-enter {
     animation: screenFadeIn 0.25s ease;
   }
   .landing-inner { max-width: 560px; text-align: center; }
@@ -866,6 +866,24 @@
   .dash-plan-menu .dropdown-item.danger { color: #B3452C; }
 
   /* ═════════════════════════════════════════════════════════════════════
+     HOME DASHBOARD
+  ═════════════════════════════════════════════════════════════════════ */
+  .home-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
+  .home-stat-card { border: 1px solid var(--line); border-radius: 12px; background: var(--paper-card); padding: 18px 20px; }
+  .home-stat-number { font-family: var(--display); font-size: 30px; font-weight: 700; color: var(--pitch-deep); line-height: 1.1; }
+  .home-stat-label { font-size: 12.5px; font-weight: 600; color: var(--ink-faint); margin-top: 4px; }
+  .home-stat-sub { font-size: 11.5px; color: var(--ink-faint); margin-top: 6px; }
+  .home-quick-actions { display: flex; gap: 10px; margin-bottom: 30px; }
+  .home-section-title { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--ink); margin-bottom: 12px; }
+  .home-recent-row {
+    display: flex; align-items: center; justify-content: space-between; padding: 12px 14px;
+    border: 1px solid var(--line); border-radius: 9px; background: var(--paper-card); margin-bottom: 8px; cursor: pointer;
+  }
+  .home-recent-row:hover { border-color: var(--pitch); }
+  .home-recent-row-title { font-weight: 600; font-size: 13.5px; color: var(--ink); }
+  .home-recent-row-date { font-size: 12px; color: var(--ink-faint); }
+
+  /* ═════════════════════════════════════════════════════════════════════
      DRILL LIBRARY
   ═════════════════════════════════════════════════════════════════════ */
   #library-screen { display: flex; min-height: 100vh; }
@@ -936,10 +954,33 @@
   </div>
 
   <!-- ══════════════════════════ MAIN APP (hidden until signed in) ══════════════════════════ -->
+  <!-- ══════════════════════════ HOME (generic landing dashboard) ══════════════════════════ -->
+  <div id="home-screen" style="display:none;">
+    <div class="dash-sidebar">
+      <div class="dash-logo">coachsessionplan</div>
+      <button class="dash-nav-item active" id="home-nav-home">Home</button>
+      <div class="dash-section-label">Practice Planning</div>
+      <button class="dash-nav-item" id="home-nav-drills" title="Create and manage individual drills">Drill Creator</button>
+      <button class="dash-nav-item" id="home-nav-plans">Practice Plans</button>
+      <button class="dash-nav-item" id="home-nav-library" title="Drills you've saved for reuse">Drill Library</button>
+    </div>
+    <div class="dash-main">
+      <div class="dash-header"><h1>Home</h1></div>
+      <div class="home-stats-grid" id="home-stats-grid"><p class="dash-empty">Loading…</p></div>
+      <div class="home-quick-actions">
+        <button class="btn btn-primary" id="home-new-plan-btn">+ New Practice Plan</button>
+        <button class="btn btn-ghost" id="home-new-drill-btn">+ New Drill</button>
+      </div>
+      <h2 class="home-section-title">Recently Updated Practice Plans</h2>
+      <div id="home-recent-plans-list"><p class="dash-empty">Loading…</p></div>
+    </div>
+  </div>
+
   <!-- ══════════════════════════ DASHBOARD ══════════════════════════ -->
   <div id="dashboard-screen" style="display:none;">
     <div class="dash-sidebar">
       <div class="dash-logo">coachsessionplan</div>
+      <button class="dash-nav-item" id="dash-nav-home">Home</button>
       <div class="dash-section-label">Practice Planning</div>
       <button class="dash-nav-item" id="dash-nav-drills" title="Create and manage individual drills">
         Drill Creator
@@ -1037,8 +1078,12 @@
   <div id="library-screen" style="display:none;">
     <div class="dash-sidebar">
       <div class="dash-logo">coachsessionplan</div>
-      <button class="dash-nav-item" id="lib-back-to-dashboard-btn" style="margin-bottom:14px;">&larr; Practice Plans</button>
-      <div class="dash-section-label">Search</div>
+      <button class="dash-nav-item" id="lib-nav-home">Home</button>
+      <div class="dash-section-label">Practice Planning</div>
+      <button class="dash-nav-item" id="lib-nav-drills" title="Create and manage individual drills">Drill Creator</button>
+      <button class="dash-nav-item" id="lib-nav-plans">Practice Plans</button>
+      <button class="dash-nav-item active" id="lib-nav-library">Drill Library</button>
+      <div class="dash-section-label" style="margin-top:16px;">Search</div>
       <input type="text" id="lib-search-input" class="field-input" placeholder="Search drill…" style="margin-bottom:16px;">
       <div class="dash-section-label">Tags</div>
       <input type="text" id="lib-tag-search-input" class="field-input" placeholder="Search in tags…" style="margin-bottom:10px;">
@@ -5706,10 +5751,11 @@ function showScreen(name) {
   // remembers which of the two "real" app screens was last active, so a
   // refresh lands back on the editor rather than bouncing to the
   // dashboard just because there's no ?id= for an unsaved new plan yet
-  if (["app", "dashboard", "library", "library-detail"].includes(name)) sessionStorage.setItem("lastScreen", name);
+  if (["app", "home", "dashboard", "library", "library-detail"].includes(name)) sessionStorage.setItem("lastScreen", name);
   document.getElementById("initial-loading").style.display = "none";
   document.getElementById("landing-screen").style.display = name === "landing" ? "flex" : "none";
   document.getElementById("signin-screen").style.display = name === "signin" ? "flex" : "none";
+  document.getElementById("home-screen").style.display = name === "home" ? "flex" : "none";
   document.getElementById("dashboard-screen").style.display = name === "dashboard" ? "flex" : "none";
   document.getElementById("library-screen").style.display = name === "library" ? "flex" : "none";
   document.getElementById("library-detail-screen").style.display = name === "library-detail" ? "block" : "none";
@@ -5718,6 +5764,7 @@ function showScreen(name) {
   // instant hard cut — restart the animation each time by removing and
   // re-adding the class (forcing a reflow in between so it re-triggers)
   const el = name === "signin" ? document.getElementById("signin-screen")
+    : name === "home" ? document.getElementById("home-screen")
     : name === "dashboard" ? document.getElementById("dashboard-screen")
     : name === "library" ? document.getElementById("library-screen")
     : name === "library-detail" ? document.getElementById("library-detail-screen")
@@ -5820,9 +5867,15 @@ function refreshAuthUI() {
           renderLibraryGrid();
         } else if (lastScreen === "library-detail" && sessionStorage.getItem("lastLibraryDetailId")) {
           openLibraryDrillDetail(sessionStorage.getItem("lastLibraryDetailId"));
-        } else {
+        } else if (lastScreen === "dashboard") {
           showScreen("dashboard");
           renderDashboardPlans();
+        } else {
+          // Home is the true default landing page now — a fresh sign-in
+          // with no prior screen recorded lands here, not directly on
+          // Practice Plans
+          showScreen("home");
+          renderHomeDashboard();
         }
       }
     }
@@ -6024,6 +6077,76 @@ function seedFreshDrill() {
 let allDashboardPlans = [];
 let selectedDashboardTags = new Set();
 let selectedRowIds = new Set(); // for future bulk delete/duplicate/visibility actions
+
+/* ═════════════════════════════════════════════════════════════════════
+   HOME DASHBOARD — the generic landing page you return to whenever you
+   close out of the drill creator, a practice plan, or the drill library.
+   Stats are computed client-side from the same lightweight list
+   endpoints the other pages already use — no separate backend endpoint.
+═════════════════════════════════════════════════════════════════════ */
+async function renderHomeDashboard() {
+  const statsEl = document.getElementById("home-stats-grid");
+  const recentEl = document.getElementById("home-recent-plans-list");
+  statsEl.innerHTML = '<p class="dash-empty">Loading…</p>';
+  recentEl.innerHTML = '<p class="dash-empty">Loading…</p>';
+  try {
+    const token = await getAuthToken();
+    const headers = token ? { authorization: "Bearer " + token } : {};
+    const [plansRes, drillsRes] = await Promise.all([
+      fetch("/api/drills", { headers }),
+      fetch("/api/drill-library", { headers })
+    ]);
+    const plans = plansRes.ok ? (await plansRes.json()).drills : [];
+    const drills = drillsRes.ok ? (await drillsRes.json()).drills : [];
+
+    // most common tag across every saved library drill
+    const tagCounts = new Map();
+    drills.forEach(d => {
+      let tags = [];
+      try { tags = JSON.parse(d.tags || "[]"); } catch {}
+      (Array.isArray(tags) ? tags : []).forEach(t => tagCounts.set(t, (tagCounts.get(t) || 0) + 1));
+    });
+    let topTag = null, topTagCount = 0;
+    tagCounts.forEach((count, tag) => { if (count > topTagCount) { topTag = tag; topTagCount = count; } });
+
+    statsEl.innerHTML = `
+      <div class="home-stat-card">
+        <div class="home-stat-number">${drills.length}</div>
+        <div class="home-stat-label">Drills Created</div>
+      </div>
+      <div class="home-stat-card">
+        <div class="home-stat-number">${plans.length}</div>
+        <div class="home-stat-label">Practice Plans Created</div>
+      </div>
+      <div class="home-stat-card">
+        <div class="home-stat-number">${topTag ? escapeHtml(topTag) : "—"}</div>
+        <div class="home-stat-label">Most Common Category</div>
+        <div class="home-stat-sub">${topTag ? `used on ${topTagCount} drill${topTagCount === 1 ? "" : "s"}` : "no tags yet"}</div>
+      </div>
+    `;
+
+    const recentPlans = plans.slice().sort((a, b) => b.updated_at - a.updated_at).slice(0, 5);
+    if (!recentPlans.length) {
+      recentEl.innerHTML = '<p class="dash-empty">No practice plans yet — create your first one above.</p>';
+    } else {
+      recentEl.innerHTML = "";
+      recentPlans.forEach(p => {
+        const updated = new Date(p.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+        const row = document.createElement("div");
+        row.className = "home-recent-row";
+        row.innerHTML = `
+          <span class="home-recent-row-title">${escapeHtml(p.title || "Untitled Play")}</span>
+          <span class="home-recent-row-date">Last edited ${updated}</span>
+        `;
+        row.addEventListener("click", () => openPracticePlan(p.id));
+        recentEl.appendChild(row);
+      });
+    }
+  } catch {
+    statsEl.innerHTML = '<p class="dash-empty">Could not load your stats — check your connection.</p>';
+    recentEl.innerHTML = "";
+  }
+}
 
 async function renderDashboardPlans() {
   const listEl = document.getElementById("dash-plans-list");
@@ -6318,6 +6441,21 @@ async function openStandaloneDrillEditorExisting(id) {
 }
 
 document.getElementById("dash-nav-drills").addEventListener("click", openStandaloneDrillEditorBlank);
+document.getElementById("dash-nav-home").addEventListener("click", () => {
+  showScreen("home");
+  renderHomeDashboard();
+});
+document.getElementById("home-nav-drills").addEventListener("click", openStandaloneDrillEditorBlank);
+document.getElementById("home-nav-plans").addEventListener("click", () => {
+  showScreen("dashboard");
+  renderDashboardPlans();
+});
+document.getElementById("home-nav-library").addEventListener("click", () => {
+  showScreen("library");
+  renderLibraryGrid();
+});
+document.getElementById("home-new-plan-btn").addEventListener("click", seedFreshDrill);
+document.getElementById("home-new-drill-btn").addEventListener("click", openStandaloneDrillEditorBlank);
 
 let allLibraryDrills = [];
 let selectedLibraryTags = new Set();
@@ -6462,7 +6600,12 @@ document.getElementById("dash-nav-library").addEventListener("click", () => {
   showScreen("library");
   renderLibraryGrid();
 });
-document.getElementById("lib-back-to-dashboard-btn").addEventListener("click", () => {
+document.getElementById("lib-nav-home").addEventListener("click", () => {
+  showScreen("home");
+  renderHomeDashboard();
+});
+document.getElementById("lib-nav-drills").addEventListener("click", openStandaloneDrillEditorBlank);
+document.getElementById("lib-nav-plans").addEventListener("click", () => {
   showScreen("dashboard");
   renderDashboardPlans();
 });
@@ -6484,13 +6627,11 @@ document.getElementById("close-btn").addEventListener("click", () => {
   // into whatever plan was last open, regardless of being back on the
   // dashboard visually
   history.replaceState(null, "", location.pathname);
-  if (isStandaloneDrillMode) {
-    showScreen("library");
-    renderLibraryGrid();
-  } else {
-    showScreen("dashboard");
-    renderDashboardPlans();
-  }
+  // Home is the default landing spot whenever closing out of the drill
+  // creator, a practice plan, or the drill library — from here the left
+  // nav has one-click access to any of the three
+  showScreen("home");
+  renderHomeDashboard();
 });
 
 loadDrillFromUrl();
