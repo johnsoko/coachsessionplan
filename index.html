@@ -1788,6 +1788,12 @@ const textDefaults  = { color: "#F7F8F3", size: 18 };
 const SHAPE_KINDS = ["circle", "square", "triangle"];
 const ARROW_KINDS = ["run", "pass", "dribble"];
 function textColorFor(hex) {
+  // the generic luminance formula below doesn't match perceived contrast
+  // well for a few specific bright/saturated colors — these three read as
+  // needing black text even though the formula's weighted brightness
+  // score puts them under the threshold
+  const forceBlackText = ["#1DEB1D", "#F045D2", "#FF0037"];
+  if (forceBlackText.includes(hex.toUpperCase())) return "#1B211C";
   const c = hex.replace("#", "");
   const r = parseInt(c.substr(0,2),16), g = parseInt(c.substr(2,2),16), b = parseInt(c.substr(4,2),16);
   const lum = (0.299*r + 0.587*g + 0.114*b) / 255;
