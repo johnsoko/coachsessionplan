@@ -3947,6 +3947,7 @@ async function loadSceneWithTransition(sceneId) {
   const ph = phases.find(p => p.id === activePhaseId);
   if (!ph || isPlaying || manualSceneTransitionActive || sceneId === ph.activeSceneId) return;
   const fromTokens = tokens.map(t => ({ id: t.id, x: t.x, y: t.y }));
+  const fromShapes = shapes.slice();
   manualSceneTransitionActive = true;
   loadScene(sceneId);
   const moves = [];
@@ -3954,7 +3955,10 @@ async function loadSceneWithTransition(sceneId) {
     const from = fromTokens.find(f => f.id === t.id);
     if (from && (from.x !== t.x || from.y !== t.y)) moves.push({ tokenId: t.id, fromX: from.x, fromY: from.y, toX: t.x, toY: t.y });
   });
-  const shapesToWipe = shapes.slice();
+  const shapesToWipe = shapes.filter(s => {
+    const prev = fromShapes.find(ps => ps.id === s.id);
+    return !prev || JSON.stringify(prev) !== JSON.stringify(s);
+  });
   shapesToWipe.forEach(s => { playbackProgress[s.id] = 0; });
   moves.forEach(m => { playbackOverrides[m.tokenId] = { x: m.fromX, y: m.fromY }; });
   renderTokens(); renderShapes();
@@ -5044,7 +5048,11 @@ async function playPhaseScenes(ph, onSceneDone) {
         }
       });
       tokens = scene.tokens; shapes = scene.shapes;
-      shapes.forEach(s => { playbackProgress[s.id] = 0; });
+      const shapesToWipe = shapes.filter(s => {
+        const prev = prevScene.shapes.find(ps => ps.id === s.id);
+        return !prev || JSON.stringify(prev) !== JSON.stringify(s);
+      });
+      shapesToWipe.forEach(s => { playbackProgress[s.id] = 0; });
       playerMoves.concat(otherMoves).forEach(m => { playbackOverrides[m.tokenId] = { x: m.fromX, y: m.fromY }; });
       newPlayers.concat(newOthers, newBalls).forEach(id => hiddenTokenIds.add(id));
       renderTokens(); renderShapes(); renderSceneTimeline();
@@ -5057,7 +5065,7 @@ async function playPhaseScenes(ph, onSceneDone) {
       otherMoves.forEach(m => delete playbackOverrides[m.tokenId]);
       newOthers.forEach(id => hiddenTokenIds.delete(id));
       renderTokens();
-      await wipeInShapes(shapes, 500);
+      await wipeInShapes(shapesToWipe, 500);
       if (!isPlaying) return;
       // only a ball placed fresh in this scene reveals last — a ball that
       // was already moving tweened along with the players above
