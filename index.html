@@ -251,6 +251,12 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.25); z-index: 5;
   }
   .token.dragging { cursor: grabbing; z-index: 20; }
+  .rotation-handle-dot {
+    position: absolute; width: 12px; height: 12px; border-radius: 50%;
+    background: var(--bib); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+    cursor: grab; z-index: 8;
+  }
+  .rotation-handle-dot:active { cursor: grabbing; }
   .token.light { background: var(--paper-card); color: var(--ink); }
   .token.dark  { background: var(--ink); color: var(--paper-card); }
   .token.ball  { width: 18px; height: 18px; background: var(--paper-card); border: 2px solid var(--ink); }
@@ -2359,13 +2365,13 @@ function addToken(type, x, y, team) {
 }
 function addEquipmentToken(kind, x, y) {
   const size = equipmentSizeMemory[kind] != null ? equipmentSizeMemory[kind] : equipmentDefaults.size;
-  const t = { id: nextId++, type: "equipment", kind, x, y, color: equipmentDefaults.color, size };
+  const t = { id: nextId++, type: "equipment", kind, x, y, color: equipmentDefaults.color, size, rotation: 0 };
   tokens.push(t);
   renderTokens();
   return t;
 }
 function addTextToken(content, x, y) {
-  const t = { id: nextId++, type: "text", x, y, content, color: textDefaults.color, size: textDefaults.size };
+  const t = { id: nextId++, type: "text", x, y, content, color: textDefaults.color, size: textDefaults.size, rotation: 0 };
   tokens.push(t);
   return t;
 }
@@ -2716,7 +2722,15 @@ function renderTokens() {
       el.addEventListener("mousedown", ev => startTokenDrag(ev, t.id));
       el.addEventListener("touchstart", ev => startTokenDrag(ev, t.id), {passive:false});
     }
+    if ((t.type === "equipment" || t.type === "text") && t.rotation) {
+      el.style.transform = `translate(-50%, -50%) rotate(${t.rotation}deg)`;
+    }
     layer.appendChild(el);
+    // rotation handle — only for the single selected equipment/text token,
+    // never during a multi-selection or while editing text in place
+    if ((t.type === "equipment" || t.type === "text") && t.id === selectedTokenId && !isEditing && multiTokenIds.length === 0) {
+      layer.appendChild(buildRotationHandle(t, pos));
+    }
     if (t.type === "player" && t.showName && t.name) {
       const nameEl = document.createElement("div");
       nameEl.className = "player-name-label";
@@ -2753,6 +2767,47 @@ function refreshTokenSelectionClasses() {
     const id = Number(el.dataset.tokenId);
     el.classList.toggle("selected", id === selectedTokenId || multiTokenIds.includes(id));
   });
+}
+function buildRotationHandle(t, pos) {
+  const dot = document.createElement("div");
+  dot.className = "rotation-handle-dot";
+  const angleRad = ((t.rotation || 0) - 90) * Math.PI / 180; // -90 so 0° points straight up
+  const dist = 28;
+  const dx = Math.cos(angleRad) * dist;
+  const dy = Math.sin(angleRad) * dist;
+  dot.style.left = pos.x + "%";
+  dot.style.top = pos.y + "%";
+  dot.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+  dot.addEventListener("mousedown", ev => startTokenRotate(ev, t.id));
+  dot.addEventListener("touchstart", ev => startTokenRotate(ev, t.id), {passive:false});
+  return dot;
+}
+function startTokenRotate(ev, id) {
+  ev.stopPropagation(); ev.preventDefault();
+  if (blockIfScene1InAnimate()) return;
+  let moved = false;
+  function onMove(e) {
+    const t = tokens.find(tk => tk.id === id);
+    if (!t) return;
+    const p = pctFromEvent(e);
+    const centerPx = px(t.x, t.y);
+    const mousePx = px(p.x, p.y);
+    const angleDeg = Math.atan2(mousePx.y - centerPx.y, mousePx.x - centerPx.x) * 180 / Math.PI + 90;
+    if (!moved) { moved = true; pushHistory(); }
+    t.rotation = Math.round(angleDeg);
+    renderTokens();
+  }
+  function onUp() {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    document.removeEventListener("touchmove", onMove);
+    document.removeEventListener("touchend", onUp);
+    if (moved) renderPhaseThumbActive();
+  }
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+  document.addEventListener("touchmove", onMove, {passive:false});
+  document.addEventListener("touchend", onUp);
 }
 function startTokenDrag(e, id) {
   if (currentTool !== "select") return;
@@ -3333,14 +3388,25 @@ function drawShape(s, highlight) {
     strokeSmooth(s.points.map(p => px(p.x, p.y)));
     ctx.setLineDash([]);
   } else if (SHAPE_KINDS.includes(s.style)) {
-    drawShapeGeometry(s.style, px(s.x1, s.y1), px(s.x2, s.y2), !!s.fill, color);
+    const p1 = px(s.x1, s.y1), p2 = px(s.x2, s.y2);
+    if (s.rotation) {
+      const cx = (p1.x + p2.x) / 2, cy = (p1.y + p2.y) / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(s.rotation * Math.PI / 180);
+      ctx.translate(-cx, -cy);
+      drawShapeGeometry(s.style, p1, p2, !!s.fill, color);
+      ctx.restore();
+    } else {
+      drawShapeGeometry(s.style, p1, p2, !!s.fill, color);
+    }
   }
 
   if (highlight) {
     shapeEndpoints(s).forEach(pt => {
       const hp = px(pt.x, pt.y);
       ctx.beginPath(); ctx.arc(hp.x, hp.y, pt.role === "control" ? 5 : 6, 0, Math.PI * 2);
-      ctx.fillStyle = pt.role === "control" ? "#3B6FB6" : "#E2892B"; ctx.fill();
+      ctx.fillStyle = pt.role === "control" ? "#3B6FB6" : pt.role === "rotate" ? "#2E6B3F" : "#E2892B"; ctx.fill();
       ctx.lineWidth = 1.5; ctx.strokeStyle = "#F7F8F3"; ctx.setLineDash([]); ctx.stroke();
     });
   }
@@ -3386,6 +3452,16 @@ function shapeEndpoints(s) {
     const c = curveMidpoint(s);
     eps.push({ x: c.x, y: c.y, role: "control" });
   }
+  if (SHAPE_KINDS.includes(s.style)) {
+    // rotation handle sits offset from the shape's center in whatever
+    // direction its current rotation already points "up" toward — so it
+    // visually spins around the shape as you drag it, rather than
+    // jumping back to a fixed screen position every frame
+    const cx = (s.x1 + s.x2) / 2, cy = (s.y1 + s.y2) / 2;
+    const angleRad = ((s.rotation || 0) - 90) * Math.PI / 180;
+    const dist = 8; // percent units
+    eps.push({ x: cx + Math.cos(angleRad) * dist, y: cy + Math.sin(angleRad) * dist, role: "rotate" });
+  }
   return eps;
 }
 function hitTestHandle(s, xPct, yPct) {
@@ -3403,7 +3479,12 @@ function startShapeResize(s, role) {
   function onMove(ev) {
     ev.preventDefault();
     const p = pctFromEvent(ev);
-    if (s.style === "dribble" && s.points && s.points.length) {
+    if (role === "rotate") {
+      const cx = (s.x1 + s.x2) / 2, cy = (s.y1 + s.y2) / 2;
+      const centerPx = px(cx, cy);
+      const mousePx = px(p.x, p.y);
+      s.rotation = Math.round(Math.atan2(mousePx.y - centerPx.y, mousePx.x - centerPx.x) * 180 / Math.PI + 90);
+    } else if (s.style === "dribble" && s.points && s.points.length) {
       const idx = role === "start" ? 0 : s.points.length - 1;
       s.points[idx] = { x: p.x, y: p.y };
     } else if (role === "start") { s.x1 = p.x; s.y1 = p.y; }
@@ -4063,19 +4144,23 @@ function phaseThumbHTML(ph, opts) {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
       const cx = (p1.x+p2.x)/2, cy = (p1.y+p2.y)/2, rx = Math.abs(p2.x-p1.x)/2, ry = Math.abs(p2.y-p1.y)/2;
       const fill = s.fill ? `fill="${color}" fill-opacity="0.22"` : `fill="none"`;
-      return `<ellipse cx="${cx}" cy="${cy}" rx="${rx||1}" ry="${ry||1}" ${fill} stroke="${color}" stroke-width="${width}"/>`;
+      const rotAttr = s.rotation ? ` transform="rotate(${s.rotation} ${cx} ${cy})"` : "";
+      return `<ellipse cx="${cx}" cy="${cy}" rx="${rx||1}" ry="${ry||1}" ${fill} stroke="${color}" stroke-width="${width}"${rotAttr}/>`;
     }
     if (s.style === "square") {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
       const x = Math.min(p1.x,p2.x), y = Math.min(p1.y,p2.y);
+      const w = Math.abs(p2.x-p1.x), h = Math.abs(p2.y-p1.y);
       const fill = s.fill ? `fill="${color}" fill-opacity="0.22"` : `fill="none"`;
-      return `<rect x="${x}" y="${y}" width="${Math.abs(p2.x-p1.x)}" height="${Math.abs(p2.y-p1.y)}" ${fill} stroke="${color}" stroke-width="${width}"/>`;
+      const rotAttr = s.rotation ? ` transform="rotate(${s.rotation} ${x+w/2} ${y+h/2})"` : "";
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${fill} stroke="${color}" stroke-width="${width}"${rotAttr}/>`;
     }
     if (s.style === "triangle") {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
       const x = Math.min(p1.x,p2.x), y = Math.min(p1.y,p2.y), w = Math.abs(p2.x-p1.x), h = Math.abs(p2.y-p1.y);
       const fill = s.fill ? `fill="${color}" fill-opacity="0.22"` : `fill="none"`;
-      return `<polygon points="${x+w/2},${y} ${x+w},${y+h} ${x},${y+h}" ${fill} stroke="${color}" stroke-width="${width}"/>`;
+      const rotAttr = s.rotation ? ` transform="rotate(${s.rotation} ${x+w/2} ${y+h/2})"` : "";
+      return `<polygon points="${x+w/2},${y} ${x+w},${y+h} ${x},${y+h}" ${fill} stroke="${color}" stroke-width="${width}"${rotAttr}/>`;
     }
     return "";
   }).join("");
@@ -4103,37 +4188,34 @@ function phaseThumbHTML(ph, opts) {
       const s = t.size || 22;
       // matched to applyEquipmentStyle()'s real shape for each kind,
       // rather than one generic marker for all equipment
+      let shapeSvg = "";
       if (t.kind === "cone") {
         const half = toVB(s * 0.5), h = toVB(s);
-        return `<polygon points="${p.x},${(p.y-h/2).toFixed(1)} ${(p.x-half).toFixed(1)},${(p.y+h/2).toFixed(1)} ${(p.x+half).toFixed(1)},${(p.y+h/2).toFixed(1)}" fill="${c}"/>`;
-      }
-      if (t.kind === "flatcone") {
+        shapeSvg = `<polygon points="${p.x},${(p.y-h/2).toFixed(1)} ${(p.x-half).toFixed(1)},${(p.y+h/2).toFixed(1)} ${(p.x+half).toFixed(1)},${(p.y+h/2).toFixed(1)}" fill="${c}"/>`;
+      } else if (t.kind === "flatcone") {
         const rx = toVB(s) / 2, ry = toVB(s * 0.42) / 2;
-        return `<ellipse cx="${p.x}" cy="${p.y}" rx="${rx}" ry="${ry}" fill="${c}"/>`;
-      }
-      if (t.kind === "minigoal") {
+        shapeSvg = `<ellipse cx="${p.x}" cy="${p.y}" rx="${rx}" ry="${ry}" fill="${c}"/>`;
+      } else if (t.kind === "minigoal") {
         const w = toVB(s * 0.26), h = toVB(s * 1.15);
-        return `<rect x="${(p.x-w/2).toFixed(1)}" y="${(p.y-h/2).toFixed(1)}" width="${w}" height="${h}" fill="none" stroke="${c}" stroke-width="${toVB(3)}"/>`;
-      }
-      if (t.kind === "largegoal") {
+        shapeSvg = `<rect x="${(p.x-w/2).toFixed(1)}" y="${(p.y-h/2).toFixed(1)}" width="${w}" height="${h}" fill="none" stroke="${c}" stroke-width="${toVB(3)}"/>`;
+      } else if (t.kind === "largegoal") {
         const w = toVB(s * 0.5), h = toVB(s * 1.7);
-        return `<rect x="${(p.x-w/2).toFixed(1)}" y="${(p.y-h/2).toFixed(1)}" width="${w}" height="${h}" fill="none" stroke="${c}" stroke-width="${toVB(4)}"/>`;
-      }
-      if (t.kind === "dummy") {
+        shapeSvg = `<rect x="${(p.x-w/2).toFixed(1)}" y="${(p.y-h/2).toFixed(1)}" width="${w}" height="${h}" fill="none" stroke="${c}" stroke-width="${toVB(4)}"/>`;
+      } else if (t.kind === "dummy") {
         const w = toVB(s * 0.55), h = toVB(s * 1.1);
-        return `<rect x="${(p.x-w/2).toFixed(1)}" y="${(p.y-h/2).toFixed(1)}" width="${w}" height="${h}" rx="${toVB(3)}" fill="${c}"/>`;
-      }
-      if (t.kind === "ladder") {
+        shapeSvg = `<rect x="${(p.x-w/2).toFixed(1)}" y="${(p.y-h/2).toFixed(1)}" width="${w}" height="${h}" rx="${toVB(3)}" fill="${c}"/>`;
+      } else if (t.kind === "ladder") {
         const w = toVB(s * 1.8), h = toVB(s * 0.45);
-        return `<rect x="${(p.x-w/2).toFixed(1)}" y="${(p.y-h/2).toFixed(1)}" width="${w}" height="${h}" fill="none" stroke="${c}" stroke-width="${toVB(2)}"/>`;
+        shapeSvg = `<rect x="${(p.x-w/2).toFixed(1)}" y="${(p.y-h/2).toFixed(1)}" width="${w}" height="${h}" fill="none" stroke="${c}" stroke-width="${toVB(2)}"/>`;
       }
-      return "";
+      return t.rotation ? `<g transform="rotate(${t.rotation} ${p.x} ${p.y})">${shapeSvg}</g>` : shapeSvg;
     }
     if (t.type === "text") {
       // a text label isn't a token at all on the real pitch — showing it
       // as a colored dot risked being mistaken for a player or the ball
       const fontSize = toVB(t.size || 18);
-      return `<text x="${p.x}" y="${p.y + fontSize*0.36}" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="${fontSize}" fill="${c}" text-anchor="middle">T</text>`;
+      const rotAttr = t.rotation ? ` transform="rotate(${t.rotation} ${p.x} ${p.y})"` : "";
+      return `<text x="${p.x}" y="${p.y + fontSize*0.36}" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="${fontSize}" fill="${c}" text-anchor="middle"${rotAttr}>T</text>`;
     }
     return "";
   }).join("");
