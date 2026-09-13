@@ -3762,6 +3762,28 @@ let draggedPhaseId = null;
 // with duplicates. Not yet wired to an actual "add to library" action.
 let selectedForLibraryPhaseIds = new Set();
 const LIBRARY_BADGE_SVG = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 1.5h6a.5.5 0 0 1 .5.5v9l-3.5-2-3.5 2v-9a.5.5 0 0 1 .5-.5z" fill="currentColor"/></svg>`;
+// Deleting a drill from the Library deliberately never touches the phase
+// data of any practice plan that was linked to it — the practice plan's
+// own drill content is never at risk. But that means the badge can go
+// stale: it keeps showing "in your library" even after the library entry
+// is gone. This checks on click rather than trusting the cached badge
+// state, and reverts to a checkbox if the link turned out to be dead.
+async function verifyLibraryBadgeClick(ph) {
+  const id = ph.libraryDrillId;
+  try {
+    const res = await fetch(`/api/drill-library/${id}`);
+    if (res.ok) {
+      toast("Already in your Drill Library"); // opening it directly is coming later
+    } else {
+      ph.libraryDrillId = null;
+      toast("This drill was removed from your Drill Library — check the box to add it back");
+      renderPhaseList();
+      renderPhaseNotes();
+    }
+  } catch {
+    toast("Already in your Drill Library");
+  }
+}
 
 // contentSrc supplies the tokens/shapes to copy (or null for blank);
 // token ids are preserved on the copy (not reassigned) so scene-to-scene
@@ -4148,7 +4170,7 @@ function renderPhaseList() {
     if (libBadge) {
       libBadge.addEventListener("click", e => {
         e.stopPropagation();
-        toast("Already in your Drill Library"); // opening the library entry directly is coming later
+        verifyLibraryBadgeClick(ph);
       });
     }
     const labelInput = div.querySelector(".phase-thumb-label-input");
@@ -4670,7 +4692,7 @@ function renderPhaseNotes() {
         libControl.className = "phase-note-library-badge";
         libControl.title = "In Drill Library";
         libControl.innerHTML = LIBRARY_BADGE_SVG;
-        libControl.addEventListener("click", () => toast("Already in your Drill Library")); // opening it directly is coming later
+        libControl.addEventListener("click", () => verifyLibraryBadgeClick(ph));
       } else {
         libControl = document.createElement("input");
         libControl.type = "checkbox";
