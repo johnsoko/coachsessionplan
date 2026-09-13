@@ -5201,7 +5201,11 @@ async function importDrillIntoPhases(id, title) {
     if (!res.ok) { toast("Could not load that drill"); return; }
     const data = await res.json();
     // fresh ids for every token/shape/scene — this is a new phase in this
-    // session's own drill, not a live link back to the library entry
+    // session's own drill, but it IS linked back to the library entry it
+    // came from (libraryDrillId) so it shows as already-in-the-library
+    // immediately rather than needing to be re-checked. Edits made here
+    // just flow back to that same library entry automatically next time
+    // this practice plan is saved, same as any other linked phase.
     const scenes = (data.scenes && data.scenes.length ? data.scenes : [{ tokens: [], shapes: [] }]).map(sc => ({
       id: sceneNextId++,
       tokens: (sc.tokens || []).map(t => ({ ...t, id: nextId++ })),
@@ -5209,7 +5213,8 @@ async function importDrillIntoPhases(id, title) {
     }));
     const newPhase = {
       id: phaseNextId++, surface: data.surface || "full", scenes, activeSceneId: scenes[0].id,
-      noteBlocks: [data.notes || ""], title: title || "", duration: "", dimensions: data.dimensions || ""
+      noteBlocks: [data.notes || ""], title: title || "", duration: "", dimensions: data.dimensions || "",
+      libraryDrillId: id
     };
     saveActivePhase();
     const insertAt = phases.findIndex(p => p.id === activePhaseId);
