@@ -800,7 +800,7 @@
   }
   .dash-section-label {
     font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
-    color: var(--ink-faint); padding: 0 6px; margin-bottom: 8px;
+    color: var(--ink-faint); padding: 0 6px; margin-bottom: 8px; margin-top: 20px;
   }
   .dash-nav-item {
     display: block; width: 100%; text-align: left; border: none; background: transparent;
@@ -873,7 +873,6 @@
   .home-stat-number { font-family: var(--display); font-size: 30px; font-weight: 700; color: var(--pitch-deep); line-height: 1.1; }
   .home-stat-label { font-size: 12.5px; font-weight: 600; color: var(--ink-faint); margin-top: 4px; }
   .home-stat-sub { font-size: 11.5px; color: var(--ink-faint); margin-top: 6px; }
-  .home-quick-actions { display: flex; gap: 10px; margin-bottom: 30px; }
   .home-section-title { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--ink); margin-bottom: 12px; }
   .home-recent-row {
     display: flex; align-items: center; justify-content: space-between; padding: 12px 14px;
@@ -958,19 +957,15 @@
   <div id="home-screen" style="display:none;">
     <div class="dash-sidebar">
       <div class="dash-logo">coachsessionplan</div>
-      <button class="dash-nav-item active" id="home-nav-home">Home</button>
+      <button class="dash-nav-item active" id="home-nav-home">Dashboard</button>
       <div class="dash-section-label">Practice Planning</div>
       <button class="dash-nav-item" id="home-nav-drills" title="Create and manage individual drills">Drill Creator</button>
       <button class="dash-nav-item" id="home-nav-plans">Practice Plans</button>
       <button class="dash-nav-item" id="home-nav-library" title="Drills you've saved for reuse">Drill Library</button>
     </div>
     <div class="dash-main">
-      <div class="dash-header"><h1>Home</h1></div>
+      <div class="dash-header"><h1>Dashboard</h1></div>
       <div class="home-stats-grid" id="home-stats-grid"><p class="dash-empty">Loading…</p></div>
-      <div class="home-quick-actions">
-        <button class="btn btn-primary" id="home-new-plan-btn">+ New Practice Plan</button>
-        <button class="btn btn-ghost" id="home-new-drill-btn">+ New Drill</button>
-      </div>
       <h2 class="home-section-title">Recently Updated Practice Plans</h2>
       <div id="home-recent-plans-list"><p class="dash-empty">Loading…</p></div>
     </div>
@@ -980,7 +975,7 @@
   <div id="dashboard-screen" style="display:none;">
     <div class="dash-sidebar">
       <div class="dash-logo">coachsessionplan</div>
-      <button class="dash-nav-item" id="dash-nav-home">Home</button>
+      <button class="dash-nav-item" id="dash-nav-home">Dashboard</button>
       <div class="dash-section-label">Practice Planning</div>
       <button class="dash-nav-item" id="dash-nav-drills" title="Create and manage individual drills">
         Drill Creator
@@ -1078,7 +1073,7 @@
   <div id="library-screen" style="display:none;">
     <div class="dash-sidebar">
       <div class="dash-logo">coachsessionplan</div>
-      <button class="dash-nav-item" id="lib-nav-home">Home</button>
+      <button class="dash-nav-item" id="lib-nav-home">Dashboard</button>
       <div class="dash-section-label">Practice Planning</div>
       <button class="dash-nav-item" id="lib-nav-drills" title="Create and manage individual drills">Drill Creator</button>
       <button class="dash-nav-item" id="lib-nav-plans">Practice Plans</button>
@@ -6454,8 +6449,6 @@ document.getElementById("home-nav-library").addEventListener("click", () => {
   showScreen("library");
   renderLibraryGrid();
 });
-document.getElementById("home-new-plan-btn").addEventListener("click", seedFreshDrill);
-document.getElementById("home-new-drill-btn").addEventListener("click", openStandaloneDrillEditorBlank);
 
 let allLibraryDrills = [];
 let selectedLibraryTags = new Set();
