@@ -4068,7 +4068,7 @@ function phaseThumbHTML(ph, opts) {
     return "";
   }).join("");
 
-  return `<svg viewBox="${surf.viewBox}" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%;display:block;">${STRIPES_DEFS}${fieldMarkup}${shapeMarkup}${tokenMarkup}</svg>`;
+  return `<svg viewBox="${surf.viewBox}" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%;display:block;">${STRIPES_DEFS}${fieldMarkup}${shapeMarkup}${tokenMarkup}</svg>`;
 }
 function renderPhaseList() {
   const idx = phases.findIndex(p=>p.id===activePhaseId);
