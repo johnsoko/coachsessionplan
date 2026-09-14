@@ -1537,6 +1537,11 @@
                 <button data-fill="0" class="active">Outline</button>
                 <button data-fill="1">Filled</button>
               </div>
+              <span class="tp-label">Border</span>
+              <div class="tp-toggle-row" id="shape-dash-toggle">
+                <button data-dash="0" class="active">Solid</button>
+                <button data-dash="1">Dashed</button>
+              </div>
             </div>
           </div>
 
@@ -1834,7 +1839,7 @@ const EQUIPMENT_DEFAULT_SIZES = { cone: 14, flatcone: 14, minigoal: 32, largegoa
 let equipmentSizeMemory = { ...EQUIPMENT_DEFAULT_SIZES };
 const EQUIPMENT_KINDS = ["cone", "flatcone", "minigoal", "largegoal", "dummy", "ladder"];
 const drawDefaults  = { color: "#F7F8F3", width: 2.6, curved: false };
-const shapeDefaults = { color: "#F7F8F3", width: 2.4, fill: false };
+const shapeDefaults = { color: "#F7F8F3", width: 2.4, fill: false, dashed: false };
 // same per-kind "last used" memory as equipment, applied to circle/
 // square/triangle so each shape kind remembers its own last width
 let shapeSizeMemory = { circle: 2.4, square: 2.4, triangle: 2.4 };
@@ -3071,10 +3076,12 @@ function syncShapePopover() {
   const color = s ? (s.color || shapeDefaults.color) : shapeDefaults.color;
   const width = s ? (s.width || shapeDefaults.width) : shapeSizeMemory[kind];
   const fill  = s ? !!s.fill : shapeDefaults.fill;
+  const dashed = s ? !!s.dashed : shapeDefaults.dashed;
   document.querySelectorAll("#shape-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
   document.getElementById("shape-size").value = width;
   document.getElementById("shape-size-val").textContent = width.toFixed(1) + "px";
   document.querySelectorAll("#shape-fill-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.fill === "1") === fill));
+  document.querySelectorAll("#shape-dash-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.dash === "1") === dashed));
   document.querySelectorAll("#shape-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o.dataset.style === kind));
 }
 function setShapeColor(color) {
@@ -3092,6 +3099,12 @@ function setShapeFill(fill) {
   pushHistory();
   const matched = activeShapesOfKind(SHAPE_KINDS);
   if (matched.length) { matched.forEach(s => s.fill = fill); renderShapes(); } else { shapeDefaults.fill = fill; }
+  syncShapePopover();
+}
+function setShapeDash(dashed) {
+  pushHistory();
+  const matched = activeShapesOfKind(SHAPE_KINDS);
+  if (matched.length) { matched.forEach(s => s.dashed = dashed); renderShapes(); } else { shapeDefaults.dashed = dashed; }
   syncShapePopover();
 }
 
@@ -3241,6 +3254,9 @@ function initShapePopover() {
   sizeInput.addEventListener("change", () => pushHistory());
   document.querySelectorAll("#shape-fill-toggle button").forEach(btn => {
     btn.addEventListener("click", () => setShapeFill(btn.dataset.fill === "1"));
+  });
+  document.querySelectorAll("#shape-dash-toggle button").forEach(btn => {
+    btn.addEventListener("click", () => setShapeDash(btn.dataset.dash === "1"));
   });
   document.querySelectorAll("#shape-popover .arrow-opt").forEach(opt => {
     opt.addEventListener("click", e => {
@@ -3429,6 +3445,7 @@ function drawShape(s, highlight) {
     ctx.setLineDash([]);
   } else if (SHAPE_KINDS.includes(s.style)) {
     const p1 = px(s.x1, s.y1), p2 = px(s.x2, s.y2);
+    ctx.setLineDash(s.dashed ? [6, 4] : []);
     if (s.rotation) {
       const cx = (p1.x + p2.x) / 2, cy = (p1.y + p2.y) / 2;
       ctx.save();
@@ -3440,6 +3457,7 @@ function drawShape(s, highlight) {
     } else {
       drawShapeGeometry(s.style, p1, p2, !!s.fill, color);
     }
+    ctx.setLineDash([]);
   }
 
   if (highlight) {
@@ -4202,7 +4220,8 @@ function phaseThumbHTML(ph, opts) {
       const cx = (p1.x+p2.x)/2, cy = (p1.y+p2.y)/2, rx = Math.abs(p2.x-p1.x)/2, ry = Math.abs(p2.y-p1.y)/2;
       const fill = s.fill ? `fill="${color}" fill-opacity="0.22"` : `fill="none"`;
       const rotAttr = s.rotation ? ` transform="rotate(${s.rotation} ${cx} ${cy})"` : "";
-      return `<ellipse cx="${cx}" cy="${cy}" rx="${rx||1}" ry="${ry||1}" ${fill} stroke="${color}" stroke-width="${width}"${rotAttr}/>`;
+      const dashAttr = s.dashed ? ` stroke-dasharray="${toVB(6)},${toVB(4)}"` : "";
+      return `<ellipse cx="${cx}" cy="${cy}" rx="${rx||1}" ry="${ry||1}" ${fill} stroke="${color}" stroke-width="${width}"${dashAttr}${rotAttr}/>`;
     }
     if (s.style === "square") {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
@@ -4210,14 +4229,16 @@ function phaseThumbHTML(ph, opts) {
       const w = Math.abs(p2.x-p1.x), h = Math.abs(p2.y-p1.y);
       const fill = s.fill ? `fill="${color}" fill-opacity="0.22"` : `fill="none"`;
       const rotAttr = s.rotation ? ` transform="rotate(${s.rotation} ${x+w/2} ${y+h/2})"` : "";
-      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${fill} stroke="${color}" stroke-width="${width}"${rotAttr}/>`;
+      const dashAttr = s.dashed ? ` stroke-dasharray="${toVB(6)},${toVB(4)}"` : "";
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${fill} stroke="${color}" stroke-width="${width}"${dashAttr}${rotAttr}/>`;
     }
     if (s.style === "triangle") {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
       const x = Math.min(p1.x,p2.x), y = Math.min(p1.y,p2.y), w = Math.abs(p2.x-p1.x), h = Math.abs(p2.y-p1.y);
       const fill = s.fill ? `fill="${color}" fill-opacity="0.22"` : `fill="none"`;
       const rotAttr = s.rotation ? ` transform="rotate(${s.rotation} ${x+w/2} ${y+h/2})"` : "";
-      return `<polygon points="${x+w/2},${y} ${x+w},${y+h} ${x},${y+h}" ${fill} stroke="${color}" stroke-width="${width}"${rotAttr}/>`;
+      const dashAttr = s.dashed ? ` stroke-dasharray="${toVB(6)},${toVB(4)}"` : "";
+      return `<polygon points="${x+w/2},${y} ${x+w},${y+h} ${x},${y+h}" ${fill} stroke="${color}" stroke-width="${width}"${dashAttr}${rotAttr}/>`;
     }
     return "";
   }).join("");
