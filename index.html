@@ -910,19 +910,18 @@
   .home-tag-bar-track { flex: 1; background: var(--paper-raised); border-radius: 4px; height: 18px; overflow: hidden; }
   .home-tag-bar-fill { height: 100%; background: var(--pitch); border-radius: 4px; min-width: 3px; transition: width 0.3s ease; }
   .home-tag-bar-count { width: 28px; flex-shrink: 0; font-size: 12.5px; color: var(--ink-faint); font-weight: 600; }
-  .home-tag-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
-  .home-tag-chart-col { min-width: 0; }
   .home-tag-chart-more {
     margin-top: 4px; background: none; border: none; color: var(--pitch-deep); font-weight: 600;
     font-size: 12.5px; cursor: pointer; padding: 4px 2px;
   }
   .home-tag-chart-more:hover { text-decoration: underline; }
-  .home-tag-pie-wrap { display: flex; align-items: center; gap: 20px; }
-  .home-tag-pie-legend { flex: 1; min-width: 0; }
-  .home-tag-pie-legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 12.5px; }
-  .home-tag-pie-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-  .home-tag-pie-legend-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: 600; }
-  .home-tag-pie-legend-pct { color: var(--ink-faint); font-weight: 600; flex-shrink: 0; }
+  .home-tag-stack-track { display: flex; width: 100%; height: 22px; border-radius: 5px; overflow: hidden; margin-bottom: 14px; }
+  .home-tag-stack-seg { height: 100%; }
+  .home-tag-stack-legend { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+  .home-tag-stack-legend-row { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+  .home-tag-stack-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .home-tag-stack-legend-label { color: var(--ink); font-weight: 600; }
+  .home-tag-stack-legend-pct { color: var(--ink-faint); font-weight: 600; }
 
   /* ═════════════════════════════════════════════════════════════════════
      DRILL LIBRARY
@@ -1011,15 +1010,10 @@
       <h2 class="home-section-title">Recently Updated Practice Plans</h2>
       <div id="home-recent-plans-list"><p class="dash-empty">Loading…</p></div>
       <h2 class="home-section-title" style="margin-top:28px;">Practice Plan Tags</h2>
-      <div class="home-tag-charts-row">
-        <div class="home-tag-chart-col">
-          <div id="home-tag-chart"><p class="dash-empty">Loading…</p></div>
-          <button class="home-tag-chart-more" id="home-tag-chart-more-btn" style="display:none;">Show more</button>
-        </div>
-        <div class="home-tag-chart-col">
-          <div id="home-tag-pie"><p class="dash-empty">Loading…</p></div>
-        </div>
-      </div>
+      <div id="home-tag-chart"><p class="dash-empty">Loading…</p></div>
+      <button class="home-tag-chart-more" id="home-tag-chart-more-btn" style="display:none;">Show more</button>
+      <h2 class="home-section-title" style="margin-top:22px;">Share of Total Tag Use</h2>
+      <div id="home-tag-stack"><p class="dash-empty">Loading…</p></div>
     </div>
   </div>
 
@@ -6585,11 +6579,11 @@ async function renderHomeDashboard() {
       (Array.isArray(tags) ? tags : []).forEach(t => planTagCounts.set(t, (planTagCounts.get(t) || 0) + 1));
     });
     const tagChartEl = document.getElementById("home-tag-chart");
-    const pieChartEl = document.getElementById("home-tag-pie");
+    const stackEl = document.getElementById("home-tag-stack");
     const moreBtn = document.getElementById("home-tag-chart-more-btn");
     if (!planTagCounts.size) {
       tagChartEl.innerHTML = '<p class="dash-empty">No tags on any practice plan yet — add some on the Details tab.</p>';
-      pieChartEl.innerHTML = "";
+      stackEl.innerHTML = "";
       moreBtn.style.display = "none";
     } else {
       const allSorted = [...planTagCounts.entries()].sort((a, b) => b[1] - a[1]);
@@ -6615,43 +6609,22 @@ async function renderHomeDashboard() {
       moreBtn.onclick = () => { barExpanded = !barExpanded; renderBars(); };
       renderBars();
 
-      // pie chart stays capped at 6 slices regardless — unlike the bar
-      // chart, a pie doesn't stay readable with more slices than that,
-      // so there's no expand option here on purpose
-      const PIE_CAP = 6;
-      const pieSlices = allSorted.slice(0, PIE_CAP);
-      const pieTotal = pieSlices.reduce((sum, [, c]) => sum + c, 0);
+      // a single stacked bar showing every tag's true share of ALL tag
+      // uses — unlike a pie, this stays readable with as many segments
+      // as there are tags, so there's no cap and no "Other" bucket needed
+      const grandTotal = allSorted.reduce((sum, [, c]) => sum + c, 0);
       const colors = PLAYER_COLORS;
-      const R = 50, r = 25, circumference = 2 * Math.PI * r;
-      let offset = 0;
-      // slices are drawn slightly longer than their true length and
-      // overlapping into the next one — pure floating-point-accurate
-      // boundaries still leave a hairline seam gap in some browsers
-      // (worst at the last-slice-back-to-first-slice seam), which is
-      // invisible against most color pairs but shows up as an obvious
-      // notch against high-contrast neighbors. Since later slices paint
-      // over earlier ones in DOM order, this tiny overlap is invisible
-      // while completely eliminating the gap.
-      const SEAM_OVERLAP = 0.6;
-      const arcs = pieSlices.map(([tag, count], i) => {
-        const len = (count / pieTotal) * circumference;
-        const drawLen = len + SEAM_OVERLAP;
-        const circle = `<circle cx="50" cy="50" r="${r}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="${R}" stroke-dasharray="${drawLen} ${circumference - drawLen}" stroke-dashoffset="${-offset}"/>`;
-        offset += len;
-        return circle;
-      }).join("");
-      const legend = pieSlices.map(([tag, count], i) => `
-        <div class="home-tag-pie-legend-row">
-          <span class="home-tag-pie-swatch" style="background:${colors[i % colors.length]}"></span>
-          <span class="home-tag-pie-legend-label" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span>
-          <span class="home-tag-pie-legend-pct">${Math.round((count / pieTotal) * 100)}%</span>
+      const segs = allSorted.map(([tag, count], i) => `<div class="home-tag-stack-seg" style="width:${(count / grandTotal) * 100}%; background:${colors[i % colors.length]}" title="${escapeHtml(tag)}: ${Math.round((count / grandTotal) * 100)}%"></div>`).join("");
+      const legend = allSorted.map(([tag, count], i) => `
+        <div class="home-tag-stack-legend-row">
+          <span class="home-tag-stack-swatch" style="background:${colors[i % colors.length]}"></span>
+          <span class="home-tag-stack-legend-label">${escapeHtml(tag)}</span>
+          <span class="home-tag-stack-legend-pct">${Math.round((count / grandTotal) * 100)}%</span>
         </div>
       `).join("");
-      pieChartEl.innerHTML = `
-        <div class="home-tag-pie-wrap">
-          <svg width="110" height="110" viewBox="0 0 100 100" style="transform:rotate(-90deg); flex-shrink:0;">${arcs}</svg>
-          <div class="home-tag-pie-legend">${legend}</div>
-        </div>
+      stackEl.innerHTML = `
+        <div class="home-tag-stack-track">${segs}</div>
+        <div class="home-tag-stack-legend">${legend}</div>
       `;
     }
   } catch {
