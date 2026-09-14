@@ -3237,6 +3237,11 @@ function initArrowPopover() {
       const newStyle = opt.dataset.style;
       const matched = activeShapesOfKind(ARROW_KINDS);
       document.querySelectorAll("#arrow-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o === opt));
+      // always keep the default in sync with whatever's now highlighted,
+      // regardless of whether a shape was also selected — otherwise the
+      // next NEW line drawn would silently use the style that was
+      // current before this click, not the one now shown as active
+      arrowStyle = newStyle;
       if (matched.length) {
         // an arrow is currently selected on the field — change its
         // style directly (matching how color/width edits already work
@@ -3258,7 +3263,6 @@ function initArrowPopover() {
         renderShapes();
         syncArrowPopover();
       } else {
-        arrowStyle = newStyle;
         setTool("arrow", true);
       }
     });
