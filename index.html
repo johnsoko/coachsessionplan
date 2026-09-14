@@ -1838,7 +1838,16 @@ const RANDOM_POSITION_POOL = ["GK", "RB", "LB", "CB", "CDM", "CM", "CAM", "RM", 
 function positionForNumber(num) {
   return FORMATION_442[num] || RANDOM_POSITION_POOL[Math.floor(Math.random() * RANDOM_POSITION_POOL.length)];
 }
-const teamCounts = { light: 0, dark: 0 };
+// finds the lowest jersey number not currently in use by this team on
+// the field right now — so deleting players frees up their numbers for
+// reuse by the next one placed, instead of numbers only ever climbing
+// higher regardless of gaps left behind by deletions
+function nextAvailableNumber(team) {
+  const used = new Set(tokens.filter(t => t.type === "player" && t.team === team).map(t => t.num));
+  let n = 1;
+  while (used.has(n)) n++;
+  return n;
+}
 const equipmentDefaults = { color: "#E2892B", size: 24 };
 // each equipment kind gets its own starting size when first placed, since
 // a cone and a large goal obviously shouldn't render at the same scale
@@ -2169,7 +2178,7 @@ function pasteClipboard() {
   const newTokenIds = [], newShapeIds = [];
   clipboard.tokens.forEach(t => {
     const copy = {...t, id: nextId++, x: Math.min(97, t.x + 4), y: Math.min(97, t.y + 4)};
-    if (copy.type === "player") { copy.num = teamCounts[copy.team] + 1; teamCounts[copy.team]++; copy.pos = positionForNumber(copy.num); }
+    if (copy.type === "player") { copy.num = nextAvailableNumber(copy.team); copy.pos = positionForNumber(copy.num); }
     tokens.push(copy);
     newTokenIds.push(copy.id);
   });
@@ -2364,9 +2373,8 @@ function addToken(type, x, y, team) {
       t.num = preset.presetNum;
       preset.presetNum = null;
     } else {
-      t.num = teamCounts[t.team] + 1;
+      t.num = nextAvailableNumber(t.team);
     }
-    teamCounts[t.team]++;
     t.pos = preset.presetPos || positionForNumber(t.num);
     preset.presetPos = "";
     t.color = teamDefaults[t.team].color;
@@ -2403,7 +2411,7 @@ function duplicateToken(id) {
   if (!t) return;
   pushHistory();
   const copy = {...t, id: nextId++, x: Math.min(96, t.x + 5), y: Math.min(96, t.y + 5)};
-  if (copy.type === "player") { copy.num = teamCounts[copy.team] + 1; teamCounts[copy.team]++; copy.pos = positionForNumber(copy.num); }
+  if (copy.type === "player") { copy.num = nextAvailableNumber(copy.team); copy.pos = positionForNumber(copy.num); }
   tokens.push(copy);
   renderTokens(); renderPhaseThumbActive();
 }
@@ -2617,7 +2625,6 @@ function applyFormation(key) {
       labelMode: teamDefaults[team].labelMode, showName: teamDefaults[team].showNames, name: ""
     });
   });
-  teamCounts[team] = f.players.length;
   selectedTokenId = null; selectedShapeId = null;
   multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
   renderTokens(); renderShapes();
