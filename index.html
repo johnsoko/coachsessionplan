@@ -440,6 +440,7 @@
   .phase-note-notes.note-blocks { align-self: stretch; height: 100%; min-height: 56px; padding: 6px 6px; }
   .phase-note-notes .note-block-text { font-size: 12.5px; padding: 3px 4px; line-height: 1.4; }
   .phase-note-notes .note-block-add { width: 15px; height: 15px; font-size: 12px; }
+  .phase-note-notes .note-block-delete { width: 15px; height: 15px; }
   .thumb-play-btn {
     position: absolute; bottom: 8px; right: 8px; z-index: 6; width: 28px; height: 28px; border-radius: 50%;
     border: none; background: rgba(27,33,28,0.55); color: #F7F8F3; display: flex; align-items: center; justify-content: center;
@@ -470,6 +471,13 @@
     flex: 1; font-size: 15.5px; color: var(--ink); padding: 5px 4px; outline: none; min-height: 1.5em; line-height: 1.5;
   }
   .note-block-text:empty::before { content: "Type a note…"; color: var(--ink-faint); }
+  .note-block-delete {
+    flex-shrink: 0; width: 18px; height: 18px; margin-top: 6px; border: none; background: transparent;
+    color: var(--ink-faint); border-radius: 4px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: opacity 0.12s;
+  }
+  .note-block-row:hover .note-block-delete, .note-block-row:focus-within .note-block-delete { opacity: 1; }
+  .note-block-delete:hover { background: var(--paper-card); color: #B3452C; }
 
   /* ── ANIMATE / OUTPUT stub views ── */
   #view-output { overflow-y: auto; }
@@ -4994,6 +5002,9 @@ function renderNoteBlocks(blocks, wrap) {
         <span class="note-block-grip" title="Drag to reorder"><span class="action-grip-dots"><span></span><span></span><span></span><span></span><span></span><span></span></span></span>
       </div>
       <div class="note-block-text" contenteditable="true" spellcheck="false"></div>
+      <button class="note-block-delete" title="Delete this line">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
     `;
     const textEl = row.querySelector(".note-block-text");
     textEl.textContent = text;
@@ -5016,6 +5027,21 @@ function renderNoteBlocks(blocks, wrap) {
       blocks.splice(idx + 1, 0, "");
       renderNoteBlocks(blocks, wrap);
       focusNoteBlock(wrap, idx + 1);
+    });
+    row.querySelector(".note-block-delete").addEventListener("click", () => {
+      // deleting the only remaining line just clears its text instead
+      // of removing the row entirely — there should always be at least
+      // one line to type into, matching the existing Backspace-to-delete
+      // behavior above
+      if (blocks.length > 1) {
+        blocks.splice(idx, 1);
+        renderNoteBlocks(blocks, wrap);
+        focusNoteBlock(wrap, Math.max(0, idx - 1));
+      } else {
+        blocks[idx] = "";
+        renderNoteBlocks(blocks, wrap);
+        focusNoteBlock(wrap, 0);
+      }
     });
     row.addEventListener("dragstart", () => {
       draggedBlock = { blocks, wrap, index: idx };
