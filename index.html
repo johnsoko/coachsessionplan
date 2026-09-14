@@ -2849,6 +2849,7 @@ function startTokenDrag(e, id) {
     document.removeEventListener("mouseup", onUp);
     document.removeEventListener("touchmove", onMove);
     document.removeEventListener("touchend", onUp);
+    dragTokenId = null;
     if (dragMoved) {
       const rect = stage.getBoundingClientRect();
       const cx = ev.changedTouches ? ev.changedTouches[0].clientX : ev.clientX;
@@ -2857,9 +2858,20 @@ function startTokenDrag(e, id) {
       if (outside) { deleteToken(id); return; }
       pushHistory();
       renderPhaseThumbActive();
+      renderTokens();
+    } else {
+      // a plain click with no movement still needs a render eventually
+      // (e.g. to show the rotation handle on newly-selected equipment/
+      // text) but doing it synchronously here destroyed and recreated
+      // the token's DOM node on every single click, including the
+      // first half of a double-click gesture — which made the
+      // browser's dblclick detection (used to re-enter text editing)
+      // unreliable since the element identity kept changing mid-gesture.
+      // Deferring to the next tick lets the browser's own click/dblclick
+      // dispatch (which happens synchronously right after mouseup)
+      // finish first, on the still-intact original element.
+      setTimeout(renderTokens, 0);
     }
-    dragTokenId = null;
-    renderTokens();
   }
   document.addEventListener("mousemove", onMove);
   document.addEventListener("mouseup", onUp);
@@ -4239,11 +4251,9 @@ function phaseThumbHTML(ph, opts) {
       return t.rotation ? `<g transform="rotate(${t.rotation} ${p.x} ${p.y})">${shapeSvg}</g>` : shapeSvg;
     }
     if (t.type === "text") {
-      // a text label isn't a token at all on the real pitch — showing it
-      // as a colored dot risked being mistaken for a player or the ball
       const fontSize = toVB(t.size || 18);
       const rotAttr = t.rotation ? ` transform="rotate(${t.rotation} ${p.x} ${p.y})"` : "";
-      return `<text x="${p.x}" y="${p.y + fontSize*0.36}" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="${fontSize}" fill="${c}" text-anchor="middle"${rotAttr}>T</text>`;
+      return `<text x="${p.x}" y="${p.y + fontSize*0.36}" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="${fontSize}" fill="${c}" text-anchor="middle"${rotAttr}>${escapeHtml(t.content || "")}</text>`;
     }
     return "";
   }).join("");
