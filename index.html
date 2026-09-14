@@ -910,6 +910,19 @@
   .home-tag-bar-track { flex: 1; background: var(--paper-raised); border-radius: 4px; height: 18px; overflow: hidden; }
   .home-tag-bar-fill { height: 100%; background: var(--pitch); border-radius: 4px; min-width: 3px; transition: width 0.3s ease; }
   .home-tag-bar-count { width: 28px; flex-shrink: 0; font-size: 12.5px; color: var(--ink-faint); font-weight: 600; }
+  .home-tag-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+  .home-tag-chart-col { min-width: 0; }
+  .home-tag-chart-more {
+    margin-top: 4px; background: none; border: none; color: var(--pitch-deep); font-weight: 600;
+    font-size: 12.5px; cursor: pointer; padding: 4px 2px;
+  }
+  .home-tag-chart-more:hover { text-decoration: underline; }
+  .home-tag-pie-wrap { display: flex; align-items: center; gap: 20px; }
+  .home-tag-pie-legend { flex: 1; min-width: 0; }
+  .home-tag-pie-legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 12.5px; }
+  .home-tag-pie-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .home-tag-pie-legend-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); font-weight: 600; }
+  .home-tag-pie-legend-pct { color: var(--ink-faint); font-weight: 600; flex-shrink: 0; }
 
   /* ═════════════════════════════════════════════════════════════════════
      DRILL LIBRARY
@@ -998,7 +1011,15 @@
       <h2 class="home-section-title">Recently Updated Practice Plans</h2>
       <div id="home-recent-plans-list"><p class="dash-empty">Loading…</p></div>
       <h2 class="home-section-title" style="margin-top:28px;">Practice Plan Tags</h2>
-      <div id="home-tag-chart"><p class="dash-empty">Loading…</p></div>
+      <div class="home-tag-charts-row">
+        <div class="home-tag-chart-col">
+          <div id="home-tag-chart"><p class="dash-empty">Loading…</p></div>
+          <button class="home-tag-chart-more" id="home-tag-chart-more-btn" style="display:none;">Show more</button>
+        </div>
+        <div class="home-tag-chart-col">
+          <div id="home-tag-pie"><p class="dash-empty">Loading…</p></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -6564,18 +6585,64 @@ async function renderHomeDashboard() {
       (Array.isArray(tags) ? tags : []).forEach(t => planTagCounts.set(t, (planTagCounts.get(t) || 0) + 1));
     });
     const tagChartEl = document.getElementById("home-tag-chart");
+    const pieChartEl = document.getElementById("home-tag-pie");
+    const moreBtn = document.getElementById("home-tag-chart-more-btn");
     if (!planTagCounts.size) {
       tagChartEl.innerHTML = '<p class="dash-empty">No tags on any practice plan yet — add some on the Details tab.</p>';
+      pieChartEl.innerHTML = "";
+      moreBtn.style.display = "none";
     } else {
-      const sorted = [...planTagCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-      const maxCount = sorted[0][1];
-      tagChartEl.innerHTML = sorted.map(([tag, count]) => `
-        <div class="home-tag-bar-row">
-          <div class="home-tag-bar-label" title="${escapeHtml(tag)}">${escapeHtml(tag)}</div>
-          <div class="home-tag-bar-track"><div class="home-tag-bar-fill" style="width:${Math.max(3, (count / maxCount) * 100)}%"></div></div>
-          <div class="home-tag-bar-count">${count}</div>
+      const allSorted = [...planTagCounts.entries()].sort((a, b) => b[1] - a[1]);
+      const BAR_CAP = 6;
+      let barExpanded = false;
+      function renderBars() {
+        const shown = barExpanded ? allSorted : allSorted.slice(0, BAR_CAP);
+        const maxCount = allSorted[0][1];
+        tagChartEl.innerHTML = shown.map(([tag, count]) => `
+          <div class="home-tag-bar-row">
+            <div class="home-tag-bar-label" title="${escapeHtml(tag)}">${escapeHtml(tag)}</div>
+            <div class="home-tag-bar-track"><div class="home-tag-bar-fill" style="width:${Math.max(3, (count / maxCount) * 100)}%"></div></div>
+            <div class="home-tag-bar-count">${count}</div>
+          </div>
+        `).join("");
+        if (allSorted.length > BAR_CAP) {
+          moreBtn.style.display = "block";
+          moreBtn.textContent = barExpanded ? "Show less" : `Show ${allSorted.length - BAR_CAP} more`;
+        } else {
+          moreBtn.style.display = "none";
+        }
+      }
+      moreBtn.onclick = () => { barExpanded = !barExpanded; renderBars(); };
+      renderBars();
+
+      // pie chart stays capped at 6 slices regardless — unlike the bar
+      // chart, a pie doesn't stay readable with more slices than that,
+      // so there's no expand option here on purpose
+      const PIE_CAP = 6;
+      const pieSlices = allSorted.slice(0, PIE_CAP);
+      const pieTotal = pieSlices.reduce((sum, [, c]) => sum + c, 0);
+      const colors = PLAYER_COLORS;
+      const R = 50, r = 25, circumference = 2 * Math.PI * r;
+      let offset = 0;
+      const arcs = pieSlices.map(([tag, count], i) => {
+        const len = (count / pieTotal) * circumference;
+        const circle = `<circle cx="50" cy="50" r="${r}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="${R}" stroke-dasharray="${len} ${circumference - len}" stroke-dashoffset="${-offset}"/>`;
+        offset += len;
+        return circle;
+      }).join("");
+      const legend = pieSlices.map(([tag, count], i) => `
+        <div class="home-tag-pie-legend-row">
+          <span class="home-tag-pie-swatch" style="background:${colors[i % colors.length]}"></span>
+          <span class="home-tag-pie-legend-label" title="${escapeHtml(tag)}">${escapeHtml(tag)}</span>
+          <span class="home-tag-pie-legend-pct">${Math.round((count / pieTotal) * 100)}%</span>
         </div>
       `).join("");
+      pieChartEl.innerHTML = `
+        <div class="home-tag-pie-wrap">
+          <svg width="110" height="110" viewBox="0 0 100 100" style="transform:rotate(-90deg); flex-shrink:0;">${arcs}</svg>
+          <div class="home-tag-pie-legend">${legend}</div>
+        </div>
+      `;
     }
   } catch {
     statsEl.innerHTML = '<p class="dash-empty">Could not load your stats — check your connection.</p>';
