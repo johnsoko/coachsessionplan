@@ -2820,7 +2820,6 @@ function startTokenRotate(ev, id) {
   document.addEventListener("touchmove", onMove, {passive:false});
   document.addEventListener("touchend", onUp);
 }
-let lastTokenClickId = null, lastTokenClickTime = 0;
 function startTokenDrag(e, id) {
   if (currentTool !== "select") return;
   if (blockIfScene1InAnimate()) return;
@@ -2875,23 +2874,20 @@ function startTokenDrag(e, id) {
       renderPhaseThumbActive();
       renderTokens();
     } else {
-      // App-level double-click detection, keyed to the token's id rather
-      // than DOM element identity — the native dblclick event needs both
-      // clicks to land on the literal same DOM node, but this app's
-      // rendering pattern frequently rebuilds token elements between
-      // clicks (even just one tick later), which made dblclick fire
-      // unreliably for re-entering text edit mode. This works regardless
-      // of whether the element was rebuilt in between.
+      // a click with no real movement on a text token enters edit mode
+      // directly — double-click detection (native and app-level) kept
+      // proving unreliable in practice, and a text label's whole point
+      // is usually to edit it, so requiring a second click just added
+      // friction without much benefit. Dragging (real movement) still
+      // works separately via the threshold above, so moving vs editing
+      // stays unambiguous: drag to move, click in place to edit.
       const t = tokens.find(tk => tk.id === id);
-      const now = Date.now();
-      if (t && t.type === "text" && lastTokenClickId === id && (now - lastTokenClickTime) < 450) {
+      if (t && t.type === "text") {
         editingTextId = id;
-        lastTokenClickId = null;
+        renderTokens();
       } else {
-        lastTokenClickId = id;
-        lastTokenClickTime = now;
+        setTimeout(renderTokens, 0);
       }
-      setTimeout(renderTokens, 0);
     }
   }
   document.addEventListener("mousemove", onMove);
