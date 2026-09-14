@@ -2692,7 +2692,7 @@ function renderTokens() {
       el.style.height = t.size + "px";
       el.style.background = t.color;
       el.style.color = textColorFor(t.color);
-      el.style.fontSize = Math.max(8, Math.round(t.size * (label.length > 1 ? 0.42 : 0.5))) + "px";
+      el.style.fontSize = Math.max(8, Math.round(t.size * (label.length > 1 ? 0.48 : 0.58))) + "px";
       el.addEventListener("dblclick", ev => { ev.stopPropagation(); openNameModal(t.id); });
     } else if (t.type === "equipment") {
       applyEquipmentStyle(el, t);
@@ -4284,7 +4284,7 @@ function phaseThumbHTML(ph, opts) {
       const mode = t.labelMode || "number";
       const label = mode === "number" ? String(t.num) : mode === "position" ? (t.pos || "") : "";
       const textC = textColorFor(c);
-      const fontSize = Math.max(toVB(6), r * (label.length > 1 ? 0.84 : 1.0));
+      const fontSize = Math.max(toVB(6), r * (label.length > 1 ? 0.96 : 1.16));
       const circle = `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${c}"/>`;
       const text = label ? `<text x="${p.x}" y="${p.y + fontSize*0.36}" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="${fontSize}" fill="${textC}" text-anchor="middle">${label}</text>` : "";
       return circle + text;
