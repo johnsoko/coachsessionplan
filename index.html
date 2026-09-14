@@ -339,6 +339,9 @@
   .equip-kind-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 4px; }
   .equip-kind-row .arrow-opt { justify-content: center; padding: 8px 4px; border: 1px solid var(--line); border-radius: 8px; }
   .equip-kind-row .arrow-opt.selected { border-color: var(--pitch); }
+  .arrow-kind-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 4px; }
+  .arrow-kind-row .arrow-opt { justify-content: center; padding: 8px 4px; border: 1px solid var(--line); border-radius: 8px; }
+  .arrow-kind-row .arrow-opt.selected { border-color: var(--pitch); }
   .arrow-opt span { font-size: 12.5px; font-weight: 500; color: var(--ink-soft); }
   .arrow-opt.selected { background: var(--pitch-tint); }
   .arrow-opt.selected span { color: var(--pitch-deep); }
@@ -1356,17 +1359,16 @@
               Run / Pass / Dribble
             </button>
             <div class="arrow-popover" id="arrow-popover">
-              <div class="arrow-opt" data-style="run">
-                <svg width="30" height="14" viewBox="0 0 30 14"><path d="M2 11L26 3" stroke="#1B211C" stroke-width="1.8"/><path d="M20 3h6v6" stroke="#1B211C" stroke-width="1.8"/></svg>
-                <span>Run</span>
-              </div>
-              <div class="arrow-opt selected" data-style="pass">
-                <svg width="30" height="14" viewBox="0 0 30 14"><path d="M2 11L26 3" stroke="#1B211C" stroke-width="1.8" stroke-dasharray="2.4 2.6"/></svg>
-                <span>Pass</span>
-              </div>
-              <div class="arrow-opt" data-style="dribble">
-                <svg width="30" height="14" viewBox="0 0 30 14"><path d="M2 9c2.5-5 4.5 5 7 0s4.5 5 7 0 4.5 5 6 0" stroke="#1B211C" stroke-width="1.5" fill="none"/></svg>
-                <span>Dribble</span>
+              <div class="arrow-kind-row">
+                <div class="arrow-opt" data-style="run" title="Run">
+                  <svg width="30" height="14" viewBox="0 0 30 14"><path d="M2 11L26 3" stroke="#1B211C" stroke-width="1.8"/><path d="M20 3h6v6" stroke="#1B211C" stroke-width="1.8"/></svg>
+                </div>
+                <div class="arrow-opt selected" data-style="pass" title="Pass">
+                  <svg width="30" height="14" viewBox="0 0 30 14"><path d="M2 11L26 3" stroke="#1B211C" stroke-width="1.8" stroke-dasharray="2.4 2.6"/></svg>
+                </div>
+                <div class="arrow-opt" data-style="dribble" title="Dribble">
+                  <svg width="30" height="14" viewBox="0 0 30 14"><path d="M2 9c2.5-5 4.5 5 7 0s4.5 5 7 0 4.5 5 6 0" stroke="#1B211C" stroke-width="1.5" fill="none"/></svg>
+                </div>
               </div>
               <div style="height:1px;background:var(--line);margin:6px 2px;"></div>
               <span class="tp-label" style="margin-top:0;">Color</span>
