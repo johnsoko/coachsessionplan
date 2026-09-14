@@ -2820,6 +2820,7 @@ function startTokenRotate(ev, id) {
   document.addEventListener("touchmove", onMove, {passive:false});
   document.addEventListener("touchend", onUp);
 }
+let lastTokenClickId = null, lastTokenClickTime = 0;
 function startTokenDrag(e, id) {
   if (currentTool !== "select") return;
   if (blockIfScene1InAnimate()) return;
@@ -2860,16 +2861,22 @@ function startTokenDrag(e, id) {
       renderPhaseThumbActive();
       renderTokens();
     } else {
-      // a plain click with no movement still needs a render eventually
-      // (e.g. to show the rotation handle on newly-selected equipment/
-      // text) but doing it synchronously here destroyed and recreated
-      // the token's DOM node on every single click, including the
-      // first half of a double-click gesture — which made the
-      // browser's dblclick detection (used to re-enter text editing)
-      // unreliable since the element identity kept changing mid-gesture.
-      // Deferring to the next tick lets the browser's own click/dblclick
-      // dispatch (which happens synchronously right after mouseup)
-      // finish first, on the still-intact original element.
+      // App-level double-click detection, keyed to the token's id rather
+      // than DOM element identity — the native dblclick event needs both
+      // clicks to land on the literal same DOM node, but this app's
+      // rendering pattern frequently rebuilds token elements between
+      // clicks (even just one tick later), which made dblclick fire
+      // unreliably for re-entering text edit mode. This works regardless
+      // of whether the element was rebuilt in between.
+      const t = tokens.find(tk => tk.id === id);
+      const now = Date.now();
+      if (t && t.type === "text" && lastTokenClickId === id && (now - lastTokenClickTime) < 450) {
+        editingTextId = id;
+        lastTokenClickId = null;
+      } else {
+        lastTokenClickId = id;
+        lastTokenClickTime = now;
+      }
       setTimeout(renderTokens, 0);
     }
   }
