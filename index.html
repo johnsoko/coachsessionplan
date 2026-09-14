@@ -2838,9 +2838,23 @@ function startTokenDrag(e, id) {
   const selT = tokens.find(tk => tk.id === id);
   refreshTokenSelectionClasses(); renderShapes();
 
+  // require a small amount of real cursor movement before this counts
+  // as a drag rather than a click — real physical clicking almost
+  // always involves a sub-pixel amount of jitter, which without this
+  // threshold marked every single click as "moved", which silently
+  // broke double-click-to-edit (that only treats a click as part of a
+  // double-click if nothing moved) — the fix wasn't unreliable timing,
+  // it was that a genuine no-movement click almost never happened
+  const startClientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const startClientY = e.touches ? e.touches[0].clientY : e.clientY;
+  const DRAG_THRESHOLD_PX = 4;
+
   function onMove(ev) {
-    const p = pctFromEvent(ev);
+    const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
+    const cy = ev.touches ? ev.touches[0].clientY : ev.clientY;
+    if (!dragMoved && Math.hypot(cx - startClientX, cy - startClientY) < DRAG_THRESHOLD_PX) return;
     dragMoved = true;
+    const p = pctFromEvent(ev);
     const t = tokens.find(tk => tk.id === id);
     t.x = p.x; t.y = p.y;
     renderTokens();
