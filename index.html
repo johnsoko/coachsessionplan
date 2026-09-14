@@ -6624,9 +6624,19 @@ async function renderHomeDashboard() {
       const colors = PLAYER_COLORS;
       const R = 50, r = 25, circumference = 2 * Math.PI * r;
       let offset = 0;
+      // slices are drawn slightly longer than their true length and
+      // overlapping into the next one — pure floating-point-accurate
+      // boundaries still leave a hairline seam gap in some browsers
+      // (worst at the last-slice-back-to-first-slice seam), which is
+      // invisible against most color pairs but shows up as an obvious
+      // notch against high-contrast neighbors. Since later slices paint
+      // over earlier ones in DOM order, this tiny overlap is invisible
+      // while completely eliminating the gap.
+      const SEAM_OVERLAP = 0.6;
       const arcs = pieSlices.map(([tag, count], i) => {
         const len = (count / pieTotal) * circumference;
-        const circle = `<circle cx="50" cy="50" r="${r}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="${R}" stroke-dasharray="${len} ${circumference - len}" stroke-dashoffset="${-offset}"/>`;
+        const drawLen = len + SEAM_OVERLAP;
+        const circle = `<circle cx="50" cy="50" r="${r}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="${R}" stroke-dasharray="${drawLen} ${circumference - drawLen}" stroke-dashoffset="${-offset}"/>`;
         offset += len;
         return circle;
       }).join("");
