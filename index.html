@@ -3234,9 +3234,33 @@ function initArrowPopover() {
   document.querySelectorAll("#arrow-popover .arrow-opt").forEach(opt => {
     opt.addEventListener("click", e => {
       e.stopPropagation();
-      arrowStyle = opt.dataset.style;
+      const newStyle = opt.dataset.style;
+      const matched = activeShapesOfKind(ARROW_KINDS);
       document.querySelectorAll("#arrow-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o === opt));
-      setTool("arrow", true);
+      if (matched.length) {
+        // an arrow is currently selected on the field — change its
+        // style directly (matching how color/width edits already work
+        // for a selection) rather than just arming the tool to draw a
+        // brand new one, which left the selected arrow untouched
+        pushHistory();
+        matched.forEach(s => {
+          // dribble paths use a points array instead of x1,y1,x2,y2 —
+          // convert between the two representations so switching styles
+          // never leaves a shape with neither, which would render nothing
+          if (newStyle === "dribble" && (!s.points || s.points.length < 2)) {
+            s.points = [{ x: s.x1, y: s.y1 }, { x: s.x2, y: s.y2 }];
+          } else if (s.style === "dribble" && newStyle !== "dribble" && s.points && s.points.length >= 2) {
+            s.x1 = s.points[0].x; s.y1 = s.points[0].y;
+            s.x2 = s.points[s.points.length - 1].x; s.y2 = s.points[s.points.length - 1].y;
+          }
+          s.style = newStyle;
+        });
+        renderShapes();
+        syncArrowPopover();
+      } else {
+        arrowStyle = newStyle;
+        setTool("arrow", true);
+      }
     });
   });
   document.querySelectorAll("#arrow-curve-toggle button").forEach(btn => {
