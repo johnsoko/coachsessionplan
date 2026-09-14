@@ -905,6 +905,11 @@
   .home-recent-row:hover { border-color: var(--pitch); }
   .home-recent-row-title { font-weight: 600; font-size: 13.5px; color: var(--ink); }
   .home-recent-row-date { font-size: 12px; color: var(--ink-faint); }
+  .home-tag-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .home-tag-bar-label { width: 120px; flex-shrink: 0; font-size: 13px; font-weight: 600; color: var(--ink); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .home-tag-bar-track { flex: 1; background: var(--paper-raised); border-radius: 4px; height: 18px; overflow: hidden; }
+  .home-tag-bar-fill { height: 100%; background: var(--pitch); border-radius: 4px; min-width: 3px; transition: width 0.3s ease; }
+  .home-tag-bar-count { width: 28px; flex-shrink: 0; font-size: 12.5px; color: var(--ink-faint); font-weight: 600; }
 
   /* ═════════════════════════════════════════════════════════════════════
      DRILL LIBRARY
@@ -992,6 +997,8 @@
       <div class="home-stats-grid" id="home-stats-grid"><p class="dash-empty">Loading…</p></div>
       <h2 class="home-section-title">Recently Updated Practice Plans</h2>
       <div id="home-recent-plans-list"><p class="dash-empty">Loading…</p></div>
+      <h2 class="home-section-title" style="margin-top:28px;">Practice Plan Tags</h2>
+      <div id="home-tag-chart"><p class="dash-empty">Loading…</p></div>
     </div>
   </div>
 
@@ -6546,6 +6553,29 @@ async function renderHomeDashboard() {
         row.addEventListener("click", () => openPracticePlan(p.id));
         recentEl.appendChild(row);
       });
+    }
+
+    // how many times each tag has been used across practice plans
+    // specifically — separate from the library drills' tag count above
+    const planTagCounts = new Map();
+    plans.forEach(p => {
+      let tags = [];
+      try { tags = JSON.parse(p.tags || "[]"); } catch {}
+      (Array.isArray(tags) ? tags : []).forEach(t => planTagCounts.set(t, (planTagCounts.get(t) || 0) + 1));
+    });
+    const tagChartEl = document.getElementById("home-tag-chart");
+    if (!planTagCounts.size) {
+      tagChartEl.innerHTML = '<p class="dash-empty">No tags on any practice plan yet — add some on the Details tab.</p>';
+    } else {
+      const sorted = [...planTagCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+      const maxCount = sorted[0][1];
+      tagChartEl.innerHTML = sorted.map(([tag, count]) => `
+        <div class="home-tag-bar-row">
+          <div class="home-tag-bar-label" title="${escapeHtml(tag)}">${escapeHtml(tag)}</div>
+          <div class="home-tag-bar-track"><div class="home-tag-bar-fill" style="width:${Math.max(3, (count / maxCount) * 100)}%"></div></div>
+          <div class="home-tag-bar-count">${count}</div>
+        </div>
+      `).join("");
     }
   } catch {
     statsEl.innerHTML = '<p class="dash-empty">Could not load your stats — check your connection.</p>';
