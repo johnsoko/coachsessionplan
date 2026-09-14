@@ -3864,6 +3864,19 @@ function onStageDown(e) {
       selectAndMaybeMoveShape(clicked, p);
       return;
     }
+    // clicking empty space always clears whatever was selected first —
+    // since drawing requires an actual drag, a plain click here can
+    // only mean "deselect", never "keep editing the previous shape".
+    // Without this, the tool stayed armed for drawing after a line was
+    // finished, but the just-drawn line never actually deselected
+    // until you clicked entirely off the field.
+    if (selectedShapeId || selectedTokenId) {
+      selectedShapeId = null; selectedTokenId = null;
+      multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
+      hideShapeToolbar();
+      closeAllPopovers();
+      renderShapes(); renderTokens();
+    }
     pushHistory();
     isDrawing = true; drawStart = p; freehand = [p];
     document.addEventListener("mousemove", onStageMove);
