@@ -3496,12 +3496,16 @@ document.getElementById("field-zoom-slider").addEventListener("input", e => {
 function applyFieldZoom() {
   document.getElementById("field-zoom-val").textContent = fieldZoomLevel + "%";
   const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
-  if (fieldZoomLevel === 0) {
-    stage.style.maxWidth = baseWidth + "px";
-  } else {
-    const actualScale = 100 + (fieldZoomLevel / 100) * 40;
-    stage.style.maxWidth = (baseWidth * actualScale / 100) + "px";
-  }
+  // 0% always matches THIS surface's own true page-load size, but 100%
+  // reaches the same generous absolute size (896px = the standard
+  // 640px base scaled 140%) regardless of which surface it is — a
+  // narrower surface (vertical/half fields etc.) therefore scales up
+  // MORE relatively than a full-width one, matching how zoom felt
+  // before it became surface-aware, instead of only ever scaling 40%
+  // up from its own smaller starting point
+  const ABSOLUTE_MAX = 640 * 1.4;
+  const t = fieldZoomLevel / 100;
+  stage.style.maxWidth = (baseWidth + (ABSOLUTE_MAX - baseWidth) * t) + "px";
 }
 
 function px(xPct, yPct) { return { x: (xPct/100)*rectW, y: (yPct/100)*rectH }; }
