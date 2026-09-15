@@ -2129,6 +2129,7 @@ function transposeXY(obj) {
   if (obj.cx != null && obj.cy != null) { const t = obj.cx; obj.cx = obj.cy; obj.cy = t; }
   if (obj.points) obj.points.forEach(p => { const t = p.x; p.x = p.y; p.y = t; });
 }
+let fieldZoomLevel = 0; // 0-100, read by applyFieldZoom() — kept as a global so applySurface() can re-apply it against a new surface's own base width
 function applySurface(name) {
   surface = name;
   const s = SURFACES[name];
@@ -2139,6 +2140,7 @@ function applySurface(name) {
   // canvas area and forces a vertical scrollbar — cap those narrower so
   // the whole field stays visible without scrolling
   stageEl.style.maxWidth = (s.maxWidth || 640) + "px";
+  if (fieldZoomLevel > 0 && typeof applyFieldZoom === "function") applyFieldZoom();
   const svg = document.getElementById("pitch-svg");
   svg.setAttribute("viewBox", s.viewBox);
   svg.innerHTML = STRIPES_DEFS + s.markup;
@@ -3483,13 +3485,24 @@ document.getElementById("field-zoom-slider").addEventListener("input", e => {
   // the slider itself reads 0-100 (0 = the normal default field size at
   // page load, 100 = as large as is actually useful — beyond that the
   // field exceeds a typical screen's available width without adding
-  // any real benefit) — mapped internally to the true 100%-140% scale
-  // range that gets applied to the field
-  const sliderVal = parseInt(e.target.value, 10);
-  document.getElementById("field-zoom-val").textContent = sliderVal + "%";
-  const actualScale = 100 + (sliderVal / 100) * 40;
-  stage.style.maxWidth = (640 * actualScale / 100) + "px";
+  // any real benefit) — mapped internally to a 100%-140% scale applied
+  // on top of whatever THIS surface's own base max-width actually is —
+  // several surfaces (like square-ish grids) use a narrower base than
+  // the common 640px, so scaling from a hardcoded 640 was wrong for
+  // those and never actually returned to the true page-load size at 0%
+  fieldZoomLevel = parseInt(e.target.value, 10);
+  applyFieldZoom();
 });
+function applyFieldZoom() {
+  document.getElementById("field-zoom-val").textContent = fieldZoomLevel + "%";
+  const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
+  if (fieldZoomLevel === 0) {
+    stage.style.maxWidth = baseWidth + "px";
+  } else {
+    const actualScale = 100 + (fieldZoomLevel / 100) * 40;
+    stage.style.maxWidth = (baseWidth * actualScale / 100) + "px";
+  }
+}
 
 function px(xPct, yPct) { return { x: (xPct/100)*rectW, y: (yPct/100)*rectH }; }
 
