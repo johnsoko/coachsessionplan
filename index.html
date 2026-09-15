@@ -2044,8 +2044,8 @@ const SURFACES = {
     markup: `
       <rect x="0" y="0" width="600" height="400" fill="#2E6B3F"/>
       <rect x="0" y="0" width="600" height="400" fill="url(#stripes)" opacity="0.5"/>
-      <rect x="20" y="20" width="560" height="360" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
-      ${Array.from({length:2}).map((_,i)=>{const p=20+((i+1)*560/3);return `<line x1="${p}" y1="20" x2="${p}" y2="380" stroke="rgba(255,255,255,0.4)" stroke-width="1.6"/>`;}).join("")}
+      <rect x="20" y="20" width="560" height="360" fill="none" stroke="#fefefe" stroke-width="1.4"/>
+      ${Array.from({length:2}).map((_,i)=>{const p=20+((i+1)*560/3);return `<line x1="${p}" y1="20" x2="${p}" y2="380" stroke="#fefefe" stroke-width="1.4"/>`;}).join("")}
     `
   },
   fourzone: {
@@ -2054,8 +2054,8 @@ const SURFACES = {
     markup: `
       <rect x="0" y="0" width="600" height="400" fill="#2E6B3F"/>
       <rect x="0" y="0" width="600" height="400" fill="url(#stripes)" opacity="0.5"/>
-      <rect x="20" y="20" width="560" height="360" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
-      ${Array.from({length:3}).map((_,i)=>{const p=20+((i+1)*560/4);return `<line x1="${p}" y1="20" x2="${p}" y2="380" stroke="rgba(255,255,255,0.4)" stroke-width="1.6"/>`;}).join("")}
+      <rect x="20" y="20" width="560" height="360" fill="none" stroke="#fefefe" stroke-width="1.4"/>
+      ${Array.from({length:3}).map((_,i)=>{const p=20+((i+1)*560/4);return `<line x1="${p}" y1="20" x2="${p}" y2="380" stroke="#fefefe" stroke-width="1.4"/>`;}).join("")}
     `
   },
   twosquare: {
@@ -2064,8 +2064,8 @@ const SURFACES = {
     markup: `
       <rect x="0" y="0" width="440" height="240" fill="#2E6B3F"/>
       <rect x="0" y="0" width="440" height="240" fill="url(#stripes)" opacity="0.5"/>
-      <rect x="20" y="20" width="400" height="200" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
-      <line x1="220" y1="20" x2="220" y2="220" stroke="rgba(255,255,255,0.4)" stroke-width="1.6"/>
+      <rect x="20" y="20" width="400" height="200" fill="none" stroke="#fefefe" stroke-width="1"/>
+      <line x1="220" y1="20" x2="220" y2="220" stroke="#fefefe" stroke-width="1"/>
     `
   },
   fourgrid: {
@@ -2075,9 +2075,9 @@ const SURFACES = {
     markup: `
       <rect x="0" y="0" width="480" height="480" fill="#2E6B3F"/>
       <rect x="0" y="0" width="480" height="480" fill="url(#stripes)" opacity="0.5"/>
-      <rect x="20" y="20" width="440" height="440" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
-      <line x1="240" y1="20" x2="240" y2="460" stroke="rgba(255,255,255,0.4)" stroke-width="1.6"/>
-      <line x1="20" y1="240" x2="460" y2="240" stroke="rgba(255,255,255,0.4)" stroke-width="1.6"/>
+      <rect x="20" y="20" width="440" height="440" fill="none" stroke="#fefefe" stroke-width="1.1"/>
+      <line x1="240" y1="20" x2="240" y2="460" stroke="#fefefe" stroke-width="1.1"/>
+      <line x1="20" y1="240" x2="460" y2="240" stroke="#fefefe" stroke-width="1.1"/>
     `
   },
   sixgrid: {
@@ -2086,9 +2086,9 @@ const SURFACES = {
     markup: `
       <rect x="0" y="0" width="580" height="400" fill="#2E6B3F"/>
       <rect x="0" y="0" width="580" height="400" fill="url(#stripes)" opacity="0.5"/>
-      <rect x="20" y="20" width="540" height="360" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
-      ${Array.from({length:2}).map((_,i)=>{const p=20+((i+1)*540/3);return `<line x1="${p}" y1="20" x2="${p}" y2="380" stroke="rgba(255,255,255,0.4)" stroke-width="1.6"/>`;}).join("")}
-      <line x1="20" y1="200" x2="560" y2="200" stroke="rgba(255,255,255,0.4)" stroke-width="1.6"/>
+      <rect x="20" y="20" width="540" height="360" fill="none" stroke="#fefefe" stroke-width="1.3"/>
+      ${Array.from({length:2}).map((_,i)=>{const p=20+((i+1)*540/3);return `<line x1="${p}" y1="20" x2="${p}" y2="380" stroke="#fefefe" stroke-width="1.3"/>`;}).join("")}
+      <line x1="20" y1="200" x2="560" y2="200" stroke="#fefefe" stroke-width="1.3"/>
     `
   },
   rectangle: {
@@ -2097,7 +2097,7 @@ const SURFACES = {
     markup: `
       <rect x="0" y="0" width="700" height="460" fill="#2E6B3F"/>
       <rect x="0" y="0" width="700" height="460" fill="url(#stripes)" opacity="0.5"/>
-      <rect x="20" y="20" width="660" height="420" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
+      <rect x="20" y="20" width="660" height="420" fill="none" stroke="#fefefe" stroke-width="1.6"/>
     `
   },
   twogrid: {
@@ -2106,8 +2106,8 @@ const SURFACES = {
     markup: `
       <rect x="0" y="0" width="600" height="400" fill="#2E6B3F"/>
       <rect x="0" y="0" width="600" height="400" fill="url(#stripes)" opacity="0.5"/>
-      <rect x="20" y="20" width="560" height="360" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
-      <line x1="300" y1="20" x2="300" y2="380" stroke="rgba(255,255,255,0.4)" stroke-width="1.6"/>
+      <rect x="20" y="20" width="560" height="360" fill="none" stroke="#fefefe" stroke-width="1.4"/>
+      <line x1="300" y1="20" x2="300" y2="380" stroke="#fefefe" stroke-width="1.4"/>
     `
   }
 };
