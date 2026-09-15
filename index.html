@@ -2770,7 +2770,7 @@ formationGridEl.addEventListener("click", e => {
 });
 
 function applyEquipmentStyle(el, t) {
-  const s = t.size || equipmentDefaults.size;
+  const s = (t.size || equipmentDefaults.size) * fieldScaleFactor();
   const c = t.color || equipmentDefaults.color;
   switch (t.kind) {
     case "cone":
@@ -2825,16 +2825,17 @@ function renderTokens() {
       const mode = t.labelMode || "number";
       const label = mode === "number" ? String(t.num) : mode === "position" ? (t.pos || "") : "";
       el.textContent = label;
-      el.style.width = t.size + "px";
-      el.style.height = t.size + "px";
+      const scaledSize = t.size * fieldScaleFactor();
+      el.style.width = scaledSize + "px";
+      el.style.height = scaledSize + "px";
       el.style.background = t.color;
       el.style.color = textColorFor(t.color);
-      el.style.fontSize = Math.max(8, Math.round(t.size * (label.length > 1 ? 0.48 : 0.58))) + "px";
+      el.style.fontSize = Math.max(8, Math.round(scaledSize * (label.length > 1 ? 0.48 : 0.58))) + "px";
       el.addEventListener("dblclick", ev => { ev.stopPropagation(); openNameModal(t.id); });
     } else if (t.type === "equipment") {
       applyEquipmentStyle(el, t);
     } else if (t.type === "ball") {
-      const s = t.size || ballDefaults.size;
+      const s = (t.size || ballDefaults.size) * fieldScaleFactor();
       el.style.width = s + "px"; el.style.height = s + "px";
       el.style.borderRadius = "50%";
       el.style.background = t.color || ballDefaults.color;
@@ -2851,7 +2852,7 @@ function renderTokens() {
     } else if (t.type === "text") {
       el.textContent = t.content || "";
       el.style.color = t.color || textDefaults.color;
-      el.style.fontSize = (t.size || textDefaults.size) + "px";
+      el.style.fontSize = ((t.size || textDefaults.size) * fieldScaleFactor()) + "px";
       if (t.id === editingTextId) {
         isEditing = true;
         el.contentEditable = "true";
@@ -2898,7 +2899,7 @@ function renderTokens() {
       nameEl.textContent = t.name;
       nameEl.style.left = pos.x + "%";
       nameEl.style.top  = pos.y + "%";
-      nameEl.style.transform = `translate(-50%, ${t.size/2 + 4}px)`;
+      nameEl.style.transform = `translate(-50%, ${(t.size/2 + 4) * fieldScaleFactor()}px)`;
       layer.appendChild(nameEl);
     }
   });
@@ -2934,7 +2935,7 @@ function equipmentHalfHeightPx(t) {
   // applyEquipmentStyle()'s ratios) — a fixed offset looked fine for
   // small items like cones, but put the handle right on top of (or even
   // inside) anything tall, like the goals
-  const s = t.size || equipmentDefaults.size;
+  const s = (t.size || equipmentDefaults.size) * fieldScaleFactor();
   const ratios = { cone: 1, flatcone: 0.42, minigoal: 1.15, largegoal: 1.7, dummy: 0.57, ladder: 0.45 };
   return (s * (ratios[t.kind] || 1)) / 2;
 }
@@ -2942,8 +2943,8 @@ function buildRotationHandle(t, pos) {
   const dot = document.createElement("div");
   dot.className = "rotation-handle-dot";
   const angleRad = ((t.rotation || 0) - 90) * Math.PI / 180; // -90 so 0° points straight up
-  const halfHeight = t.type === "equipment" ? equipmentHalfHeightPx(t) : (t.size || textDefaults.size) / 2;
-  const dist = halfHeight + 16;
+  const halfHeight = t.type === "equipment" ? equipmentHalfHeightPx(t) : ((t.size || textDefaults.size) * fieldScaleFactor()) / 2;
+  const dist = halfHeight + 16 * fieldScaleFactor();
   const dx = Math.cos(angleRad) * dist;
   const dy = Math.sin(angleRad) * dist;
   dot.style.left = pos.x + "%";
@@ -3007,6 +3008,13 @@ function startTokenDrag(e, id) {
   const startClientX = e.touches ? e.touches[0].clientX : e.clientX;
   const startClientY = e.touches ? e.touches[0].clientY : e.clientY;
   const DRAG_THRESHOLD_PX = 4;
+  // tracks the cursor's own last position (in field %) so each move only
+  // applies the incremental change since the previous frame, rather than
+  // snapping the token to sit exactly under the cursor — a click that
+  // lands anywhere but the token's dead center (the common case) would
+  // otherwise make the token jump to re-center on the cursor the instant
+  // dragging starts, which is what made this feel especially jarring
+  let last = pctFromEvent(e);
 
   function onMove(ev) {
     const cx = ev.touches ? ev.touches[0].clientX : ev.clientX;
@@ -3015,7 +3023,9 @@ function startTokenDrag(e, id) {
     dragMoved = true;
     const p = pctFromEvent(ev);
     const t = tokens.find(tk => tk.id === id);
-    t.x = p.x; t.y = p.y;
+    t.x = Math.min(100, Math.max(0, t.x + (p.x - last.x)));
+    t.y = Math.min(100, Math.max(0, t.y + (p.y - last.y)));
+    last = p;
     renderTokens();
   }
   function onUp(ev) {
@@ -3662,6 +3672,23 @@ function applyFieldZoom() {
   const t = fieldZoomLevel / 100;
   stage.style.maxWidth = (baseWidth + (ABSOLUTE_MAX - baseWidth) * t) + "px";
 }
+// how much bigger the field currently is than its own natural (zoom=0)
+// size, purely due to the zoom slider — everything drawn on top of the
+// field (player/equipment/ball/text size, rotation-handle offsets,
+// arrow and shape line widths) is set in fixed CSS/canvas pixels, so
+// without this they'd stay a constant size while the field visibly
+// grows around them, making them look smaller and smaller as zoom
+// increases. Deliberately keyed off fieldZoomLevel rather than the
+// stage's actual rendered width, so ordinary responsive shrinking on a
+// narrow screen (zoom still at 0%) is untouched — this only kicks in
+// once the person has actually moved the slider.
+function fieldScaleFactor() {
+  if (fieldZoomLevel <= 0) return 1;
+  const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
+  const ABSOLUTE_MAX = 640 * 1.4;
+  const t = fieldZoomLevel / 100;
+  return (baseWidth + (ABSOLUTE_MAX - baseWidth) * t) / baseWidth;
+}
 
 function px(xPct, yPct) { return { x: (xPct/100)*rectW, y: (yPct/100)*rectH }; }
 
@@ -3703,7 +3730,7 @@ function drawShapeGeometry(kind, p1, p2, fill, color) {
 function drawShape(s, highlight) {
   ctx.save();
   const color = s.color || drawDefaults.color;
-  const width = s.width || drawDefaults.width;
+  const width = (s.width || drawDefaults.width) * fieldScaleFactor();
   ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
 
   if (s.style === "run" || s.style === "pass") {
@@ -3751,11 +3778,12 @@ function drawShape(s, highlight) {
   }
 
   if (highlight) {
+    const hf = fieldScaleFactor();
     shapeEndpoints(s).forEach(pt => {
       const hp = px(pt.x, pt.y);
-      ctx.beginPath(); ctx.arc(hp.x, hp.y, pt.role === "control" ? 5 : 6, 0, Math.PI * 2);
+      ctx.beginPath(); ctx.arc(hp.x, hp.y, (pt.role === "control" ? 5 : 6) * hf, 0, Math.PI * 2);
       ctx.fillStyle = pt.role === "control" ? "#3B6FB6" : pt.role === "rotate" ? "#2E6B3F" : "#E2892B"; ctx.fill();
-      ctx.lineWidth = 1.5; ctx.strokeStyle = "#F7F8F3"; ctx.setLineDash([]); ctx.stroke();
+      ctx.lineWidth = 1.5 * hf; ctx.strokeStyle = "#F7F8F3"; ctx.setLineDash([]); ctx.stroke();
     });
   }
   ctx.restore();
@@ -3815,9 +3843,10 @@ function shapeEndpoints(s) {
 function hitTestHandle(s, xPct, yPct) {
   const p = px(xPct, yPct);
   const eps = shapeEndpoints(s);
+  const tol = 11 * fieldScaleFactor();
   for (let i = 0; i < eps.length; i++) {
     const hp = px(eps[i].x, eps[i].y);
-    if (Math.hypot(hp.x - p.x, hp.y - p.y) < 11) return eps[i].role;
+    if (Math.hypot(hp.x - p.x, hp.y - p.y) < tol) return eps[i].role;
   }
   return null;
 }
@@ -4038,8 +4067,9 @@ function hitTestShape(s, x, y, tolerance) {
   // onStageDown) so starting a brand-new arrow near an existing one's
   // line doesn't keep "catching" on it instead — precise clicks can
   // still grab the existing shape, just not ones that are merely nearby
-  const lineTol = tolerance != null ? tolerance : 10;
-  const padTol = tolerance != null ? tolerance * 0.6 : 6;
+  const hf = fieldScaleFactor();
+  const lineTol = (tolerance != null ? tolerance : 10) * hf;
+  const padTol = (tolerance != null ? tolerance * 0.6 : 6) * hf;
   if (s.style === "dribble" && s.points) {
     return s.points.some(pt => { const pp = px(pt.x, pt.y); return Math.hypot(pp.x-p.x, pp.y-p.y) < lineTol; });
   }
@@ -4171,10 +4201,11 @@ function onStageMove(e) {
   if (!isDrawing) return;
   e.preventDefault();
   const p = pctFromEvent(e);
+  const hf = fieldScaleFactor();
   if (currentTool === "shape") {
     renderShapes();
     ctx.save();
-    ctx.strokeStyle = shapeDefaults.color; ctx.lineWidth = shapeSizeMemory[shapeKind]; ctx.setLineDash([]);
+    ctx.strokeStyle = shapeDefaults.color; ctx.lineWidth = shapeSizeMemory[shapeKind] * hf; ctx.setLineDash([]);
     drawShapeGeometry(shapeKind, px(drawStart.x, drawStart.y), px(p.x, p.y), shapeDefaults.fill, shapeDefaults.color);
     ctx.restore();
     return;
@@ -4182,13 +4213,13 @@ function onStageMove(e) {
   if (arrowStyle === "dribble") freehand.push(p);
   renderShapes();
   ctx.save();
-  ctx.strokeStyle = drawDefaults.color; ctx.lineWidth = drawDefaults.width; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  ctx.strokeStyle = drawDefaults.color; ctx.lineWidth = drawDefaults.width * hf; ctx.lineCap = "round"; ctx.lineJoin = "round";
   if (arrowStyle === "dribble") { ctx.setLineDash([1,8]); strokeSmooth(freehand.map(pt => px(pt.x, pt.y))); }
   else {
     ctx.setLineDash(arrowStyle === "pass" ? [3,7] : []);
     const p1 = px(drawStart.x, drawStart.y), p2 = px(p.x, p.y);
     const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x);
-    const headLen = 8 + drawDefaults.width*1.8;
+    const headLen = (8 + drawDefaults.width*1.8) * hf;
     const lx2 = p2.x - headLen*0.8*Math.cos(angle), ly2 = p2.y - headLen*0.8*Math.sin(angle);
     ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(lx2,ly2); ctx.stroke();
     ctx.setLineDash([]);
