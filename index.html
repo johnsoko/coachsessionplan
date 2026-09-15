@@ -1418,9 +1418,10 @@
               <span class="tp-label" style="margin-top:0;">Color</span>
               <div class="tp-swatch-row" id="arrow-swatch-row"></div>
               <span class="tp-label">Size</span>
-              <div class="tp-size-row">
-                <input type="range" id="arrow-size" min="1" max="6" step="0.5">
-                <span class="tp-size-val" id="arrow-size-val"></span>
+              <div class="tp-toggle-row" id="arrow-size-toggle">
+                <button data-width="1.5">Thin</button>
+                <button data-width="2.6" class="active">Medium</button>
+                <button data-width="4.2">Thick</button>
               </div>
               <span class="tp-label">Line</span>
               <div class="tp-toggle-row" id="arrow-curve-toggle">
@@ -3092,8 +3093,12 @@ function syncArrowPopover() {
   const kind  = s ? s.style : arrowStyle;
   const curved = (s && (s.style === "run" || s.style === "pass")) ? !!s.curved : drawDefaults.curved;
   document.querySelectorAll("#arrow-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
-  document.getElementById("arrow-size").value = width;
-  document.getElementById("arrow-size-val").textContent = width.toFixed(1) + "px";
+  // older saved arrows may have an arbitrary width from before this was
+  // simplified to three presets — match to the closest preset for
+  // display rather than requiring an exact match
+  const widthPresets = [1.5, 2.6, 4.2];
+  const closestWidth = widthPresets.reduce((a, b) => Math.abs(b - width) < Math.abs(a - width) ? b : a);
+  document.querySelectorAll("#arrow-size-toggle button").forEach(b => b.classList.toggle("active", parseFloat(b.dataset.width) === closestWidth));
   document.querySelectorAll("#arrow-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o.dataset.style === kind));
   document.querySelectorAll("#arrow-curve-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.curved === "1") === curved));
 }
@@ -3279,9 +3284,12 @@ function initArrowPopover() {
     s.addEventListener("click", () => setArrowColor(c));
     row.appendChild(s);
   });
-  const sizeInput = document.getElementById("arrow-size");
-  sizeInput.addEventListener("input", e => setArrowWidth(parseFloat(e.target.value)));
-  sizeInput.addEventListener("change", () => pushHistory());
+  document.querySelectorAll("#arrow-size-toggle button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      pushHistory();
+      setArrowWidth(parseFloat(btn.dataset.width));
+    });
+  });
   document.querySelectorAll("#arrow-popover .arrow-opt").forEach(opt => {
     opt.addEventListener("click", e => {
       e.stopPropagation();
