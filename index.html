@@ -1417,7 +1417,7 @@
               <div style="height:1px;background:var(--line);margin:6px 2px;"></div>
               <span class="tp-label" style="margin-top:0;">Color</span>
               <div class="tp-swatch-row" id="arrow-swatch-row"></div>
-              <span class="tp-label">Size</span>
+              <span class="tp-label">Line Width</span>
               <div class="tp-toggle-row" id="arrow-size-toggle">
                 <button data-width="1.5">Thin</button>
                 <button data-width="2.6" class="active">Medium</button>
@@ -1575,10 +1575,11 @@
               <div style="height:1px;background:var(--line);margin:6px 2px;"></div>
               <span class="tp-label" style="margin-top:0;">Color</span>
               <div class="tp-swatch-row" id="shape-swatch-row"></div>
-              <span class="tp-label">Size</span>
-              <div class="tp-size-row">
-                <input type="range" id="shape-size" min="1" max="6" step="0.5">
-                <span class="tp-size-val" id="shape-size-val"></span>
+              <span class="tp-label">Border Width</span>
+              <div class="tp-toggle-row" id="shape-size-toggle">
+                <button data-width="1.5">Thin</button>
+                <button data-width="2.4" class="active">Medium</button>
+                <button data-width="4">Thick</button>
               </div>
               <span class="tp-label">Style</span>
               <div class="tp-toggle-row" id="shape-fill-toggle">
@@ -3137,8 +3138,12 @@ function syncShapePopover() {
   const fill  = s ? !!s.fill : shapeDefaults.fill;
   const dashed = s ? !!s.dashed : shapeDefaults.dashed;
   document.querySelectorAll("#shape-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
-  document.getElementById("shape-size").value = width;
-  document.getElementById("shape-size-val").textContent = width.toFixed(1) + "px";
+  // older saved shapes may have an arbitrary width from before this was
+  // simplified to three presets — match to the closest preset for
+  // display rather than requiring an exact match
+  const widthPresets = [1.5, 2.4, 4];
+  const closestWidth = widthPresets.reduce((a, b) => Math.abs(b - width) < Math.abs(a - width) ? b : a);
+  document.querySelectorAll("#shape-size-toggle button").forEach(b => b.classList.toggle("active", parseFloat(b.dataset.width) === closestWidth));
   document.querySelectorAll("#shape-fill-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.fill === "1") === fill));
   document.querySelectorAll("#shape-dash-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.dash === "1") === dashed));
   document.querySelectorAll("#shape-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o.dataset.style === kind));
@@ -3339,9 +3344,12 @@ function initShapePopover() {
     s.addEventListener("click", () => setShapeColor(c));
     row.appendChild(s);
   });
-  const sizeInput = document.getElementById("shape-size");
-  sizeInput.addEventListener("input", e => setShapeWidth(parseFloat(e.target.value)));
-  sizeInput.addEventListener("change", () => pushHistory());
+  document.querySelectorAll("#shape-size-toggle button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      pushHistory();
+      setShapeWidth(parseFloat(btn.dataset.width));
+    });
+  });
   document.querySelectorAll("#shape-fill-toggle button").forEach(btn => {
     btn.addEventListener("click", () => setShapeFill(btn.dataset.fill === "1"));
   });
