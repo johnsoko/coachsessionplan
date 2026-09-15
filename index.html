@@ -4084,13 +4084,15 @@ function onStageDown(e) {
   if (currentTool === "select" && (e.target.closest(".token") || e.target.closest(".token-toolbar") || e.target.closest(".shape-toolbar"))) return;
   const p = pctFromEvent(e);
 
-  // grabbing a selected shape's resize/rotate handle only takes priority
-  // over the current tool while Select is active. With a drawing tool
-  // armed, a click near the handle of the arrow you just finished should
-  // start a new line right there, not silently start dragging the old
-  // one's endpoint — which otherwise happens constantly when drawing
-  // several arrows in a row from the same spot
-  if (currentTool === "select" && selectedShapeId) {
+  // grabbing a selected shape's own resize/rotate handle takes priority
+  // over the current tool whenever the click lands precisely on it —
+  // this has to work with a drawing tool still armed too, since drawing
+  // an arrow leaves that tool active for drawing the next one, and
+  // immediately adjusting the arrow you just finished is the common
+  // case. hitTestHandle's own tight ~11px tolerance is what keeps this
+  // safe: only a precise hit on the handle itself grabs it — anything
+  // merely nearby still falls through to start a new shape below.
+  if (selectedShapeId) {
     const sel = shapes.find(sh => sh.id === selectedShapeId);
     if (sel) {
       const hi = hitTestHandle(sel, p.x, p.y);
