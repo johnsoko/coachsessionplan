@@ -3070,12 +3070,14 @@ function syncTeamPopover(team) {
 function setTeamColor(team, color) {
   pushHistory();
   const matched = activeTokensForTeam(team);
-  if (matched.length) { matched.forEach(t => t.color = color); renderTokens(); } else { teamDefaults[team].color = color; }
+  if (matched.length) { matched.forEach(t => t.color = color); renderTokens(); }
+  teamDefaults[team].color = color;
   syncTeamPopover(team);
 }
 function setTeamSize(team, size) {
   const matched = activeTokensForTeam(team);
-  if (matched.length) { matched.forEach(t => t.size = size); renderTokens(); } else { teamDefaults[team].size = size; }
+  if (matched.length) { matched.forEach(t => t.size = size); renderTokens(); }
+  teamDefaults[team].size = size;
   syncTeamPopover(team);
 }
 function setTeamLabelMode(team, mode) {
@@ -3109,18 +3111,22 @@ function syncEquipmentPopover() {
 function setEquipmentKind(kind) {
   pushHistory();
   const matched = activeTokensOfType("equipment");
-  if (matched.length) { matched.forEach(t => t.kind = kind); renderTokens(); } else { equipmentKind = kind; }
+  if (matched.length) { matched.forEach(t => t.kind = kind); renderTokens(); }
+  equipmentKind = kind;
   syncEquipmentPopover();
 }
 function setEquipmentColor(color) {
   pushHistory();
   const matched = activeTokensOfType("equipment");
-  if (matched.length) { matched.forEach(t => t.color = color); renderTokens(); } else { equipmentDefaults.color = color; }
+  if (matched.length) { matched.forEach(t => t.color = color); renderTokens(); }
+  equipmentDefaults.color = color;
   syncEquipmentPopover();
 }
 function setEquipmentSize(size) {
   const matched = activeTokensOfType("equipment");
-  if (matched.length) { matched.forEach(t => t.size = size); renderTokens(); } else { equipmentSizeMemory[equipmentKind] = size; }
+  const kind = matched.length ? matched[0].kind : equipmentKind;
+  if (matched.length) { matched.forEach(t => t.size = size); renderTokens(); }
+  equipmentSizeMemory[kind] = size;
   syncEquipmentPopover();
 }
 
@@ -3150,20 +3156,21 @@ function setArrowCurved(curved) {
       if (curved && s.cx == null) { s.cx = (s.x1 + s.x2) / 2; s.cy = (s.y1 + s.y2) / 2; }
     });
     renderShapes();
-  } else {
-    drawDefaults.curved = curved;
   }
+  drawDefaults.curved = curved;
   syncArrowPopover();
 }
 function setArrowColor(color) {
   pushHistory();
   const matched = activeShapesOfKind(ARROW_KINDS);
-  if (matched.length) { matched.forEach(s => s.color = color); renderShapes(); } else { drawDefaults.color = color; }
+  if (matched.length) { matched.forEach(s => s.color = color); renderShapes(); }
+  drawDefaults.color = color;
   syncArrowPopover();
 }
 function setArrowWidth(width) {
   const matched = activeShapesOfKind(ARROW_KINDS);
-  if (matched.length) { matched.forEach(s => s.width = width); renderShapes(); } else { drawDefaults.width = width; }
+  if (matched.length) { matched.forEach(s => s.width = width); renderShapes(); }
+  drawDefaults.width = width;
   syncArrowPopover();
 }
 
@@ -3189,24 +3196,29 @@ function syncShapePopover() {
 function setShapeColor(color) {
   pushHistory();
   const matched = activeShapesOfKind(SHAPE_KINDS);
-  if (matched.length) { matched.forEach(s => s.color = color); renderShapes(); } else { shapeDefaults.color = color; }
+  if (matched.length) { matched.forEach(s => s.color = color); renderShapes(); }
+  shapeDefaults.color = color;
   syncShapePopover();
 }
 function setShapeWidth(width) {
   const matched = activeShapesOfKind(SHAPE_KINDS);
-  if (matched.length) { matched.forEach(s => s.width = width); renderShapes(); } else { shapeSizeMemory[shapeKind] = width; }
+  const kind = matched.length ? matched[0].style : shapeKind;
+  if (matched.length) { matched.forEach(s => s.width = width); renderShapes(); }
+  shapeSizeMemory[kind] = width;
   syncShapePopover();
 }
 function setShapeFill(fill) {
   pushHistory();
   const matched = activeShapesOfKind(SHAPE_KINDS);
-  if (matched.length) { matched.forEach(s => s.fill = fill); renderShapes(); } else { shapeDefaults.fill = fill; }
+  if (matched.length) { matched.forEach(s => s.fill = fill); renderShapes(); }
+  shapeDefaults.fill = fill;
   syncShapePopover();
 }
 function setShapeDash(dashed) {
   pushHistory();
   const matched = activeShapesOfKind(SHAPE_KINDS);
-  if (matched.length) { matched.forEach(s => s.dashed = dashed); renderShapes(); } else { shapeDefaults.dashed = dashed; }
+  if (matched.length) { matched.forEach(s => s.dashed = dashed); renderShapes(); }
+  shapeDefaults.dashed = dashed;
   syncShapePopover();
 }
 
@@ -3222,12 +3234,14 @@ function syncTextPopover() {
 function setTextColor(color) {
   pushHistory();
   const matched = activeTokensOfType("text");
-  if (matched.length) { matched.forEach(t => t.color = color); renderTokens(); } else { textDefaults.color = color; }
+  if (matched.length) { matched.forEach(t => t.color = color); renderTokens(); }
+  textDefaults.color = color;
   syncTextPopover();
 }
 function setTextSize(size) {
   const matched = activeTokensOfType("text");
-  if (matched.length) { matched.forEach(t => t.size = size); renderTokens(); } else { textDefaults.size = size; }
+  if (matched.length) { matched.forEach(t => t.size = size); renderTokens(); }
+  textDefaults.size = size;
   syncTextPopover();
 }
 
