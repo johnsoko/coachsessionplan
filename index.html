@@ -1391,8 +1391,8 @@
         </button>
         <div class="tk-zoom-row" title="Zoom the field">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.3" stroke="currentColor" stroke-width="1.3"/><path d="M9.2 9.2L12 12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-          <input type="range" id="field-zoom-slider" min="100" max="250" step="10" value="100">
-          <span id="field-zoom-val">100%</span>
+          <input type="range" id="field-zoom-slider" min="0" max="100" step="10" value="0">
+          <span id="field-zoom-val">0%</span>
         </div>
 
         <div class="tk-section-label" id="tk-sec-actions">Add Actions</div>
@@ -3463,9 +3463,16 @@ document.getElementById("field-zoom-slider").addEventListener("input", e => {
   // with zero changes needed, and .canvas-inner's overflow:auto lets the
   // user scroll/pan to reach parts of the field pushed outside the
   // visible area once it's larger than the panel
-  const zoom = parseInt(e.target.value, 10);
-  document.getElementById("field-zoom-val").textContent = zoom + "%";
-  stage.style.maxWidth = (640 * zoom / 100) + "px";
+  //
+  // the slider itself reads 0-100 (0 = the normal default field size at
+  // page load, 100 = as large as is actually useful — beyond that the
+  // field exceeds a typical screen's available width without adding
+  // any real benefit) — mapped internally to the true 100%-140% scale
+  // range that gets applied to the field
+  const sliderVal = parseInt(e.target.value, 10);
+  document.getElementById("field-zoom-val").textContent = sliderVal + "%";
+  const actualScale = 100 + (sliderVal / 100) * 40;
+  stage.style.maxWidth = (640 * actualScale / 100) + "px";
 });
 
 function px(xPct, yPct) { return { x: (xPct/100)*rectW, y: (yPct/100)*rectH }; }
