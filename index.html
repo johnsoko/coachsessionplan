@@ -259,7 +259,7 @@
   .rotation-handle-dot:active { cursor: grabbing; }
   .token.light { background: var(--paper-card); color: var(--ink); }
   .token.dark  { background: var(--ink); color: var(--paper-card); }
-  .token.ball  { width: 18px; height: 18px; background: var(--paper-card); border: 2px solid var(--ink); }
+  .token.ball  { border: none; border-radius: 0; box-shadow: none; }
   .token.eq-cone      { width: 0; height: 0; background: none; box-shadow: none; border-radius: 2px; }
   .token.eq-flatcone  { border-radius: 50%; box-shadow: none; }
   .token.eq-minigoal  { border-radius: 2px; background: none; border-style: solid; box-shadow: none; }
@@ -650,6 +650,15 @@
   .modal-card h4 { font-family: var(--display); font-size: 18px; font-weight: 600; margin-bottom: 14px; }
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   .modal-card-wide { width: 720px; max-width: 92vw; }
+  .full-animation-card { width: 780px; max-width: 94vw; }
+  .full-animation-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .full-animation-phase-label { font-size: 12px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); flex: 1; }
+  .full-animation-stage {
+    position: relative; width: 100%; aspect-ratio: 4/3; background: var(--pitch);
+    border-radius: 10px; overflow: hidden;
+  }
+  .full-animation-stage .thumb-anim-target { position: relative; width: 100%; height: 100%; }
+  .full-animation-status { font-size: 13px; color: var(--ink-faint); }
   .import-phase-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .import-phase-header button { border: none; background: transparent; font-size: 22px; color: var(--ink-faint); }
   .import-phase-toolbar { margin-bottom: 10px; }
@@ -1490,10 +1499,21 @@
               <input type="text" class="field-input tp-name-value" data-team="dark" placeholder="Player name" maxlength="24" style="margin-top:6px;">
             </div>
           </div>
-          <button class="tk-btn" data-tool="ball" style="width:100%;">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M9 5.5l2.4 1.7-.9 2.8H7.5l-.9-2.8z" stroke="currentColor" stroke-width="1.1"/></svg>
-            Ball
-          </button>
+          <div style="position:relative;">
+            <button class="tk-btn" data-tool="ball" style="width:100%;">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M9 5.5l2.4 1.7-.9 2.8H7.5l-.9-2.8z" stroke="currentColor" stroke-width="1.1"/></svg>
+              Ball
+            </button>
+            <div class="team-popover" id="ball-popover">
+              <span class="tp-label" style="margin-top:0;">Color</span>
+              <div class="tp-swatch-row" id="ball-swatch-row"></div>
+              <span class="tp-label">Size</span>
+              <div class="tp-size-row">
+                <input type="range" id="ball-size" min="10" max="32" step="2">
+                <span class="tp-size-val" id="ball-size-val"></span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="tk-section-label" id="tk-sec-teamshape">Add Team Shape</div>
@@ -1690,7 +1710,7 @@
             <div class="output-section-label">Drill Description</div>
             <div id="output-description-text"></div>
           </div>
-          <button class="btn btn-primary" id="output-play-full-btn" data-toast="Add Actions in Draw to animate this play">
+          <button class="btn btn-primary" id="output-play-full-btn">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4 2.5v9l8-4.5z" fill="currentColor"/></svg>
             Play Full Animation
           </button>
@@ -1779,6 +1799,27 @@
       </div>
     </div>
   </div>
+
+  <div class="modal-overlay" id="full-animation-modal-overlay">
+    <div class="modal-card modal-card-wide full-animation-card">
+      <div class="full-animation-head">
+        <h4 style="margin-bottom:0;">Full Animation</h4>
+        <span class="full-animation-phase-label" id="full-animation-phase-label"></span>
+        <button class="modal-x" id="full-animation-close">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="full-animation-stage" id="full-animation-stage"></div>
+      <div class="modal-actions" style="justify-content:space-between; align-items:center;">
+        <span class="full-animation-status" id="full-animation-status"></span>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost" id="full-animation-replay" style="display:none;">Replay</button>
+          <button class="btn btn-primary" id="full-animation-done">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <div class="dropdown-menu output-settings-menu" id="output-settings-overlay">
       <div class="output-settings-head">
@@ -1902,6 +1943,7 @@ const shapeDefaults = { color: "#F7F8F3", width: 2.4, fill: false, dashed: false
 // square/triangle so each shape kind remembers its own last width
 let shapeSizeMemory = { circle: 2.4, square: 2.4, triangle: 2.4 };
 const textDefaults  = { color: "#F7F8F3", size: 18 };
+const ballDefaults  = { color: "#F7F8F3", size: 18 };
 const SHAPE_KINDS = ["circle", "square", "triangle"];
 const ARROW_KINDS = ["run", "pass", "dribble"];
 function textColorFor(hex) {
@@ -2338,7 +2380,7 @@ function focusOpenPanel(id) {
   el.addEventListener("transitionend", onEnd);
   setTimeout(run, 320);
 }
-const TOOL_POPOVER_IDS = { arrow: "arrow-popover", home: "home-popover", away: "away-popover", equipment: "equipment-popover", shape: "shape-popover", text: "text-popover" };
+const TOOL_POPOVER_IDS = { arrow: "arrow-popover", home: "home-popover", away: "away-popover", equipment: "equipment-popover", shape: "shape-popover", text: "text-popover", ball: "ball-popover" };
 document.querySelectorAll(".tk-btn[data-tool]").forEach(btn => {
   btn.addEventListener("click", e => {
     const tool = btn.dataset.tool;
@@ -2368,6 +2410,7 @@ document.querySelectorAll(".tk-btn[data-tool]").forEach(btn => {
     else if (tool === "equipment") { document.getElementById("equipment-popover").classList.add("open"); syncEquipmentPopover(); focusOpenPanel("equipment-popover"); }
     else if (tool === "shape") { document.getElementById("shape-popover").classList.add("open"); syncShapePopover(); focusOpenPanel("shape-popover"); }
     else if (tool === "text") { document.getElementById("text-popover").classList.add("open"); syncTextPopover(); focusOpenPanel("text-popover"); }
+    else if (tool === "ball") { document.getElementById("ball-popover").classList.add("open"); syncBallPopover(); focusOpenPanel("ball-popover"); }
   });
 });
 document.querySelectorAll(".arrow-popover, .team-popover").forEach(p => {
@@ -2453,6 +2496,9 @@ function addToken(type, x, y, team) {
     t.showName = teamDefaults[t.team].showNames;
     t.name = preset.presetName || "";
     preset.presetName = "";
+  } else if (type === "ball") {
+    t.color = ballDefaults.color;
+    t.size = ballDefaults.size;
   }
   tokens.push(t);
   renderTokens();
@@ -2787,6 +2833,15 @@ function renderTokens() {
       el.addEventListener("dblclick", ev => { ev.stopPropagation(); openNameModal(t.id); });
     } else if (t.type === "equipment") {
       applyEquipmentStyle(el, t);
+    } else if (t.type === "ball") {
+      const s = t.size || ballDefaults.size;
+      el.style.width = s + "px"; el.style.height = s + "px";
+      el.style.background = t.color || ballDefaults.color;
+      el.style.maskImage = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 928.6 928.6'%3E%3Cpath d='M361.2,578.801c4,12.398,15.5,20.699,28.5,20.699h149c13,0,24.5-8.4,28.5-20.699L613.3,437.1c4-12.4-0.4-25.9-10.9-33.5l-120.5-87.7c-10.5-7.6-24.8-7.6-35.3,0L326,403.5c-10.5,7.601-14.9,21.2-10.9,33.5L361.2,578.801z'/%3E%3Cpath d='M136,792.6c42.6,42.6,92.3,76.1,147.6,99.5c57.3,24.201,118.101,36.5,180.7,36.5s123.5-12.299,180.7-36.5c55.3-23.4,104.899-56.9,147.6-99.5C835.2,750,868.7,700.301,892.1,645c24.2-57.301,36.5-118.1,36.5-180.699c0-62.701-12.3-123.501-36.5-180.701C868.7,228.3,835.2,178.7,792.6,136C750,93.4,700.3,59.9,645,36.5C587.8,12.3,527,0,464.3,0S340.8,12.3,283.6,36.5C228.3,59.9,178.6,93.4,136,136c-42.6,42.6-76.1,92.3-99.5,147.6C12.3,340.8,0,401.7,0,464.301C0,527,12.3,587.801,36.5,645C59.9,700.4,93.4,750,136,792.6z M189,189c40.6-40.6,88.6-71.1,141-90.3l-10.5,22.7c-6.9,14.7-0.7,32.3,13.8,39.5l116.5,58c8.5,4.2,18.5,4.2,26.9-0.1l116-58.9c14.6-7.4,20.6-25,13.6-39.7l-10.7-22.6c53.5,19.1,102.601,50,144,91.4c7.9,7.9,15.4,16,22.5,24.4l-24.7-2.2c-16.199-1.4-30.6,10.3-32.399,26.5L690.2,367c-1.101,9.4,2.399,18.801,9.3,25.301l94.899,89c11.9,11.1,30.4,10.799,41.9-0.801l17.4-17.6c0,0.4,0,0.9,0,1.299c0,76.102-21.7,149-62.2,211.4l-5.2-24.4c-3.4-15.898-18.8-26.199-34.8-23.199l-128,23.699C614.2,653.4,606.2,659.5,602,668l-57.3,116.9c-7.2,14.6-1.4,32.199,13,39.799l22.1,11.602c-36.9,11.398-75.8,17.299-115.5,17.299s-78.6-5.9-115.5-17.299l22.1-11.602c14.4-7.5,20.2-25.199,13-39.799L326.6,668.1c-4.2-8.5-12.1-14.6-21.5-16.299l-128-23.701c-16-3-31.4,7.301-34.8,23.201l-5.2,24.398C96.6,613.301,74.9,540.5,74.9,464.301c0-0.401,0-0.901,0-1.301l17.4,17.6c11.4,11.6,30,11.9,41.9,0.801l94.9-89c6.9-6.5,10.4-15.9,9.3-25.3l-14.8-129.3c-1.8-16.2-16.2-27.9-32.4-26.5l-24.7,2.2C173.6,205.1,181.1,196.9,189,189z'/%3E%3C/svg%3E\")";
+      el.style.webkitMaskImage = el.style.maskImage;
+      el.style.maskSize = "contain"; el.style.webkitMaskSize = "contain";
+      el.style.maskRepeat = "no-repeat"; el.style.webkitMaskRepeat = "no-repeat";
+      el.style.maskPosition = "center"; el.style.webkitMaskPosition = "center";
     } else if (t.type === "text") {
       el.textContent = t.content || "";
       el.style.color = t.color || textDefaults.color;
@@ -3004,7 +3059,7 @@ function hideTokenToolbar() {}
 function hideToolbars() {}
 
 function closeAllPopovers() {
-  ["arrow-popover", "home-popover", "away-popover", "equipment-popover", "shape-popover", "text-popover", "formations-popover"].forEach(id => {
+  ["arrow-popover", "home-popover", "away-popover", "equipment-popover", "shape-popover", "text-popover", "ball-popover", "formations-popover"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.remove("open");
   });
@@ -3245,6 +3300,29 @@ function setTextSize(size) {
   syncTextPopover();
 }
 
+function syncBallPopover() {
+  const matched = activeTokensOfType("ball");
+  const t = matched[0];
+  const color = t ? t.color : ballDefaults.color;
+  const size  = t ? t.size  : ballDefaults.size;
+  document.querySelectorAll("#ball-swatch-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === color));
+  document.getElementById("ball-size").value = size;
+  document.getElementById("ball-size-val").textContent = size + "px";
+}
+function setBallColor(color) {
+  pushHistory();
+  const matched = activeTokensOfType("ball");
+  if (matched.length) { matched.forEach(t => t.color = color); renderTokens(); }
+  ballDefaults.color = color;
+  syncBallPopover();
+}
+function setBallSize(size) {
+  const matched = activeTokensOfType("ball");
+  if (matched.length) { matched.forEach(t => t.size = size); renderTokens(); }
+  ballDefaults.size = size;
+  syncBallPopover();
+}
+
 function initTeamPopovers() {
   ["light", "dark"].forEach(team => {
     const row = document.querySelector(`.tp-swatch-row[data-team="${team}"]`);
@@ -3431,6 +3509,19 @@ function initTextPopover() {
   sizeInput.addEventListener("change", () => pushHistory());
   syncTextPopover();
 }
+function initBallPopover() {
+  const row = document.getElementById("ball-swatch-row");
+  PLAYER_COLORS.forEach(c => {
+    const s = document.createElement("div");
+    s.className = "tp-swatch"; s.style.background = c; s.dataset.color = c;
+    s.addEventListener("click", () => setBallColor(c));
+    row.appendChild(s);
+  });
+  const sizeInput = document.getElementById("ball-size");
+  sizeInput.addEventListener("input", e => setBallSize(parseInt(e.target.value, 10)));
+  sizeInput.addEventListener("change", () => pushHistory());
+  syncBallPopover();
+}
 
 function toolsPanelVisible() {
   return document.getElementById("draw-tools-content").style.display !== "none";
@@ -3451,6 +3542,10 @@ function showPopoverForToken(t) {
     document.getElementById("text-popover").classList.add("open");
     syncTextPopover();
     focusOpenPanel("text-popover");
+  } else if (t.type === "ball") {
+    document.getElementById("ball-popover").classList.add("open");
+    syncBallPopover();
+    focusOpenPanel("ball-popover");
   }
 }
 function showArrowPopoverForSelection() {
@@ -3488,6 +3583,10 @@ function showPopoverForSelection() {
       document.getElementById("text-popover").classList.add("open");
       syncTextPopover();
       focusOpenPanel("text-popover");
+    } else if (t0.type === "ball") {
+      document.getElementById("ball-popover").classList.add("open");
+      syncBallPopover();
+      focusOpenPanel("ball-popover");
     }
   } else if (selShapes.length && !selTokens.length) {
     if (selShapes.every(s => ARROW_KINDS.includes(s.style))) {
@@ -4457,8 +4556,12 @@ function phaseThumbHTML(ph, opts) {
       return circle + text;
     }
     if (t.type === "ball") {
-      const r = toVB(t.size || 18) / 2;
-      return `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${c}" stroke="#1B211C" stroke-width="${toVB(1.6)}"/>`;
+      const s = toVB(t.size || 18);
+      const scale = s / 928.6;
+      const tx = p.x - s/2, ty = p.y - s/2;
+      const p1 = "M361.2,578.801c4,12.398,15.5,20.699,28.5,20.699h149c13,0,24.5-8.4,28.5-20.699L613.3,437.1c4-12.4-0.4-25.9-10.9-33.5l-120.5-87.7c-10.5-7.6-24.8-7.6-35.3,0L326,403.5c-10.5,7.601-14.9,21.2-10.9,33.5L361.2,578.801z";
+      const p2 = "M136,792.6c42.6,42.6,92.3,76.1,147.6,99.5c57.3,24.201,118.101,36.5,180.7,36.5s123.5-12.299,180.7-36.5c55.3-23.4,104.899-56.9,147.6-99.5C835.2,750,868.7,700.301,892.1,645c24.2-57.301,36.5-118.1,36.5-180.699c0-62.701-12.3-123.501-36.5-180.701C868.7,228.3,835.2,178.7,792.6,136C750,93.4,700.3,59.9,645,36.5C587.8,12.3,527,0,464.3,0S340.8,12.3,283.6,36.5C228.3,59.9,178.6,93.4,136,136c-42.6,42.6-76.1,92.3-99.5,147.6C12.3,340.8,0,401.7,0,464.301C0,527,12.3,587.801,36.5,645C59.9,700.4,93.4,750,136,792.6z M189,189c40.6-40.6,88.6-71.1,141-90.3l-10.5,22.7c-6.9,14.7-0.7,32.3,13.8,39.5l116.5,58c8.5,4.2,18.5,4.2,26.9-0.1l116-58.9c14.6-7.4,20.6-25,13.6-39.7l-10.7-22.6c53.5,19.1,102.601,50,144,91.4c7.9,7.9,15.4,16,22.5,24.4l-24.7-2.2c-16.199-1.4-30.6,10.3-32.399,26.5L690.2,367c-1.101,9.4,2.399,18.801,9.3,25.301l94.899,89c11.9,11.1,30.4,10.799,41.9-0.801l17.4-17.6c0,0.4,0,0.9,0,1.299c0,76.102-21.7,149-62.2,211.4l-5.2-24.4c-3.4-15.898-18.8-26.199-34.8-23.199l-128,23.699C614.2,653.4,606.2,659.5,602,668l-57.3,116.9c-7.2,14.6-1.4,32.199,13,39.799l22.1,11.602c-36.9,11.398-75.8,17.299-115.5,17.299s-78.6-5.9-115.5-17.299l22.1-11.602c14.4-7.5,20.2-25.199,13-39.799L326.6,668.1c-4.2-8.5-12.1-14.6-21.5-16.299l-128-23.701c-16-3-31.4,7.301-34.8,23.201l-5.2,24.398C96.6,613.301,74.9,540.5,74.9,464.301c0-0.401,0-0.901,0-1.301l17.4,17.6c11.4,11.6,30,11.9,41.9,0.801l94.9-89c6.9-6.5,10.4-15.9,9.3-25.3l-14.8-129.3c-1.8-16.2-16.2-27.9-32.4-26.5l-24.7,2.2C173.6,205.1,181.1,196.9,189,189z";
+      return `<g transform="translate(${tx.toFixed(1)} ${ty.toFixed(1)}) scale(${scale.toFixed(5)})"><path d="${p1}" fill="${c}"/><path d="${p2}" fill="${c}"/></g>`;
     }
     if (t.type === "equipment") {
       const s = t.size || 22;
@@ -4957,6 +5060,110 @@ function createAnimatedThumb(ph, wrapClass, opts) {
   }
   return wrap;
 }
+
+// plays every phase's animation back to back inside the "Full Animation"
+// modal — reuses playThumbnailAnimation() for each phase's own internal
+// scene sequence, and adds its own tween for the transition BETWEEN
+// phases (matching how the main editor's playFullAnimation() moves
+// players from one phase's end position into the next phase's start)
+let fullAnimationStopped = false;
+async function playFullAnimationModal() {
+  if (!phases.length) return;
+  saveActivePhase();
+  fullAnimationStopped = false;
+  const overlay = document.getElementById("full-animation-modal-overlay");
+  const stage = document.getElementById("full-animation-stage");
+  const label = document.getElementById("full-animation-phase-label");
+  const status = document.getElementById("full-animation-status");
+  const replayBtn = document.getElementById("full-animation-replay");
+  replayBtn.style.display = "none";
+  status.textContent = "";
+  overlay.classList.add("open");
+
+  stage.innerHTML = "";
+  const inner = document.createElement("div");
+  inner.className = "thumb-anim-target";
+  stage.appendChild(inner);
+
+  const opts = { fieldColor: outputSettings.fieldColor };
+  const isDone = () => fullAnimationStopped || !inner.isConnected;
+
+  function setStageRatio(ph) {
+    const surf = SURFACES[ph.surface] || SURFACES.full;
+    const vb = surf.viewBox.split(" ").map(Number);
+    stage.style.aspectRatio = vb[2] + " / " + vb[3];
+  }
+  function wait(ms) {
+    return new Promise(resolve => {
+      const start = performance.now();
+      function check(now) { if (isDone() || now - start >= ms) { resolve(); return; } requestAnimationFrame(check); }
+      requestAnimationFrame(check);
+    });
+  }
+  // tweens player positions from the end of the previous phase into the
+  // start of this one — matched by team+number, same identity key the
+  // main editor's own between-phase tween uses
+  function tweenBetweenPhases(ph, fromTokens, toScene, duration) {
+    return new Promise(resolve => {
+      const start = performance.now();
+      function frame(now) {
+        if (isDone()) { resolve(); return; }
+        const t = Math.min(1, (now - start) / duration);
+        const e = easeInOutThumb(t);
+        const interpolated = toScene.tokens.map(tok => {
+          const from = tok.type === "player"
+            ? fromTokens.find(f => f.type === "player" && f.team === tok.team && f.num === tok.num)
+            : fromTokens.find(f => f.id === tok.id);
+          if (!from) return tok;
+          return { ...tok, x: from.x + (tok.x - from.x) * e, y: from.y + (tok.y - from.y) * e };
+        });
+        inner.innerHTML = phaseThumbHTML(ph, { ...opts, sceneOverride: { tokens: interpolated, shapes: toScene.shapes } });
+        if (t < 1) requestAnimationFrame(frame); else resolve();
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  for (let i = 0; i < phases.length && !isDone(); i++) {
+    const ph = phases[i];
+    label.textContent = phaseNoun() + " " + (i + 1) + " of " + phases.length;
+    setStageRatio(ph);
+    if (i > 0) {
+      const prevPh = phases[i - 1];
+      const prevScene = prevPh.scenes[prevPh.scenes.length - 1];
+      const firstScene = ph.scenes[0];
+      await tweenBetweenPhases(ph, prevScene.tokens, firstScene, 700);
+      if (isDone()) break;
+    }
+    await playThumbnailAnimation(ph, inner, opts);
+    if (isDone()) break;
+    await wait(400);
+  }
+
+  if (!isDone()) {
+    const noun = phaseNoun().toLowerCase();
+    const plural = noun.endsWith("y") ? noun.slice(0, -1) + "ies" : noun + "s";
+    status.textContent = "Finished playing all " + phases.length + " " + (phases.length === 1 ? noun : plural);
+    replayBtn.style.display = "inline-flex";
+  }
+}
+function closeFullAnimationModal() {
+  fullAnimationStopped = true;
+  const inner = document.querySelector("#full-animation-stage .thumb-anim-target");
+  if (inner && activeThumbAnimations.has(inner)) activeThumbAnimations.get(inner).stop();
+  document.getElementById("full-animation-modal-overlay").classList.remove("open");
+}
+document.getElementById("full-animation-close").addEventListener("click", closeFullAnimationModal);
+document.getElementById("full-animation-done").addEventListener("click", closeFullAnimationModal);
+document.getElementById("full-animation-replay").addEventListener("click", playFullAnimationModal);
+document.getElementById("full-animation-modal-overlay").addEventListener("click", e => {
+  if (e.target.id === "full-animation-modal-overlay") closeFullAnimationModal();
+});
+document.getElementById("output-play-full-btn").addEventListener("click", () => {
+  const hasAnimation = phases.length > 1 || phases.some(ph => ph.scenes.length > 1);
+  if (!hasAnimation) { toast("Add Actions in Draw to animate this play"); return; }
+  playFullAnimationModal();
+});
 
 function formatClockTime(mins) {
   const h24 = Math.floor(mins / 60) % 24, m = ((mins % 60) + 60) % 60;
@@ -6587,6 +6794,7 @@ initEquipmentPopover();
 initArrowPopover();
 initShapePopover();
 initTextPopover();
+initBallPopover();
 
 // builds a fresh example practice plan — used both for the very first
 // visit's demo, and whenever "+ New Practice Plan" is clicked from the
