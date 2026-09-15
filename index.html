@@ -229,7 +229,7 @@
   }
   .surface-toggle button.active { background: var(--paper-card); color: var(--ink); box-shadow: 0 1px 2px rgba(27,33,28,0.12); }
   .canvas-inner {
-    flex: 1; width: 100%; position: relative;
+    flex: 1; width: 100%; position: relative; overflow: auto;
     background-image: radial-gradient(var(--line-md) 1px, transparent 1px);
     background-size: 22px 22px; display: flex; align-items: center; justify-content: center; padding: 24px;
   }
@@ -303,6 +303,12 @@
   .tk-btn.active { background: var(--pitch); color: var(--paper-card); }
   .tk-btn svg { flex-shrink: 0; }
   .tk-btn-select { background: var(--paper-raised); margin-bottom: 4px; }
+  .tk-zoom-row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px; margin-bottom: 10px;
+    background: var(--paper-raised); border-radius: 8px; color: var(--ink-faint);
+  }
+  .tk-zoom-row input[type="range"] { flex: 1; accent-color: var(--pitch); }
+  .tk-zoom-row span { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); width: 34px; text-align: right; }
 
   .formation-team-toggle { display: flex; gap: 4px; background: var(--paper-raised); border-radius: 8px; padding: 3px; margin-bottom: 10px; }
   .animate-panel-toggle { display: flex; gap: 4px; background: var(--paper-raised); border-radius: 8px; padding: 3px; margin-bottom: 14px; }
@@ -752,6 +758,9 @@
        the toolkit's internal one too would just be a second, redundant
        Select control inside the sheet */
     .tk-btn-select { display: none; }
+    /* zoom slider is desktop-only — not much room for it in the mobile
+       sheet, and pinch-to-zoom is the more natural mobile pattern anyway */
+    .tk-zoom-row { display: none; }
     .mobile-sheet-overlay {
       position: fixed; inset: 0; background: rgba(27,33,28,0.35); z-index: 85;
       opacity: 0; pointer-events: none; transition: opacity 0.2s;
@@ -1380,6 +1389,11 @@
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4 3l9 6.2-3.6.7 2 3.7-1.6.9-2-3.7-2.5 2.7z" fill="currentColor"/></svg>
           Select
         </button>
+        <div class="tk-zoom-row" title="Zoom the field">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.3" stroke="currentColor" stroke-width="1.3"/><path d="M9.2 9.2L12 12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          <input type="range" id="field-zoom-slider" min="100" max="250" step="10" value="100">
+          <span id="field-zoom-val">100%</span>
+        </div>
 
         <div class="tk-section-label" id="tk-sec-actions">Add Actions</div>
         <div class="tk-stack">
@@ -3440,6 +3454,19 @@ function resizeCanvas() {
 }
 window.addEventListener("resize", resizeCanvas);
 new ResizeObserver(resizeCanvas).observe(stage);
+document.getElementById("field-zoom-slider").addEventListener("input", e => {
+  // overriding max-width (rather than a CSS transform: scale) means the
+  // element's actual layout size changes, which the ResizeObserver above
+  // picks up automatically — resizeCanvas() re-reads rectW/rectH from
+  // getBoundingClientRect(), so every existing coordinate calculation
+  // (px(), pctFromEvent(), hit-testing, etc.) keeps working correctly
+  // with zero changes needed, and .canvas-inner's overflow:auto lets the
+  // user scroll/pan to reach parts of the field pushed outside the
+  // visible area once it's larger than the panel
+  const zoom = parseInt(e.target.value, 10);
+  document.getElementById("field-zoom-val").textContent = zoom + "%";
+  stage.style.maxWidth = (640 * zoom / 100) + "px";
+});
 
 function px(xPct, yPct) { return { x: (xPct/100)*rectW, y: (yPct/100)*rectH }; }
 
