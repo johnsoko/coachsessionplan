@@ -3826,28 +3826,25 @@ function startShapeResize(s, role) {
   pushHistory();
   function onMove(ev) {
     ev.preventDefault();
-    let p = pctFromEvent(ev);
+    const p = pctFromEvent(ev);
     if (role === "rotate") {
       const cx = (s.x1 + s.x2) / 2, cy = (s.y1 + s.y2) / 2;
       const centerPx = px(cx, cy);
       const mousePx = px(p.x, p.y);
       s.rotation = Math.round(Math.atan2(mousePx.y - centerPx.y, mousePx.x - centerPx.x) * 180 / Math.PI + 90);
     } else if (s.style === "dribble" && s.points && s.points.length) {
-      p = snapDrawPoint(p, s.id);
       const idx = role === "start" ? 0 : s.points.length - 1;
       s.points[idx] = { x: p.x, y: p.y };
-    } else if (role === "start") { p = snapDrawPoint(p, s.id); s.x1 = p.x; s.y1 = p.y; }
-    else if (role === "end") { p = snapDrawPoint(p, s.id); s.x2 = p.x; s.y2 = p.y; }
+    } else if (role === "start") { s.x1 = p.x; s.y1 = p.y; }
+    else if (role === "end") { s.x2 = p.x; s.y2 = p.y; }
     else if (role === "control") { s.cx = p.x; s.cy = p.y; }
     renderShapes();
-    if (role === "start" || role === "end") drawSnapIndicator();
   }
   function onUp() {
     document.removeEventListener("mousemove", onMove);
     document.removeEventListener("mouseup", onUp);
     document.removeEventListener("touchmove", onMove);
     document.removeEventListener("touchend", onUp);
-    activeSnapPoint = null;
     renderPhaseThumbActive();
   }
   document.addEventListener("mousemove", onMove);
@@ -4076,48 +4073,6 @@ function hitTestShape(s, x, y, tolerance) {
    STAGE POINTER HANDLING
 ───────────────────────────────────────────────────────── */
 let isDrawing = false, drawStart = null, freehand = [];
-let activeSnapPoint = null; // last point a drawing/drag operation snapped to, for the visual indicator
-// Snaps a point being drawn or dragged to any nearby shape endpoint or
-// token center, so two arrows (or an arrow and a cone/player) can share
-// an exact point without needing pixel-perfect placement — this is the
-// main source of frustration when endpoints cluster close together.
-// Distance is measured in real screen pixels (matching hitTestShape's
-// own tolerance units) so the snap radius feels consistent regardless
-// of the underlying percentage coordinate scale.
-function snapDrawPoint(p, excludeShapeId) {
-  const SNAP_PX = 12;
-  const target = px(p.x, p.y);
-  let best = null, bestDist = SNAP_PX;
-  function consider(xPct, yPct) {
-    const cand = px(xPct, yPct);
-    const d = Math.hypot(cand.x - target.x, cand.y - target.y);
-    if (d < bestDist) { bestDist = d; best = { x: xPct, y: yPct }; }
-  }
-  shapes.forEach(s => {
-    if (s.id === excludeShapeId) return;
-    if (s.style === "dribble" && s.points && s.points.length) {
-      consider(s.points[0].x, s.points[0].y);
-      consider(s.points[s.points.length - 1].x, s.points[s.points.length - 1].y);
-    } else if (s.x1 != null) {
-      consider(s.x1, s.y1);
-      consider(s.x2, s.y2);
-    }
-  });
-  tokens.forEach(t => consider(t.x, t.y));
-  activeSnapPoint = best;
-  return best || p;
-}
-// small ring drawn at the snapped-to point, so it's visible while
-// drawing/dragging that a point locked onto something rather than
-// landing wherever the cursor happened to be
-function drawSnapIndicator() {
-  if (!activeSnapPoint) return;
-  const sp = px(activeSnapPoint.x, activeSnapPoint.y);
-  ctx.save();
-  ctx.strokeStyle = "#E2892B"; ctx.lineWidth = 1.6; ctx.setLineDash([]);
-  ctx.beginPath(); ctx.arc(sp.x, sp.y, 7, 0, Math.PI * 2); ctx.stroke();
-  ctx.restore();
-}
 stage.addEventListener("mousedown", onStageDown);
 stage.addEventListener("touchstart", onStageDown, {passive:false});
 
@@ -4190,9 +4145,7 @@ function onStageDown(e) {
       renderShapes(); renderTokens();
     }
     pushHistory();
-    const skipSnap = currentTool === "arrow" && arrowStyle === "dribble";
-    if (skipSnap) { activeSnapPoint = null; drawStart = p; } else { drawStart = snapDrawPoint(p); }
-    isDrawing = true; freehand = [drawStart];
+    isDrawing = true; drawStart = p; freehand = [p];
     document.addEventListener("mousemove", onStageMove);
     document.addEventListener("touchmove", onStageMove, {passive:false});
     document.addEventListener("mouseup", onStageUp);
@@ -4215,19 +4168,16 @@ function onStageDown(e) {
 function onStageMove(e) {
   if (!isDrawing) return;
   e.preventDefault();
-  let p = pctFromEvent(e);
+  const p = pctFromEvent(e);
   if (currentTool === "shape") {
-    p = snapDrawPoint(p);
     renderShapes();
     ctx.save();
     ctx.strokeStyle = shapeDefaults.color; ctx.lineWidth = shapeSizeMemory[shapeKind]; ctx.setLineDash([]);
     drawShapeGeometry(shapeKind, px(drawStart.x, drawStart.y), px(p.x, p.y), shapeDefaults.fill, shapeDefaults.color);
-    drawSnapIndicator();
     ctx.restore();
     return;
   }
-  if (arrowStyle === "dribble") { freehand.push(p); activeSnapPoint = null; }
-  else p = snapDrawPoint(p);
+  if (arrowStyle === "dribble") freehand.push(p);
   renderShapes();
   ctx.save();
   ctx.strokeStyle = drawDefaults.color; ctx.lineWidth = drawDefaults.width; ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -4242,7 +4192,6 @@ function onStageMove(e) {
     ctx.setLineDash([]);
     drawArrowhead(p2.x, p2.y, angle, headLen, drawDefaults.color);
   }
-  drawSnapIndicator();
   ctx.restore();
 }
 function onStageUp(e) {
@@ -4252,25 +4201,22 @@ function onStageUp(e) {
   document.removeEventListener("touchend", onStageUp);
   if (!isDrawing) return;
   isDrawing = false;
-  let p = pctFromEvent(e.changedTouches ? {touches:e.changedTouches} : e);
+  const p = pctFromEvent(e.changedTouches ? {touches:e.changedTouches} : e);
   let shape;
   if (currentTool === "shape") {
-    p = snapDrawPoint(p);
     const dist = Math.hypot(p.x-drawStart.x, p.y-drawStart.y);
-    if (dist < 2) { activeSnapPoint = null; renderShapes(); return; }
+    if (dist < 2) { renderShapes(); return; }
     shape = { id: nextId++, style: shapeKind, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: shapeDefaults.color, width: shapeSizeMemory[shapeKind], fill: shapeDefaults.fill };
   } else if (arrowStyle === "dribble") {
     freehand.push(p);
     if (freehand.length < 3) { renderShapes(); return; }
     shape = { id: nextId++, style: "dribble", points: freehand.slice(), color: drawDefaults.color, width: drawDefaults.width };
   } else {
-    p = snapDrawPoint(p);
     const dist = Math.hypot(p.x-drawStart.x, p.y-drawStart.y);
-    if (dist < 2) { activeSnapPoint = null; renderShapes(); return; }
+    if (dist < 2) { renderShapes(); return; }
     shape = { id: nextId++, style: arrowStyle, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: drawDefaults.color, width: drawDefaults.width, curved: drawDefaults.curved };
     if (shape.curved) { shape.cx = (shape.x1 + shape.x2) / 2; shape.cy = (shape.y1 + shape.y2) / 2; }
   }
-  activeSnapPoint = null;
   shapes.push(shape);
   selectedShapeId = shape.id;
   renderShapes();
