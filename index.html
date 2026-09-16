@@ -657,6 +657,14 @@
     border-radius: 10px; overflow: hidden;
   }
   .full-animation-stage .thumb-anim-target { position: relative; width: 100%; height: 100%; }
+  .full-animation-title-slide {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 24px;
+  }
+  .full-animation-title-slide span {
+    font-family: var(--display); font-weight: 700; font-size: clamp(22px, 5vw, 40px);
+    color: #F7F8F3; line-height: 1.25;
+  }
   .full-animation-status { font-size: 13px; color: var(--ink-faint); }
   .import-phase-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .import-phase-header button { border: none; background: transparent; font-size: 22px; color: var(--ink-faint); }
@@ -5122,10 +5130,16 @@ function createAnimatedThumb(ph, wrapClass, opts) {
 
 // plays every phase's animation back to back inside the "Full Animation"
 // modal — reuses playThumbnailAnimation() for each phase's own internal
-// scene sequence, and adds its own tween for the transition BETWEEN
-// phases (moving players from one phase's end position into the next
-// phase's start)
+// scene sequence. Deliberately cuts straight to each next phase rather
+// than tweening between them: unlike scene-to-scene motion within one
+// phase, consecutive phases are usually unrelated setups, so smoothing
+// player positions between them would just look like a strange, unearned
+// slide across the field. When "Show Title in Animation" is checked, an
+// intro slide with the phase's own name is shown before that phase plays.
 let fullAnimationStopped = false;
+function phaseDisplayTitle(ph, i) {
+  return (ph.title && ph.title.trim()) ? ph.title.trim() : (phaseNoun() + " " + (i + 1));
+}
 async function playFullAnimationModal() {
   if (!phases.length) return;
   saveActivePhase();
@@ -5146,6 +5160,7 @@ async function playFullAnimationModal() {
 
   const opts = { fieldColor: outputSettings.fieldColor };
   const isDone = () => fullAnimationStopped || !inner.isConnected;
+  const showTitles = document.getElementById("animate-show-title").checked;
 
   function setStageRatio(ph) {
     const surf = SURFACES[ph.surface] || SURFACES.full;
@@ -5159,39 +5174,17 @@ async function playFullAnimationModal() {
       requestAnimationFrame(check);
     });
   }
-  // tweens player positions from the end of the previous phase into the
-  // start of this one — matched by team+number, same identity key the
-  // main editor's own between-phase tween uses
-  function tweenBetweenPhases(ph, fromTokens, toScene, duration) {
-    return new Promise(resolve => {
-      const start = performance.now();
-      function frame(now) {
-        if (isDone()) { resolve(); return; }
-        const t = Math.min(1, (now - start) / duration);
-        const e = easeInOutThumb(t);
-        const interpolated = toScene.tokens.map(tok => {
-          const from = tok.type === "player"
-            ? fromTokens.find(f => f.type === "player" && f.team === tok.team && f.num === tok.num)
-            : fromTokens.find(f => f.id === tok.id);
-          if (!from) return tok;
-          return { ...tok, x: from.x + (tok.x - from.x) * e, y: from.y + (tok.y - from.y) * e };
-        });
-        inner.innerHTML = phaseThumbHTML(ph, { ...opts, sceneOverride: { tokens: interpolated, shapes: toScene.shapes } });
-        if (t < 1) requestAnimationFrame(frame); else resolve();
-      }
-      requestAnimationFrame(frame);
-    });
+  function renderTitleSlide(ph, i) {
+    inner.innerHTML = `<div class="full-animation-title-slide"><span>${escapeHtml(phaseDisplayTitle(ph, i))}</span></div>`;
   }
 
   for (let i = 0; i < phases.length && !isDone(); i++) {
     const ph = phases[i];
     label.textContent = phaseNoun() + " " + (i + 1) + " of " + phases.length;
     setStageRatio(ph);
-    if (i > 0) {
-      const prevPh = phases[i - 1];
-      const prevScene = prevPh.scenes[prevPh.scenes.length - 1];
-      const firstScene = ph.scenes[0];
-      await tweenBetweenPhases(ph, prevScene.tokens, firstScene, 700);
+    if (showTitles) {
+      renderTitleSlide(ph, i);
+      await wait(1300);
       if (isDone()) break;
     }
     await playThumbnailAnimation(ph, inner, opts, null, true);
