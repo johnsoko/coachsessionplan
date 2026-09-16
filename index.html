@@ -4165,15 +4165,19 @@ function onStageDown(e) {
     // clicking empty space always clears whatever was selected first —
     // since drawing requires an actual drag, a plain click here can
     // only mean "deselect", never "keep editing the previous shape".
-    // Without this, the tool stayed armed for drawing after a line was
-    // finished, but the just-drawn line never actually deselected
-    // until you clicked entirely off the field.
+    // When something WAS selected, this click's purpose is deselection,
+    // not starting a new line — so hand control back to Select instead
+    // of leaving the drawing tool armed. A click with nothing selected
+    // to begin with is a genuine "start drawing here" and proceeds as
+    // normal below.
     if (selectedShapeId || selectedTokenId) {
       selectedShapeId = null; selectedTokenId = null;
       multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
       hideShapeToolbar();
       closeAllPopovers();
       renderShapes(); renderTokens();
+      setTool("select");
+      return;
     }
     pushHistory();
     isDrawing = true; drawStart = p; freehand = [p];
