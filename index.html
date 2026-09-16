@@ -4542,16 +4542,6 @@ function loadPhase(id) {
 // cloneCurrent true = Clone (copies the active scene's content too);
 // false = Next (blank single scene, but keeps the current field type)
 function addPhase(cloneCurrent) {
-  // a standalone drill is meant to be exactly one phase — its own save
-  // path (saveStandaloneDrill) only ever persists phases[0], so a second
-  // phase added here would animate and look completely normal right up
-  // until save, where it would silently vanish for good. Blocking the
-  // add here is what actually prevents that data loss, rather than
-  // just hiding the buttons that lead to it.
-  if (isStandaloneDrillMode) {
-    toast("A drill is a single phase — start a Practice Plan to add more activities");
-    return;
-  }
   saveActivePhase();
   const current = phases.find(p => p.id === activePhaseId);
   const ph = newPhaseObj(cloneCurrent ? current : null, current ? current.surface : "full");
@@ -5652,7 +5642,6 @@ function renderPhaseNotes() {
     dupBtn.title = "Duplicate";
     dupBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="4.5" width="7.5" height="8.5" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 4.5V3a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H11" stroke="currentColor" stroke-width="1.2"/></svg>`;
     dupBtn.addEventListener("click", () => {
-      if (isStandaloneDrillMode) { toast("A drill is a single phase — start a Practice Plan to add more activities"); return; }
       const idx = phases.findIndex(p => p.id === ph.id);
       const clone = newPhaseObj(ph, ph.surface);
       clone.noteBlocks = [...ph.noteBlocks];
@@ -5670,7 +5659,7 @@ function renderPhaseNotes() {
       renderPhaseNotes();
     });
     if (libControl) actions.appendChild(libControl);
-    if (!isStandaloneDrillMode) actions.appendChild(dupBtn);
+    actions.appendChild(dupBtn);
     actions.appendChild(delBtn);
 
     card.appendChild(handle);
@@ -6101,11 +6090,6 @@ function renderImportPhaseRows() {
   document.getElementById("import-phase-next").disabled = importPhasePage >= totalPages - 1;
 }
 async function importDrillIntoPhases(id, title) {
-  if (isStandaloneDrillMode) {
-    toast("A drill is a single phase — start a Practice Plan to add more activities");
-    closeImportPhaseModal();
-    return;
-  }
   try {
     const res = await fetch(`/api/drill-library/${id}`);
     if (!res.ok) { toast("Could not load that drill"); return; }
@@ -6693,13 +6677,6 @@ function applyStandaloneDrillModeUI() {
   document.getElementById("title-input").placeholder = placeholder;
   document.getElementById("notes-title-input").placeholder = placeholder;
   document.getElementById("phases-tab-label").textContent = isStandaloneDrillMode ? "Phases" : "Activities";
-  // a drill is a single phase, period — its own save path only ever
-  // persists the first one, so hide the ways to add a second rather
-  // than let it quietly get lost the moment the drill is saved
-  document.getElementById("phase-next").style.display = isStandaloneDrillMode ? "none" : "";
-  document.getElementById("phase-clone").style.display = isStandaloneDrillMode ? "none" : "";
-  const importItems = [document.getElementById("phase-import"), document.getElementById("phase-import-mobile")];
-  importItems.forEach(el => { if (el) el.style.display = isStandaloneDrillMode ? "none" : ""; });
 }
 
 function getTags() {
@@ -6961,18 +6938,6 @@ async function getAuthToken() {
 
 async function saveStandaloneDrill() {
   saveActivePhase();
-  // safety net: the UI now prevents adding a second phase in drill mode,
-  // but a session already in this state (started before that guard
-  // existed) would otherwise have every phase after the first silently
-  // discarded below, with no indication anything was lost. Surfacing it
-  // here means it's a visible, cancellable choice instead of silent data
-  // loss on save.
-  if (phases.length > 1) {
-    const proceed = confirm(
-      `This drill has ${phases.length} phases, but a drill can only save its first one (${phaseNoun ? phaseNoun() + " 1" : "Phase 1"}) — the rest will NOT be saved.\n\nClick Cancel to go back and remove the extra phases first, or OK to save just the first phase.`
-    );
-    if (!proceed) return;
-  }
   const ph = phases[0];
   const title = document.getElementById("title-input").value.trim();
   if (!title) {
@@ -6984,11 +6949,18 @@ async function saveStandaloneDrill() {
   const payload = {
     title,
     data: {
+      // surface/scenes/notes/dimensions here always mirror phase 1 —
+      // kept at the top level so the Drill Library grid's thumbnail
+      // query (a single json_extract on the backend, unaware of a
+      // phases array) keeps working unchanged for every drill, old or
+      // new. The full multi-phase drill — everything actually needed to
+      // reopen and keep editing it — lives in `phases` below.
       surface: ph.surface, scenes: ph.scenes,
       notes: (ph.noteBlocks || []).filter(t => t.trim()).join(" "),
       description: (drillDescriptionBlocks || []).filter(t => t.trim()).join(" "),
       dimensions: ph.dimensions || "",
-      tags: getTags(), creatorName
+      tags: getTags(), creatorName,
+      phases, phaseNextId, sceneNextId, nextId
     }
   };
   try {
@@ -7559,31 +7531,47 @@ async function openStandaloneDrillEditorExisting(id) {
     const res = await fetch(`/api/drill-library/${id}`);
     if (!res.ok) { toast("Could not load that drill"); return; }
     const data = await res.json();
-    // preserve the original token/shape ids across scenes — the tween
-    // and shape-wipe animation logic matches the SAME object between
-    // consecutive scenes by id to tell "moved" from "brand new"; handing
-    // out fresh ids independently per scene (as importDrillIntoPhases
-    // does, since IT merges into an existing session with its own ids
-    // already in play) breaks that matching entirely, since every
-    // scene's copy of the same player ends up with a different id
-    const scenes = (data.scenes && data.scenes.length ? data.scenes : [{ tokens: [], shapes: [] }]).map(sc => ({
-      id: sceneNextId++,
-      tokens: (sc.tokens || []).map(t => ({ ...t })),
-      shapes: (sc.shapes || []).map(s => ({ ...s }))
-    }));
-    // advance the global counters past anything in this drill so any
-    // NEW token/shape added while editing still gets a fresh, non-colliding id
-    scenes.forEach(sc => {
-      sc.tokens.forEach(t => { if (t.id != null && t.id >= nextId) nextId = t.id + 1; });
-      sc.shapes.forEach(s => { if (s.id != null && s.id >= nextId) nextId = s.id + 1; });
-    });
-    const ph = {
-      id: phaseNextId++, surface: data.surface || "full", scenes, activeSceneId: scenes[0].id,
-      noteBlocks: [data.notes || ""], title: data.title || "", duration: "", dimensions: data.dimensions || ""
-    };
-    repairPhaseSceneIdContinuity(ph); // in case this specific drill was saved with the id-mismatch corruption before the underlying bug was fixed
     tokens = []; shapes = [];
-    phases = [ph];
+    if (Array.isArray(data.phases) && data.phases.length) {
+      // new multi-phase drill — the full state (every phase, scene ids,
+      // and counters) was saved alongside the backward-compatible
+      // single-phase fields, so this restores exactly like a practice
+      // plan does, no id remapping needed
+      phases = data.phases;
+      phases.forEach(repairPhaseSceneIdContinuity);
+      const maxPhaseId = Math.max(0, ...phases.map(p => p.id));
+      const maxSceneId = Math.max(0, ...phases.flatMap(p => p.scenes.map(s => s.id)));
+      const maxTokenShapeId = Math.max(0, ...phases.flatMap(p => p.scenes.flatMap(s => [...s.tokens, ...s.shapes].map(o => o.id))));
+      phaseNextId = data.phaseNextId || (maxPhaseId + 1);
+      sceneNextId = data.sceneNextId || (maxSceneId + 1);
+      nextId = data.nextId || (maxTokenShapeId + 1);
+    } else {
+      // legacy single-phase drill (saved before multi-phase support) —
+      // preserve the original token/shape ids across scenes — the tween
+      // and shape-wipe animation logic matches the SAME object between
+      // consecutive scenes by id to tell "moved" from "brand new"; handing
+      // out fresh ids independently per scene (as importDrillIntoPhases
+      // does, since IT merges into an existing session with its own ids
+      // already in play) breaks that matching entirely, since every
+      // scene's copy of the same player ends up with a different id
+      const scenes = (data.scenes && data.scenes.length ? data.scenes : [{ tokens: [], shapes: [] }]).map(sc => ({
+        id: sceneNextId++,
+        tokens: (sc.tokens || []).map(t => ({ ...t })),
+        shapes: (sc.shapes || []).map(s => ({ ...s }))
+      }));
+      // advance the global counters past anything in this drill so any
+      // NEW token/shape added while editing still gets a fresh, non-colliding id
+      scenes.forEach(sc => {
+        sc.tokens.forEach(t => { if (t.id != null && t.id >= nextId) nextId = t.id + 1; });
+        sc.shapes.forEach(s => { if (s.id != null && s.id >= nextId) nextId = s.id + 1; });
+      });
+      const ph = {
+        id: phaseNextId++, surface: data.surface || "full", scenes, activeSceneId: scenes[0].id,
+        noteBlocks: [data.notes || ""], title: data.title || "", duration: "", dimensions: data.dimensions || ""
+      };
+      repairPhaseSceneIdContinuity(ph); // in case this specific drill was saved with the id-mismatch corruption before the underlying bug was fixed
+      phases = [ph];
+    }
     activePhaseId = null;
     document.getElementById("title-input").value = data.title || "";
     document.getElementById("notes-title-input").value = data.title || "";
@@ -7593,7 +7581,7 @@ async function openStandaloneDrillEditorExisting(id) {
     currentDrillId = null;
     applyStandaloneDrillModeUI();
     history.replaceState(null, "", location.pathname);
-    loadPhase(ph.id);
+    loadPhase(phases[0].id);
     renderPhaseList();
     switchMode("draw");
     showScreen("app");
