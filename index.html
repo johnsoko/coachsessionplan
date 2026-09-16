@@ -504,13 +504,6 @@
     position: absolute; right: -4px; top: 50%; transform: translateY(-50%) rotate(45deg);
     width: 8px; height: 8px; background: var(--ink);
   }
-  .animate-title-overlay {
-    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 10;
-    font-family: var(--display); font-weight: 700; font-size: 15px; color: #F7F8F3;
-    background: rgba(27,33,28,0.55); padding: 5px 14px; border-radius: 20px;
-    opacity: 0; pointer-events: none; transition: opacity 0.15s;
-  }
-  #pitch-stage.show-phase-title .animate-title-overlay { opacity: 1; }
   .animate-play-buttons { display: flex; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--line); flex-shrink: 0; }
   .animate-play-buttons .btn { padding: 9px 6px; font-size: 12.5px; white-space: nowrap; gap: 5px; }
 
@@ -1387,7 +1380,6 @@
             <canvas id="draw-canvas"></canvas>
             <div id="token-layer"></div>
             <div class="hint-pill" id="hint-pill" style="display:none;"></div>
-            <div class="animate-title-overlay" id="animate-title-overlay"></div>
           </div>
         </div>
         <div class="animate-scrub-row" id="animate-scrub-row" style="display:none;">
@@ -5490,8 +5482,6 @@ function refreshAnimatePanel() {
   const ph = phases.find(p => p.id === activePhaseId);
   const idx = phases.findIndex(p => p.id === activePhaseId);
   document.getElementById("animate-phase-title").textContent = phaseNoun() + " " + (idx + 1);
-  const overlay = document.getElementById("animate-title-overlay");
-  if (overlay) overlay.textContent = document.getElementById("title-input").value;
   renderSceneTimeline();
   renderAnimateOutputPhaseLists();
   setAnimateProgress(0);
@@ -5673,9 +5663,6 @@ async function playCurrentPhaseOnly() {
 }
 document.getElementById("phase-play-btn").addEventListener("click", playCurrentPhaseOnly);
 document.getElementById("play-full-btn").addEventListener("click", playFullAnimationModal);
-document.getElementById("animate-show-title").addEventListener("change", () => {
-  updatePlaybackUIVisibility();
-});
 document.getElementById("add-scene-btn").addEventListener("click", () => addScene());
 
 
@@ -6067,16 +6054,14 @@ document.getElementById("draw-panel-toggle").addEventListener("click", e => {
   updatePlaybackUIVisibility();
   if (showTimeline) refreshAnimatePanel();
 });
-// the progress bar and title overlay are playback UI — only relevant
-// while the Timeline panel is open, or while something is actually
-// playing (so switching back to Tools mid-playback doesn't hide the
-// progress of a still-running animation)
+// the progress bar is playback UI — only relevant while the Timeline
+// panel is open, or while something is actually playing (so switching
+// back to Tools mid-playback doesn't hide the progress of a still-running
+// animation)
 function updatePlaybackUIVisibility() {
   const timelineActive = document.querySelector('#draw-panel-toggle button[data-panel="timeline"]').classList.contains("active");
   const show = timelineActive || isPlaying;
   document.getElementById("animate-scrub-row").style.display = show ? "flex" : "none";
-  const showTitle = show && document.getElementById("animate-show-title").checked;
-  document.getElementById("animate-title-overlay").parentElement.classList.toggle("show-phase-title", showTitle);
   // the border + badge signal "you're in Animate mode" specifically —
   // tied to the toggle itself, not to isPlaying, so it reflects which
   // panel you're working in rather than whether something is animating
