@@ -521,7 +521,7 @@
   }
   .animate-play-btn:hover { background: var(--pitch-tint); color: var(--pitch-deep); }
   .animate-play-btn.playing { background: var(--bib); color: #201200; }
-  #phase-play-btn.playing { opacity: 0.65; }
+  #phase-play-btn.playing, #play-full-btn.playing { opacity: 0.65; }
   .animate-progress-track { flex: 1; height: 5px; border-radius: 3px; background: var(--paper-raised); overflow: hidden; }
   .animate-progress-fill { height: 100%; width: 0%; background: var(--pitch); border-radius: 3px; transition: width 0.08s linear; }
 
@@ -1648,6 +1648,10 @@
             <button class="btn btn-ghost" id="phase-play-btn" style="flex:1; justify-content:center;">
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4 2.5v9l8-4.5z" fill="currentColor"/></svg>
               Preview
+            </button>
+            <button class="btn btn-primary" id="play-full-btn" style="flex:1; justify-content:center;">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4 2.5v9l8-4.5z" fill="currentColor"/></svg>
+              Play Full
             </button>
           </div>
         </div>
@@ -5675,6 +5679,7 @@ async function playCurrentPhaseOnly() {
   updatePlaybackUIVisibility();
 }
 document.getElementById("phase-play-btn").addEventListener("click", playCurrentPhaseOnly);
+document.getElementById("play-full-btn").addEventListener("click", playFullAnimationModal);
 document.getElementById("animate-show-title").addEventListener("change", () => {
   updatePlaybackUIVisibility();
 });
