@@ -427,9 +427,9 @@
   .phase-note-notes-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .phase-clips-label { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); }
   .phase-clips-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px; }
-  .phase-clip-unit { display: flex; flex-direction: column; gap: 8px; width: 300px; flex-shrink: 0; }
+  .phase-clip-unit { display: flex; flex-direction: column; gap: 8px; width: 420px; flex-shrink: 0; }
   .phase-clip-card {
-    position: relative; width: 300px; border-radius: 8px; overflow: hidden; background: #000;
+    position: relative; width: 420px; border-radius: 8px; overflow: hidden; background: #000;
     aspect-ratio: 16/9; flex-shrink: 0;
   }
   .phase-clip-card iframe, .phase-clip-card video { width: 100%; height: 100%; border: none; display: block; }
@@ -442,13 +442,20 @@
   .phase-clip-notes.note-blocks { min-height: 70px; font-size: 12.5px; margin-bottom: 24px; }
   .phase-clip-notes-readonly { font-size: 12.5px; }
   .add-clip-box {
-    width: 300px; aspect-ratio: 16/9; flex-shrink: 0; border: 1.5px dashed var(--line-md); border-radius: 8px;
+    width: 420px; aspect-ratio: 16/9; flex-shrink: 0; border: 1.5px dashed var(--line-md); border-radius: 8px;
     background: var(--paper); display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 8px; color: var(--ink-soft); font-size: 12px;
   }
   .add-clip-box:hover { background: var(--paper-raised); }
   .add-clip-hint { font-size: 11.5px; color: var(--ink-faint); margin-top: 6px; }
   .session-clips-section { margin-top: 24px; display: flex; flex-direction: column; gap: 10px; }
+  /* large, single-column treatment for a video preview shown at the
+     bottom of a page — same scale as a single phase's own big thumbnail
+     — used on the Output page and the Drill Library detail page, as
+     opposed to the Details tab's row-of-cards layout */
+  #output-clips-row.phase-clips-row, .lib-detail-clips-row.phase-clips-row { flex-direction: column; }
+  #output-clips-row .phase-clip-unit, .lib-detail-clips-row .phase-clip-unit,
+  #output-clips-row .phase-clip-card, .lib-detail-clips-row .phase-clip-card { width: 100%; }
   .phase-note-add-exercise {
     font-size: 11px; color: var(--pitch-deep); border: 1.5px dashed var(--line-md); border-radius: 5px;
     padding: 4px 7px; background: none; margin-top: 2px;
@@ -5465,9 +5472,10 @@ function addClip(url) {
 // Details tab (editable, with a remove button and its own editable notes
 // under each clip, same block editor the phase notes use) and Output
 // (read-only, notes shown as a plain bullet list like phase notes there)
-function renderClipsRow(container, editable) {
+function renderClipsRow(container, editable, clipsList) {
+  const list = clipsList || sessionClips;
   container.innerHTML = "";
-  sessionClips.forEach(clip => {
+  list.forEach(clip => {
     const embed = buildClipEmbed(clip.url);
     if (!embed) return;
     if (!clip.noteBlocks || !clip.noteBlocks.length) clip.noteBlocks = [""];
@@ -5485,7 +5493,7 @@ function renderClipsRow(container, editable) {
       rm.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 2l7 7M9 2l-7 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
       rm.addEventListener("click", () => {
         sessionClips = sessionClips.filter(c => c.id !== clip.id);
-        renderClipsRow(container, editable);
+        renderClipsRow(container, editable, clipsList);
       });
       card.appendChild(rm);
     }
@@ -6962,7 +6970,8 @@ async function saveStandaloneDrill() {
       description: (drillDescriptionBlocks || []).filter(t => t.trim()).join(" "),
       dimensions: ph.dimensions || "",
       tags: getTags(), creatorName,
-      phases, phaseNextId, sceneNextId, nextId
+      phases, phaseNextId, sceneNextId, nextId,
+      clips: sessionClips
     }
   };
   try {
@@ -7046,7 +7055,7 @@ async function syncPhasesToLibrary() {
       ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
     const payload = {
       title: ph.title || "Untitled Drill",
-      data: { surface: ph.surface, scenes: ph.scenes, notes, description, tags: getTags(), creatorName }
+      data: { surface: ph.surface, scenes: ph.scenes, notes, description, tags: getTags(), creatorName, clips: sessionClips }
     };
     try {
       if (ph.libraryDrillId) {
@@ -7574,6 +7583,7 @@ async function openStandaloneDrillEditorExisting(id) {
       repairPhaseSceneIdContinuity(ph); // in case this specific drill was saved with the id-mismatch corruption before the underlying bug was fixed
       phases = [ph];
     }
+    sessionClips = Array.isArray(data.clips) ? data.clips : [];
     activePhaseId = null;
     document.getElementById("title-input").value = data.title || "";
     document.getElementById("notes-title-input").value = data.title || "";
@@ -7745,6 +7755,10 @@ async function openLibraryDrillDetail(id) {
       <div class="lib-detail-label">Description</div>
       <div class="lib-detail-desc">${escapeHtml(d.description || "No description yet.")}</div>
       <div id="lib-detail-phases"></div>
+      ${Array.isArray(d.clips) && d.clips.length ? `
+      <div class="lib-detail-label" style="margin-top:22px;">Attached Clips</div>
+      <div class="phase-clips-row lib-detail-clips-row" id="lib-detail-clips-row"></div>
+      ` : ""}
       <div class="lib-card-tags" style="margin-bottom:16px;">${tagsHTML}</div>
       <div style="display:flex; gap:10px;">
         <button class="btn btn-primary" id="lib-detail-edit-btn">Edit Drill</button>
@@ -7801,6 +7815,9 @@ async function openLibraryDrillDetail(id) {
         block.appendChild(notesBody);
         phasesEl.appendChild(block);
       });
+    }
+    if (Array.isArray(d.clips) && d.clips.length) {
+      renderClipsRow(document.getElementById("lib-detail-clips-row"), false, d.clips);
     }
     document.getElementById("lib-detail-edit-btn").addEventListener("click", () => openStandaloneDrillEditorExisting(d.id));
     document.getElementById("lib-detail-del-btn").addEventListener("click", () => {
