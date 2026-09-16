@@ -375,7 +375,7 @@
 
   /* ── NOTES VIEW ── */
   #view-notes { overflow-y: auto; justify-content: center; }
-  .notes-page { width: 100%; max-width: 1160px; padding: 44px 24px 320px; }
+  .notes-page { width: 100%; max-width: 1160px; padding: 44px 24px 60px; }
   .notes-title-input {
     width: 100%; border: none; background: transparent; font-family: var(--display); font-size: 34px;
     font-weight: 600; color: var(--ink); padding: 4px 0; margin-bottom: 28px; border-bottom: 1px solid transparent;
@@ -439,7 +439,7 @@
     justify-content: center; z-index: 2;
   }
   .phase-clip-remove:hover { background: var(--bib); }
-  .phase-clip-notes.note-blocks { min-height: 70px; font-size: 12.5px; }
+  .phase-clip-notes.note-blocks { min-height: 70px; font-size: 12.5px; margin-bottom: 24px; }
   .phase-clip-notes-readonly { font-size: 12.5px; }
   .add-clip-box {
     width: 300px; aspect-ratio: 16/9; flex-shrink: 0; border: 1.5px dashed var(--line-md); border-radius: 8px;
@@ -1750,7 +1750,7 @@
             Play Full Animation
           </button>
           <div id="output-phases-container"></div>
-          <div class="output-section" id="output-clips-section" style="margin-top:22px; margin-bottom:160px;">
+          <div class="output-section" id="output-clips-section" style="margin-top:22px; margin-bottom:40px;">
             <div class="output-section-label">Attached Clips</div>
             <div class="phase-clips-row" id="output-clips-row"></div>
           </div>
