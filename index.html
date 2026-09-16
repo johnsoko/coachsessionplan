@@ -7742,16 +7742,48 @@ async function openLibraryDrillDetail(id) {
       <div class="lib-detail-title">${escapeHtml(d.title || "Untitled Drill")}</div>
       <div class="lib-detail-label">Description</div>
       <div class="lib-detail-desc">${escapeHtml(d.description || "No description yet.")}</div>
-      <div class="lib-detail-thumb" id="lib-detail-thumb"></div>
-      <div class="lib-detail-label">Notes</div>
-      <div class="lib-detail-desc">${escapeHtml(d.notes || "No notes yet.")}</div>
+      <div id="lib-detail-phases"></div>
       <div class="lib-card-tags" style="margin-bottom:16px;">${tagsHTML}</div>
       <div style="display:flex; gap:10px;">
         <button class="btn btn-primary" id="lib-detail-edit-btn">Edit Drill</button>
         <button class="btn btn-ghost" id="lib-detail-del-btn" style="color:#B3452C;">Delete from Library</button>
       </div>
     `;
-    document.getElementById("lib-detail-thumb").appendChild(createAnimatedThumb({ surface: d.surface, scenes: d.scenes }, "lib-detail-thumb-inner"));
+    const phasesEl = document.getElementById("lib-detail-phases");
+    const phaseList = (Array.isArray(d.phases) && d.phases.length) ? d.phases : [{ surface: d.surface, scenes: d.scenes, noteBlocks: [d.notes || ""] }];
+    const multi = phaseList.length > 1;
+    phaseList.forEach((ph, idx) => {
+      const block = document.createElement("div");
+      block.className = "output-phase-block";
+      if (multi) {
+        const label = document.createElement("div");
+        label.className = "output-phase-label";
+        label.textContent = ph.title || ("Phase " + (idx + 1));
+        block.appendChild(label);
+      } else {
+        const label = document.createElement("div");
+        label.className = "lib-detail-label";
+        label.textContent = "Preview";
+        block.appendChild(label);
+      }
+      const thumbWrap = document.createElement("div");
+      thumbWrap.className = "lib-detail-thumb";
+      thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, scenes: ph.scenes }, "lib-detail-thumb-inner"));
+      block.appendChild(thumbWrap);
+      const notesBlocks = (ph.noteBlocks || []).filter(t => t.trim());
+      const notesLabel = document.createElement("div");
+      notesLabel.className = "lib-detail-label";
+      notesLabel.textContent = "Notes";
+      notesLabel.style.marginTop = "14px";
+      const notesBody = document.createElement("div");
+      notesBody.className = "output-phase-notes lib-detail-desc";
+      notesBody.innerHTML = notesBlocks.length
+        ? `<ul class="output-bullet-list">${notesBlocks.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`
+        : `<p class="output-empty">No notes yet.</p>`;
+      block.appendChild(notesLabel);
+      block.appendChild(notesBody);
+      phasesEl.appendChild(block);
+    });
     document.getElementById("lib-detail-edit-btn").addEventListener("click", () => openStandaloneDrillEditorExisting(d.id));
     document.getElementById("lib-detail-del-btn").addEventListener("click", () => {
       deleteLibraryDrill(d.id, d.title, () => { showScreen("library"); renderLibraryGrid(); });
