@@ -4793,6 +4793,13 @@ function phaseThumbHTML(ph, opts) {
   return `<svg viewBox="${surf.viewBox}" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%;display:block;">${STRIPES_DEFS}${fieldMarkup}${shapeMarkup}${tokenMarkup}</svg>`;
 }
 function renderPhaseList() {
+  // belt-and-suspenders: renderPhaseList() runs on almost every state
+  // change (load, add, delete, drag-reorder...), so re-applying this
+  // here means the Next/Clone/Import buttons can't stay stuck hidden
+  // (or wrongly visible) just because some OTHER code path forgot to
+  // call this after changing isStandaloneDrillMode — this has already
+  // been the actual bug twice.
+  if (typeof applyStandaloneDrillModeUI === "function") applyStandaloneDrillModeUI();
   const idx = phases.findIndex(p=>p.id===activePhaseId);
   document.getElementById("phase-count").textContent = `${phaseNoun().toUpperCase()} ${idx+1}/${phases.length}`;
   const prevBtn = document.getElementById("mobile-phase-prev"), nextBtn = document.getElementById("mobile-phase-next");
@@ -6689,8 +6696,8 @@ function applyStandaloneDrillModeUI() {
   // a drill is a single phase, period — its own save path only ever
   // persists the first one, so hide the ways to add a second rather
   // than let it quietly get lost the moment the drill is saved
-  document.getElementById("phase-next").style.display = isStandaloneDrillMode ? "none" : "flex";
-  document.getElementById("phase-clone").style.display = isStandaloneDrillMode ? "none" : "flex";
+  document.getElementById("phase-next").style.display = isStandaloneDrillMode ? "none" : "";
+  document.getElementById("phase-clone").style.display = isStandaloneDrillMode ? "none" : "";
   const importItems = [document.getElementById("phase-import"), document.getElementById("phase-import-mobile")];
   importItems.forEach(el => { if (el) el.style.display = isStandaloneDrillMode ? "none" : ""; });
 }
