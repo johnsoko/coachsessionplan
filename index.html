@@ -424,6 +424,27 @@
   .phase-note-time-range { font-size: 10.5px; color: var(--ink-faint); }
   .phase-note-exercise { display: flex; flex-direction: column; gap: 6px; }
   .phase-note-card .phase-note-drill-title { font-weight: 600; font-size: 13px; text-align: center; }
+  .phase-note-notes-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .phase-clips-label { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); }
+  .phase-clips-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .phase-clip-card {
+    position: relative; width: 220px; border-radius: 8px; overflow: hidden; background: #000;
+    aspect-ratio: 16/9; flex-shrink: 0;
+  }
+  .phase-clip-card iframe, .phase-clip-card video { width: 100%; height: 100%; border: none; display: block; }
+  .phase-clip-remove {
+    position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(27,33,28,0.75); color: #F7F8F3; border: none; display: flex; align-items: center;
+    justify-content: center; z-index: 2;
+  }
+  .phase-clip-remove:hover { background: var(--bib); }
+  .add-clip-box {
+    width: 220px; aspect-ratio: 16/9; flex-shrink: 0; border: 1.5px dashed var(--line-md); border-radius: 8px;
+    background: var(--paper); display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; color: var(--ink-soft); font-size: 12px;
+  }
+  .add-clip-box:hover { background: var(--paper-raised); }
+  .add-clip-hint { font-size: 11.5px; color: var(--ink-faint); margin-top: 6px; }
   .phase-note-add-exercise {
     font-size: 11px; color: var(--pitch-deep); border: 1.5px dashed var(--line-md); border-radius: 5px;
     padding: 4px 7px; background: none; margin-top: 2px;
@@ -1808,6 +1829,19 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" id="name-modal-cancel">Cancel</button>
         <button class="btn btn-primary" id="name-modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="add-clip-modal-overlay">
+    <div class="modal-card">
+      <h4>Add a Video Clip</h4>
+      <span class="tp-label" style="margin-top:0;">Video URL</span>
+      <input type="text" id="add-clip-url-input" class="field-input" placeholder="Paste a link from YouTube, Vimeo, Google Drive, Dropbox, Instagram, Facebook, or X">
+      <p class="add-clip-hint" id="add-clip-hint">Supports YouTube, Vimeo, Google Drive, Dropbox, Instagram, Facebook, and X (Twitter) links.</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="add-clip-cancel">Cancel</button>
+        <button class="btn btn-primary" id="add-clip-save">Save Video</button>
       </div>
     </div>
   </div>
@@ -4899,6 +4933,13 @@ function renderOutputContent() {
       return n;
     })() : null;
 
+    const clips = (outputSettings.showVideos && ph.clips && ph.clips.length) ? (() => {
+      const row = document.createElement("div");
+      row.className = "phase-clips-row";
+      renderClipsRow(ph, row, false);
+      return row;
+    })() : null;
+
     if (outputSettings.layout === "rows") {
       // thumbnail on the left, label + notes stacked as one column on
       // the right — matches the reference's Rows layout
@@ -4906,6 +4947,7 @@ function renderOutputContent() {
       side.className = "output-phase-side";
       if (label) side.appendChild(label);
       if (notes) side.appendChild(notes);
+      if (clips) side.appendChild(clips);
       block.appendChild(thumbWrap);
       block.appendChild(side);
     } else {
@@ -4913,6 +4955,7 @@ function renderOutputContent() {
       if (label) block.appendChild(label);
       block.appendChild(thumbWrap);
       if (notes) block.appendChild(notes);
+      if (clips) block.appendChild(clips);
     }
     return block;
   }
@@ -5332,6 +5375,141 @@ function updateTimetableTimeRanges() {
     cursor += dur;
   });
 }
+/* ─────────────────────────────────────────────────────────
+   VIDEO CLIPS — attach a clip to a phase by pasting a link from
+   any of several platforms. Each phase keeps a plain array of
+   { id, platform, url } and the embed markup is (re)built from
+   that url every render, so nothing platform-specific is stored
+   beyond the link itself.
+───────────────────────────────────────────────────────── */
+// Instagram and X/Twitter embeds are just a placeholder blockquote
+// until their own SDK script walks the DOM and replaces it — that
+// script is loaded once, lazily, the first time either is needed
+let igScriptLoaded = false, twScriptLoaded = false;
+function ensureEmbedScript(src, flagSetter, alreadyLoaded) {
+  if (alreadyLoaded) return;
+  const s = document.createElement("script");
+  s.src = src; s.async = true;
+  document.body.appendChild(s);
+  flagSetter();
+}
+// re-processes any Instagram/X placeholder blockquotes sitting in the
+// given container — safe to call unconditionally after any render,
+// since it's a no-op when neither SDK is present yet or there's
+// nothing of that kind to process
+function processSocialEmbeds() {
+  if (window.instgrm && window.instgrm.Embeds) window.instgrm.Embeds.process();
+  if (window.twttr && window.twttr.widgets) window.twttr.widgets.load();
+}
+// figures out which platform a pasted link belongs to and returns the
+// embeddable markup for it, or null if the link isn't recognized
+function buildClipEmbed(url) {
+  const u = url.trim();
+  let m;
+  // YouTube: watch?v=, youtu.be/, /embed/, /shorts/
+  m = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{6,})/i);
+  if (m) return { platform: "youtube", html: `<iframe src="https://www.youtube.com/embed/${m[1]}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>` };
+  // Vimeo: vimeo.com/12345678 (optionally /hash)
+  m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/i);
+  if (m) return { platform: "vimeo", html: `<iframe src="https://player.vimeo.com/video/${m[1]}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>` };
+  // Google Drive: drive.google.com/file/d/FILE_ID/...
+  m = u.match(/drive\.google\.com\/file\/d\/([\w-]+)/i);
+  if (m) return { platform: "gdrive", html: `<iframe src="https://drive.google.com/file/d/${m[1]}/preview" allow="autoplay" allowfullscreen></iframe>` };
+  // Dropbox: shared file link — swapping the host (or ?dl=1) serves the
+  // raw file directly, playable in a plain <video> tag
+  if (/dropbox\.com\//i.test(u)) {
+    const direct = u.replace(/^https?:\/\/(www\.)?dropbox\.com/i, "https://dl.dropboxusercontent.com").replace(/[?&]dl=0/, "");
+    return { platform: "dropbox", html: `<video controls src="${direct}"></video>` };
+  }
+  // Instagram: post or reel — official embed needs the SDK to hydrate
+  // the placeholder blockquote after it's inserted
+  m = u.match(/instagram\.com\/(?:p|reel)\/[\w-]+/i);
+  if (m) return { platform: "instagram", html: `<blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="${escapeHtml(u)}" style="width:100%;height:100%;margin:0;"></blockquote>` };
+  // Facebook: video posts embed via the public plugin iframe, no SDK needed
+  if (/(facebook\.com\/.*\/videos\/|fb\.watch\/)/i.test(u)) {
+    return { platform: "facebook", html: `<iframe src="https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(u)}&show_text=false" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>` };
+  }
+  // X / Twitter: status link — same SDK-hydrated placeholder approach as Instagram
+  m = u.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/i);
+  if (m) return { platform: "twitter", html: `<blockquote class="twitter-tweet"><a href="${escapeHtml(u)}"></a></blockquote>` };
+  return null;
+}
+function addClipToPhase(ph, url) {
+  const embed = buildClipEmbed(url);
+  if (!embed) return false;
+  if (!ph.clips) ph.clips = [];
+  ph.clips.push({ id: nextId++, platform: embed.platform, url: url.trim() });
+  if (embed.platform === "instagram") ensureEmbedScript("https://www.instagram.com/embed.js", () => igScriptLoaded = true, igScriptLoaded);
+  if (embed.platform === "twitter") ensureEmbedScript("https://platform.twitter.com/widgets.js", () => twScriptLoaded = true, twScriptLoaded);
+  return true;
+}
+// builds the actual DOM for one phase's clip row — shared between the
+// Details tab (editable, with a remove button) and Output (read-only)
+function renderClipsRow(ph, container, editable) {
+  container.innerHTML = "";
+  (ph.clips || []).forEach(clip => {
+    const embed = buildClipEmbed(clip.url);
+    if (!embed) return;
+    const card = document.createElement("div");
+    card.className = "phase-clip-card";
+    card.innerHTML = embed.html;
+    if (editable) {
+      const rm = document.createElement("button");
+      rm.className = "phase-clip-remove";
+      rm.title = "Remove clip";
+      rm.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 2l7 7M9 2l-7 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+      rm.addEventListener("click", () => {
+        ph.clips = ph.clips.filter(c => c.id !== clip.id);
+        renderPhaseNotes();
+      });
+      card.appendChild(rm);
+    }
+    container.appendChild(card);
+  });
+  if (editable) {
+    const addBox = document.createElement("button");
+    addBox.className = "add-clip-box";
+    addBox.innerHTML = `<svg width="20" height="16" viewBox="0 0 20 16" fill="none"><rect x="1" y="1.5" width="12" height="13" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 5v3M3.5 6.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M14.5 5.5l4-2.2v9.4l-4-2.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg><span>Add Clip</span>`;
+    addBox.addEventListener("click", () => openAddClipModal(ph));
+    container.appendChild(addBox);
+  }
+  processSocialEmbeds();
+}
+let addClipTargetPhaseId = null;
+function openAddClipModal(ph) {
+  addClipTargetPhaseId = ph.id;
+  document.getElementById("add-clip-url-input").value = "";
+  document.getElementById("add-clip-hint").textContent = "Supports YouTube, Vimeo, Google Drive, Dropbox, Instagram, Facebook, and X (Twitter) links.";
+  document.getElementById("add-clip-modal-overlay").classList.add("open");
+  requestAnimationFrame(() => document.getElementById("add-clip-url-input").focus());
+}
+function closeAddClipModal() {
+  document.getElementById("add-clip-modal-overlay").classList.remove("open");
+  addClipTargetPhaseId = null;
+}
+function saveAddClipModal() {
+  const ph = phases.find(p => p.id === addClipTargetPhaseId);
+  const url = document.getElementById("add-clip-url-input").value;
+  if (!ph || !url.trim()) { closeAddClipModal(); return; }
+  pushHistory();
+  const ok = addClipToPhase(ph, url);
+  if (!ok) {
+    document.getElementById("add-clip-hint").textContent = "That link isn't from a supported platform — check the URL and try again.";
+    document.getElementById("add-clip-hint").style.color = "var(--bib)";
+    return;
+  }
+  closeAddClipModal();
+  renderPhaseNotes();
+}
+document.getElementById("add-clip-save").addEventListener("click", saveAddClipModal);
+document.getElementById("add-clip-cancel").addEventListener("click", closeAddClipModal);
+document.getElementById("add-clip-modal-overlay").addEventListener("click", e => {
+  if (e.target.id === "add-clip-modal-overlay") closeAddClipModal();
+});
+document.getElementById("add-clip-url-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); saveAddClipModal(); }
+});
+
 function renderPhaseNotes() {
   const list = document.getElementById("phase-notes-list");
   if (!list) return;
@@ -5394,6 +5572,21 @@ function renderPhaseNotes() {
     notesWrap.className = "phase-note-notes note-blocks";
     renderNoteBlocks(ph.noteBlocks, notesWrap);
 
+    const clipsSection = document.createElement("div");
+    const clipsLabel = document.createElement("span");
+    clipsLabel.className = "phase-clips-label";
+    clipsLabel.textContent = "Attached Clips:";
+    const clipsRow = document.createElement("div");
+    clipsRow.className = "phase-clips-row";
+    renderClipsRow(ph, clipsRow, true);
+    clipsSection.appendChild(clipsLabel);
+    clipsSection.appendChild(clipsRow);
+
+    const notesColumnWrap = document.createElement("div");
+    notesColumnWrap.className = "phase-note-notes-col";
+    notesColumnWrap.appendChild(notesWrap);
+    notesColumnWrap.appendChild(clipsSection);
+
     const actions = document.createElement("div");
     actions.className = "phase-note-row-actions";
     let libControl = null;
@@ -5442,7 +5635,7 @@ function renderPhaseNotes() {
 
     card.appendChild(handle);
     if (!isStandaloneDrillMode) card.appendChild(timeWrap);
-    card.appendChild(exerciseWrap); card.appendChild(notesWrap); card.appendChild(actions);
+    card.appendChild(exerciseWrap); card.appendChild(notesColumnWrap); card.appendChild(actions);
 
     // only the grip handle arms dragging — otherwise a draggable=true row
     // can swallow clicks/typing in its inputs, textareas, and buttons as
