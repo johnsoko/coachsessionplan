@@ -4102,6 +4102,12 @@ function hitTestShape(s, x, y, tolerance) {
    STAGE POINTER HANDLING
 ───────────────────────────────────────────────────────── */
 let isDrawing = false, drawStart = null, freehand = [];
+// set on mousedown when that click's empty-space hit deselected an
+// existing shape/token — read back in onStageUp to tell a real drag
+// (a new shape was actually drawn, so the tool should stay armed) apart
+// from a plain click (nothing drawn, so the click's whole purpose was
+// deselecting — hand control back to Select at that point)
+let deselectedShapeOnThisDraw = false;
 stage.addEventListener("mousedown", onStageDown);
 stage.addEventListener("touchstart", onStageDown, {passive:false});
 
@@ -4162,22 +4168,22 @@ function onStageDown(e) {
       selectAndMaybeMoveShape(clicked, p);
       return;
     }
-    // clicking empty space always clears whatever was selected first —
-    // since drawing requires an actual drag, a plain click here can
-    // only mean "deselect", never "keep editing the previous shape".
-    // When something WAS selected, this click's purpose is deselection,
-    // not starting a new line — so hand control back to Select instead
-    // of leaving the drawing tool armed. A click with nothing selected
-    // to begin with is a genuine "start drawing here" and proceeds as
-    // normal below.
-    if (selectedShapeId || selectedTokenId) {
+    // empty space always clears whatever was selected first, right away —
+    // but whether that turns into "deselect and hand control back to
+    // Select" or "actually start drawing a new line here" depends on
+    // what happens next: a plain click (mouseup without ever dragging)
+    // means deselect was the whole point, so onStageUp below switches to
+    // Select; a real drag means the person is drawing a new shape start-
+    // ing from this same spot, so the tool stays armed for it — checked
+    // there rather than here, since a mousedown alone can't yet tell
+    // which of the two this is going to be.
+    deselectedShapeOnThisDraw = !!(selectedShapeId || selectedTokenId);
+    if (deselectedShapeOnThisDraw) {
       selectedShapeId = null; selectedTokenId = null;
       multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
       hideShapeToolbar();
       closeAllPopovers();
       renderShapes(); renderTokens();
-      setTool("select");
-      return;
     }
     pushHistory();
     isDrawing = true; drawStart = p; freehand = [p];
@@ -4238,18 +4244,26 @@ function onStageUp(e) {
   if (!isDrawing) return;
   isDrawing = false;
   const p = pctFromEvent(e.changedTouches ? {touches:e.changedTouches} : e);
+  // a plain click (nothing actually dragged/drawn) whose mousedown had
+  // deselected a shape means deselecting was the click's whole purpose —
+  // hand control back to Select. A real drag that produced a new shape
+  // means the tool was being used as intended, so it stays armed.
+  function noShapeCreated() {
+    renderShapes();
+    if (deselectedShapeOnThisDraw) setTool("select");
+  }
   let shape;
   if (currentTool === "shape") {
     const dist = Math.hypot(p.x-drawStart.x, p.y-drawStart.y);
-    if (dist < 2) { renderShapes(); return; }
+    if (dist < 2) { noShapeCreated(); return; }
     shape = { id: nextId++, style: shapeKind, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: shapeDefaults.color, width: shapeSizeMemory[shapeKind], fill: shapeDefaults.fill };
   } else if (arrowStyle === "dribble") {
     freehand.push(p);
-    if (freehand.length < 3) { renderShapes(); return; }
+    if (freehand.length < 3) { noShapeCreated(); return; }
     shape = { id: nextId++, style: "dribble", points: freehand.slice(), color: drawDefaults.color, width: drawDefaults.width };
   } else {
     const dist = Math.hypot(p.x-drawStart.x, p.y-drawStart.y);
-    if (dist < 2) { renderShapes(); return; }
+    if (dist < 2) { noShapeCreated(); return; }
     shape = { id: nextId++, style: arrowStyle, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: drawDefaults.color, width: drawDefaults.width, curved: drawDefaults.curved };
     if (shape.curved) { shape.cx = (shape.x1 + shape.x2) / 2; shape.cy = (shape.y1 + shape.y2) / 2; }
   }
