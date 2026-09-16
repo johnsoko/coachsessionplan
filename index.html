@@ -522,7 +522,7 @@
   }
   .animate-play-btn:hover { background: var(--pitch-tint); color: var(--pitch-deep); }
   .animate-play-btn.playing { background: var(--bib); color: #201200; }
-  #phase-play-btn.playing, #play-full-btn.playing { opacity: 0.65; }
+  #phase-play-btn.playing { opacity: 0.65; }
   .animate-progress-track { flex: 1; height: 5px; border-radius: 3px; background: var(--paper-raised); overflow: hidden; }
   .animate-progress-fill { height: 100%; width: 0%; background: var(--pitch); border-radius: 3px; transition: width 0.08s linear; }
 
@@ -1649,10 +1649,6 @@
             <button class="btn btn-ghost" id="phase-play-btn" style="flex:1; justify-content:center;">
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4 2.5v9l8-4.5z" fill="currentColor"/></svg>
               Preview
-            </button>
-            <button class="btn btn-primary" id="play-full-btn" style="flex:1; justify-content:center;">
-              <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4 2.5v9l8-4.5z" fill="currentColor"/></svg>
-              Play Full
             </button>
           </div>
         </div>
@@ -4998,7 +4994,7 @@ const activeThumbAnimations = new WeakMap();
 function easeInOutThumb(t) { return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2; }
 const THUMB_PLAY_ICON = `<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4 2.5v9l8-4.5z" fill="currentColor"/></svg>`;
 const THUMB_STOP_ICON = `<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="3.5" y="3.5" width="7" height="7" fill="currentColor"/></svg>`;
-async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
+async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl, skipSettle) {
   baseOpts = baseOpts || {};
   if (activeThumbAnimations.has(containerEl)) { activeThumbAnimations.get(containerEl).stop(); return; }
   let stopped = false;
@@ -5086,7 +5082,11 @@ async function playThumbnailAnimation(ph, containerEl, baseOpts, playBtnEl) {
 
   activeThumbAnimations.delete(containerEl);
   if (playBtnEl) { playBtnEl.classList.remove("playing"); playBtnEl.innerHTML = THUMB_PLAY_ICON; playBtnEl.title = "Play this phase's animation"; }
-  if (containerEl.isConnected) render(null, null); // settle back to the static Scene 1 identity frame
+  // the "Full Animation" modal chains phases back to back and needs to
+  // hold on the last scene it just played so its own between-phase tween
+  // can pick up smoothly from there — settling back to the identity
+  // frame here would show a one-frame jump back to Scene 1 first
+  if (!skipSettle && containerEl.isConnected) render(null, null); // settle back to the static Scene 1 identity frame
 }
 
 // used by Notes and Output previews — the play button sits as a sibling
@@ -5120,8 +5120,8 @@ function createAnimatedThumb(ph, wrapClass, opts) {
 // plays every phase's animation back to back inside the "Full Animation"
 // modal — reuses playThumbnailAnimation() for each phase's own internal
 // scene sequence, and adds its own tween for the transition BETWEEN
-// phases (matching how the main editor's playFullAnimation() moves
-// players from one phase's end position into the next phase's start)
+// phases (moving players from one phase's end position into the next
+// phase's start)
 let fullAnimationStopped = false;
 async function playFullAnimationModal() {
   if (!phases.length) return;
@@ -5191,7 +5191,7 @@ async function playFullAnimationModal() {
       await tweenBetweenPhases(ph, prevScene.tokens, firstScene, 700);
       if (isDone()) break;
     }
-    await playThumbnailAnimation(ph, inner, opts);
+    await playThumbnailAnimation(ph, inner, opts, null, true);
     if (isDone()) break;
     await wait(400);
   }
@@ -5633,18 +5633,6 @@ async function playPhaseScenes(ph, onSceneDone) {
     await wait(HOLD_MS);
   }
 }
-function switchPhaseForPlayback(id) {
-  activePhaseId = id;
-  const ph = phases.find(p => p.id === id);
-  const sc = ph.scenes.find(s => s.id === ph.activeSceneId) || ph.scenes[0];
-  ph.activeSceneId = sc.id;
-  tokens = sc.tokens; shapes = sc.shapes;
-  applySurface(ph.surface || "full");
-  renderAnimateOutputPhaseLists();
-  renderPhaseList();
-  document.getElementById("animate-phase-title").textContent = phaseNoun() + " " + (phases.findIndex(p=>p.id===id) + 1);
-  renderSceneTimeline();
-}
 // Scene 1 is a phase's canonical drill setup — the thing every preview
 // represents — so it's protected from being edited via Animate mode.
 // Draw mode can still edit it freely; this only blocks the Animate side.
@@ -5667,7 +5655,6 @@ function stopPlayback() {
   isPlaying = false;
   playbackOverrides = {}; playbackProgress = {}; hiddenTokenIds.clear();
   document.getElementById("phase-play-btn").classList.remove("playing");
-  document.getElementById("play-full-btn").classList.remove("playing");
   renderTokens(); renderShapes(); renderSceneTimeline();
   updatePlaybackUIVisibility();
 }
@@ -5688,51 +5675,7 @@ async function playCurrentPhaseOnly() {
   setAnimateProgress(100);
   updatePlaybackUIVisibility();
 }
-async function playFullAnimation() {
-  if (isPlaying) { stopPlayback(); return; }
-  if (!phases.length) return;
-  saveActivePhase();
-  const startPhaseId = activePhaseId;
-  isPlaying = true;
-  updatePlaybackUIVisibility();
-  document.getElementById("play-full-btn").classList.add("playing");
-  setAnimateProgress(0);
-  const totalWeight = phases.reduce((sum, ph) => sum + ph.scenes.length + 1, 0);
-  let done = 0;
-  for (let i = 0; i < phases.length; i++) {
-    if (!isPlaying) break;
-    const ph = phases[i];
-    if (i === 0) {
-      switchPhaseForPlayback(ph.id);
-    } else {
-      const fromPositions = {};
-      tokens.forEach(t => { if (t.type === "player") fromPositions[t.team + "-" + t.num] = playbackOverrides[t.id] || { x: t.x, y: t.y }; });
-      switchPhaseForPlayback(ph.id);
-      const moves = [];
-      tokens.forEach(t => {
-        if (t.type !== "player") return;
-        const from = fromPositions[t.team + "-" + t.num];
-        if (from) moves.push({ tokenId: t.id, fromX: from.x, fromY: from.y, toX: t.x, toY: t.y });
-      });
-      moves.forEach(m => { playbackOverrides[m.tokenId] = { x: m.fromX, y: m.fromY }; });
-      renderTokens();
-      await tweenMoves(moves, 700);
-      moves.forEach(m => delete playbackOverrides[m.tokenId]);
-      renderTokens();
-    }
-    done += 1; setAnimateProgress((done / totalWeight) * 100);
-    if (!isPlaying) break;
-    await playPhaseScenes(ph, () => { done++; setAnimateProgress((done / totalWeight) * 100); });
-  }
-  isPlaying = false;
-  playbackOverrides = {}; playbackProgress = {}; hiddenTokenIds.clear();
-  document.getElementById("play-full-btn").classList.remove("playing");
-  loadPhase(startPhaseId);
-  setAnimateProgress(100);
-  updatePlaybackUIVisibility();
-}
 document.getElementById("phase-play-btn").addEventListener("click", playCurrentPhaseOnly);
-document.getElementById("play-full-btn").addEventListener("click", playFullAnimation);
 document.getElementById("animate-show-title").addEventListener("change", () => {
   updatePlaybackUIVisibility();
 });
