@@ -3115,18 +3115,19 @@ function syncTeamPopover(team) {
   const nameToggleId = team === "light" ? "tp-name-toggle-light" : "tp-name-toggle-dark";
   document.querySelectorAll(`#${nameToggleId} button`).forEach(b => b.classList.toggle("active", (b.dataset.shownames === "1") === showNames));
   // the badge-value field edits the number when Badge is set to #, or the
-  // position text when set to Pos — same field, whichever is relevant;
-  // only meaningful (and enabled) when exactly one player is selected
-  // the badge-value field edits the number when Badge is set to #, or the
   // position text when set to Pos — same field, whichever is relevant.
   // With a single player selected, it edits that player directly; with
-  // none selected, it presets the value the NEXT placed player will get
+  // none selected, it presets the value the NEXT placed player will get.
+  // In Blank mode nothing is actually shown on the token, so the field
+  // has no value of its own — it always starts empty there.
   const badgeInput = document.querySelector(`.tp-badge-value[data-team="${team}"]`);
   const nameInput = document.querySelector(`.tp-name-value[data-team="${team}"]`);
   if (badgeInput) {
-    badgeInput.placeholder = mode === "position" ? "Position (e.g. CB)" : "Number";
+    badgeInput.placeholder = mode === "position" ? "Position (e.g. CB)" : mode === "blank" ? "Number or position" : "Number";
     badgeInput.disabled = matched.length > 1;
-    if (matched.length === 1) {
+    if (mode === "blank") {
+      badgeInput.value = "";
+    } else if (matched.length === 1) {
       badgeInput.value = mode === "position" ? (t.pos || "") : String(t.num);
     } else {
       badgeInput.value = mode === "position" ? teamDefaults[team].presetPos : (teamDefaults[team].presetNum != null ? String(teamDefaults[team].presetNum) : "");
@@ -3369,17 +3370,40 @@ function initTeamPopovers() {
     const badgeInput = document.querySelector(`.tp-badge-value[data-team="${team}"]`);
     if (badgeInput) {
       badgeInput.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") badgeInput.blur(); });
+      // restrict what can actually be typed to match the active mode —
+      // # only takes digits, Pos only takes letters, Blank is unrestricted.
+      // Filtering as-you-type (rather than validating after the fact)
+      // means there's never a mismatched value to silently lose track of.
+      badgeInput.addEventListener("input", () => {
+        const mode = teamDefaults[team].labelMode;
+        const filtered = mode === "number" ? badgeInput.value.replace(/[^0-9]/g, "")
+                        : mode === "position" ? badgeInput.value.replace(/[^a-zA-Z]/g, "")
+                        : badgeInput.value;
+        if (filtered !== badgeInput.value) badgeInput.value = filtered;
+      });
       badgeInput.addEventListener("change", () => {
         const matched = activeTokensForTeam(team);
         const mode = teamDefaults[team].labelMode;
+        const val = badgeInput.value.trim();
         if (matched.length === 1) {
           const t = matched[0];
           pushHistory();
-          if ((t.labelMode || "number") === "position") {
-            t.pos = badgeInput.value.trim();
-          } else {
-            const n = parseInt(badgeInput.value, 10);
+          const tMode = t.labelMode || "number";
+          if (tMode === "position") {
+            t.pos = val;
+          } else if (tMode === "number") {
+            const n = parseInt(val, 10);
             if (Number.isFinite(n)) t.num = Math.max(1, Math.min(99, n));
+          } else {
+            // Blank mode has no badge of its own to show — but whatever is
+            // typed here still routes into # or Pos's own value, purely so
+            // it's already there and correct if the mode is switched later.
+            if (/^[0-9]+$/.test(val)) {
+              const n = parseInt(val, 10);
+              if (Number.isFinite(n)) t.num = Math.max(1, Math.min(99, n));
+            } else if (/^[a-zA-Z]+$/.test(val)) {
+              t.pos = val;
+            }
           }
           renderTokens();
           renderPhaseThumbActive();
@@ -3387,10 +3411,17 @@ function initTeamPopovers() {
           // nothing placed/selected — this presets what the NEXT player
           // of this team will get when placed
           if (mode === "position") {
-            teamDefaults[team].presetPos = badgeInput.value.trim();
-          } else {
-            const n = parseInt(badgeInput.value, 10);
+            teamDefaults[team].presetPos = val;
+          } else if (mode === "number") {
+            const n = parseInt(val, 10);
             teamDefaults[team].presetNum = Number.isFinite(n) ? Math.max(1, Math.min(99, n)) : null;
+          } else {
+            if (/^[0-9]+$/.test(val)) {
+              const n = parseInt(val, 10);
+              teamDefaults[team].presetNum = Number.isFinite(n) ? Math.max(1, Math.min(99, n)) : null;
+            } else if (/^[a-zA-Z]+$/.test(val)) {
+              teamDefaults[team].presetPos = val;
+            }
           }
         }
         syncTeamPopover(team);
