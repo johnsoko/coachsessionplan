@@ -445,6 +445,7 @@
   }
   .add-clip-box:hover { background: var(--paper-raised); }
   .add-clip-hint { font-size: 11.5px; color: var(--ink-faint); margin-top: 6px; }
+  .session-clips-section { margin-top: 24px; display: flex; flex-direction: column; gap: 10px; }
   .phase-note-add-exercise {
     font-size: 11px; color: var(--pitch-deep); border: 1.5px dashed var(--line-md); border-radius: 5px;
     padding: 4px 7px; background: none; margin-top: 2px;
@@ -1746,6 +1747,10 @@
             Play Full Animation
           </button>
           <div id="output-phases-container"></div>
+          <div class="output-section" id="output-clips-section" style="margin-top:22px;">
+            <div class="output-section-label">Attached Clips</div>
+            <div class="phase-clips-row" id="output-clips-row"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1803,7 +1808,10 @@
         <div class="phase-notes-list" id="phase-notes-list"></div>
         <button class="btn btn-primary" id="add-timeslot-btn" style="margin-top:10px; padding:7px 14px; font-size:12.5px;">+ Add Time Slot</button>
 
-        <p class="notes-hint">More block types — video embeds, images — are coming to this page later.</p>
+        <div class="session-clips-section">
+          <span class="phase-clips-label">Attached Clips:</span>
+          <div class="phase-clips-row" id="session-clips-row"></div>
+        </div>
       </div>
     </div>
 
@@ -4903,6 +4911,12 @@ function renderOutputContent() {
       ? blocks.map(t => `<p>${escapeHtml(t)}</p>`).join("")
       : `<p class="output-empty">No description yet.</p>`;
   }
+  const clipsSection = document.getElementById("output-clips-section");
+  if (clipsSection) {
+    const showClips = outputSettings.showVideos && sessionClips.length > 0;
+    clipsSection.style.display = showClips ? "block" : "none";
+    if (showClips) renderClipsRow(document.getElementById("output-clips-row"), false);
+  }
   const playBtn = document.getElementById("output-play-full-btn");
   if (playBtn) playBtn.style.display = outputSettings.showAnimationButton ? "inline-flex" : "none";
 
@@ -4933,13 +4947,6 @@ function renderOutputContent() {
       return n;
     })() : null;
 
-    const clips = (outputSettings.showVideos && ph.clips && ph.clips.length) ? (() => {
-      const row = document.createElement("div");
-      row.className = "phase-clips-row";
-      renderClipsRow(ph, row, false);
-      return row;
-    })() : null;
-
     if (outputSettings.layout === "rows") {
       // thumbnail on the left, label + notes stacked as one column on
       // the right — matches the reference's Rows layout
@@ -4947,7 +4954,6 @@ function renderOutputContent() {
       side.className = "output-phase-side";
       if (label) side.appendChild(label);
       if (notes) side.appendChild(notes);
-      if (clips) side.appendChild(clips);
       block.appendChild(thumbWrap);
       block.appendChild(side);
     } else {
@@ -4955,7 +4961,6 @@ function renderOutputContent() {
       if (label) block.appendChild(label);
       block.appendChild(thumbWrap);
       if (notes) block.appendChild(notes);
-      if (clips) block.appendChild(clips);
     }
     return block;
   }
@@ -5376,12 +5381,14 @@ function updateTimetableTimeRanges() {
   });
 }
 /* ─────────────────────────────────────────────────────────
-   VIDEO CLIPS — attach a clip to a phase by pasting a link from
-   any of several platforms. Each phase keeps a plain array of
-   { id, platform, url } and the embed markup is (re)built from
+   VIDEO CLIPS — a single set of clips attached to the whole
+   practice plan (not per-phase), shown as its own section below
+   all the phase blocks on the Details tab. Each clip is a plain
+   { id, platform, url }, and the embed markup is (re)built from
    that url every render, so nothing platform-specific is stored
    beyond the link itself.
 ───────────────────────────────────────────────────────── */
+let sessionClips = [];
 // Instagram and X/Twitter embeds are just a placeholder blockquote
 // until their own SDK script walks the DOM and replaces it — that
 // script is loaded once, lazily, the first time either is needed
@@ -5434,20 +5441,19 @@ function buildClipEmbed(url) {
   if (m) return { platform: "twitter", html: `<blockquote class="twitter-tweet"><a href="${escapeHtml(u)}"></a></blockquote>` };
   return null;
 }
-function addClipToPhase(ph, url) {
+function addClip(url) {
   const embed = buildClipEmbed(url);
   if (!embed) return false;
-  if (!ph.clips) ph.clips = [];
-  ph.clips.push({ id: nextId++, platform: embed.platform, url: url.trim() });
+  sessionClips.push({ id: nextId++, platform: embed.platform, url: url.trim() });
   if (embed.platform === "instagram") ensureEmbedScript("https://www.instagram.com/embed.js", () => igScriptLoaded = true, igScriptLoaded);
   if (embed.platform === "twitter") ensureEmbedScript("https://platform.twitter.com/widgets.js", () => twScriptLoaded = true, twScriptLoaded);
   return true;
 }
-// builds the actual DOM for one phase's clip row — shared between the
+// builds the actual DOM for the session's clip row — shared between the
 // Details tab (editable, with a remove button) and Output (read-only)
-function renderClipsRow(ph, container, editable) {
+function renderClipsRow(container, editable) {
   container.innerHTML = "";
-  (ph.clips || []).forEach(clip => {
+  sessionClips.forEach(clip => {
     const embed = buildClipEmbed(clip.url);
     if (!embed) return;
     const card = document.createElement("div");
@@ -5459,8 +5465,8 @@ function renderClipsRow(ph, container, editable) {
       rm.title = "Remove clip";
       rm.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 2l7 7M9 2l-7 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
       rm.addEventListener("click", () => {
-        ph.clips = ph.clips.filter(c => c.id !== clip.id);
-        renderPhaseNotes();
+        sessionClips = sessionClips.filter(c => c.id !== clip.id);
+        renderClipsRow(container, editable);
       });
       card.appendChild(rm);
     }
@@ -5470,36 +5476,37 @@ function renderClipsRow(ph, container, editable) {
     const addBox = document.createElement("button");
     addBox.className = "add-clip-box";
     addBox.innerHTML = `<svg width="20" height="16" viewBox="0 0 20 16" fill="none"><rect x="1" y="1.5" width="12" height="13" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 5v3M3.5 6.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M14.5 5.5l4-2.2v9.4l-4-2.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg><span>Add Clip</span>`;
-    addBox.addEventListener("click", () => openAddClipModal(ph));
+    addBox.addEventListener("click", () => openAddClipModal(container));
     container.appendChild(addBox);
   }
   processSocialEmbeds();
 }
-let addClipTargetPhaseId = null;
-function openAddClipModal(ph) {
-  addClipTargetPhaseId = ph.id;
+let addClipTargetContainer = null;
+function openAddClipModal(container) {
+  addClipTargetContainer = container;
   document.getElementById("add-clip-url-input").value = "";
   document.getElementById("add-clip-hint").textContent = "Supports YouTube, Vimeo, Google Drive, Dropbox, Instagram, Facebook, and X (Twitter) links.";
+  document.getElementById("add-clip-hint").style.color = "";
   document.getElementById("add-clip-modal-overlay").classList.add("open");
   requestAnimationFrame(() => document.getElementById("add-clip-url-input").focus());
 }
 function closeAddClipModal() {
   document.getElementById("add-clip-modal-overlay").classList.remove("open");
-  addClipTargetPhaseId = null;
+  addClipTargetContainer = null;
 }
 function saveAddClipModal() {
-  const ph = phases.find(p => p.id === addClipTargetPhaseId);
   const url = document.getElementById("add-clip-url-input").value;
-  if (!ph || !url.trim()) { closeAddClipModal(); return; }
+  if (!addClipTargetContainer || !url.trim()) { closeAddClipModal(); return; }
   pushHistory();
-  const ok = addClipToPhase(ph, url);
+  const ok = addClip(url);
   if (!ok) {
     document.getElementById("add-clip-hint").textContent = "That link isn't from a supported platform — check the URL and try again.";
     document.getElementById("add-clip-hint").style.color = "var(--bib)";
     return;
   }
+  const container = addClipTargetContainer;
   closeAddClipModal();
-  renderPhaseNotes();
+  renderClipsRow(container, true);
 }
 document.getElementById("add-clip-save").addEventListener("click", saveAddClipModal);
 document.getElementById("add-clip-cancel").addEventListener("click", closeAddClipModal);
@@ -5515,6 +5522,8 @@ function renderPhaseNotes() {
   if (!list) return;
   saveActivePhase();
   list.innerHTML = "";
+  const sessionClipsRow = document.getElementById("session-clips-row");
+  if (sessionClipsRow) renderClipsRow(sessionClipsRow, true);
   document.getElementById("scheduling-fields-row").style.display = isStandaloneDrillMode ? "none" : "flex";
   document.getElementById("timetable-summary-banner").style.display = isStandaloneDrillMode ? "none" : "flex";
   document.getElementById("timetable-header-row").classList.toggle("drill-mode", isStandaloneDrillMode);
@@ -5572,21 +5581,6 @@ function renderPhaseNotes() {
     notesWrap.className = "phase-note-notes note-blocks";
     renderNoteBlocks(ph.noteBlocks, notesWrap);
 
-    const clipsSection = document.createElement("div");
-    const clipsLabel = document.createElement("span");
-    clipsLabel.className = "phase-clips-label";
-    clipsLabel.textContent = "Attached Clips:";
-    const clipsRow = document.createElement("div");
-    clipsRow.className = "phase-clips-row";
-    renderClipsRow(ph, clipsRow, true);
-    clipsSection.appendChild(clipsLabel);
-    clipsSection.appendChild(clipsRow);
-
-    const notesColumnWrap = document.createElement("div");
-    notesColumnWrap.className = "phase-note-notes-col";
-    notesColumnWrap.appendChild(notesWrap);
-    notesColumnWrap.appendChild(clipsSection);
-
     const actions = document.createElement("div");
     actions.className = "phase-note-row-actions";
     let libControl = null;
@@ -5635,7 +5629,7 @@ function renderPhaseNotes() {
 
     card.appendChild(handle);
     if (!isStandaloneDrillMode) card.appendChild(timeWrap);
-    card.appendChild(exerciseWrap); card.appendChild(notesColumnWrap); card.appendChild(actions);
+    card.appendChild(exerciseWrap); card.appendChild(notesWrap); card.appendChild(actions);
 
     // only the grip handle arms dragging — otherwise a draggable=true row
     // can swallow clicks/typing in its inputs, textareas, and buttons as
@@ -6667,7 +6661,7 @@ function serializeAppState() {
   return {
     title: document.getElementById("title-input").value,
     phases, phaseNextId, sceneNextId, nextId,
-    drillDescriptionBlocks, outputSettings,
+    drillDescriptionBlocks, outputSettings, sessionClips,
     practiceDate: document.getElementById("practice-date-input").value,
     practiceStartTime: document.getElementById("practice-starttime-input").value,
     duration: document.getElementById("practice-duration-input").value,
@@ -6723,6 +6717,7 @@ function loadAppState(data) {
   if (data.nextId) nextId = data.nextId;
   if (Array.isArray(data.drillDescriptionBlocks)) drillDescriptionBlocks = data.drillDescriptionBlocks;
   if (data.outputSettings) Object.assign(outputSettings, data.outputSettings);
+  if (Array.isArray(data.sessionClips)) sessionClips = data.sessionClips;
   document.getElementById("practice-date-input").value = data.practiceDate || "";
   document.getElementById("practice-starttime-input").value = data.practiceStartTime || "09:00";
   document.getElementById("practice-duration-input").value = data.duration || "";
@@ -7069,6 +7064,7 @@ function seedFreshDrill() {
   history.replaceState(null, "", location.pathname);
   tokens = []; shapes = []; phases = []; phaseNextId = 1; sceneNextId = 1; nextId = 1;
   drillDescriptionBlocks = [""];
+  sessionClips = [];
   document.getElementById("title-input").value = "";
   document.getElementById("notes-title-input").value = "";
   document.getElementById("practice-date-input").value = "";
