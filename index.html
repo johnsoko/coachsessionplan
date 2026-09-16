@@ -7095,6 +7095,14 @@ async function loadDrillFromUrl() {
     if (!res.ok) { toast("Could not find that saved drill"); return false; }
     const data = await res.json();
     currentDrillId = id;
+    // a plan loaded this way (via /api/drills) is never a standalone
+    // drill — reset explicitly and re-apply the UI so buttons hidden by
+    // an earlier standalone-drill session in this same page load (which
+    // otherwise stay hidden forever, since nothing else here would
+    // reset them) come back correctly for this practice plan
+    isStandaloneDrillMode = false;
+    currentStandaloneDrillId = null;
+    applyStandaloneDrillModeUI();
     loadAppState(data);
     markSavedSnapshot(); // baseline is the server's last-saved version, BEFORE any draft gets overlaid
     tryRestoreDraft("plan:" + id); // any unsaved edits from before a refresh take precedence over the last-saved version
