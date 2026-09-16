@@ -4436,7 +4436,7 @@ const LIBRARY_BADGE_SVG = `<svg width="11" height="11" viewBox="0 0 12 12" fill=
 async function verifyLibraryBadgeClick(ph) {
   const id = ph.libraryDrillId;
   try {
-    const res = await fetch(`/api/drill-library/${id}`);
+    const res = await fetch(`/api/drill-library/${id}`, { cache: "no-store" });
     if (res.ok) {
       toast("Already in your Drill Library"); // opening it directly is coming later
     } else {
@@ -6136,7 +6136,7 @@ function renderImportPhaseRows() {
 }
 async function importDrillIntoPhases(id, title) {
   try {
-    const res = await fetch(`/api/drill-library/${id}`);
+    const res = await fetch(`/api/drill-library/${id}`, { cache: "no-store" });
     if (!res.ok) { toast("Could not load that drill"); return; }
     const data = await res.json();
     // each ORIGINAL token/shape id gets mapped to exactly one new id,
@@ -7116,7 +7116,7 @@ async function loadDrillFromUrl() {
   const id = new URLSearchParams(location.search).get("id");
   if (!id) return false;
   try {
-    const res = await fetch(`/api/drills/${id}`);
+    const res = await fetch(`/api/drills/${id}`, { cache: "no-store" });
     if (!res.ok) { toast("Could not find that saved drill"); return false; }
     const data = await res.json();
     currentDrillId = id;
@@ -7495,7 +7495,7 @@ let editDetailsTargetId = null;
 let editDetailsFullData = null;
 async function openEditDetailsModal(id) {
   try {
-    const res = await fetch(`/api/drills/${id}`);
+    const res = await fetch(`/api/drills/${id}`, { cache: "no-store" });
     if (!res.ok) { toast("Could not load that plan"); return; }
     editDetailsFullData = await res.json();
     editDetailsTargetId = id;
@@ -7574,7 +7574,7 @@ function openStandaloneDrillEditorBlank() {
 
 async function openStandaloneDrillEditorExisting(id) {
   try {
-    const res = await fetch(`/api/drill-library/${id}`);
+    const res = await fetch(`/api/drill-library/${id}`, { cache: "no-store" });
     if (!res.ok) { toast("Could not load that drill"); return; }
     const data = await res.json();
     tokens = []; shapes = [];
@@ -7764,7 +7764,7 @@ async function openLibraryDrillDetail(id) {
   const bodyEl = document.getElementById("lib-detail-body");
   bodyEl.innerHTML = '<p class="dash-empty">Loading…</p>';
   try {
-    const res = await fetch(`/api/drill-library/${id}`);
+    const res = await fetch(`/api/drill-library/${id}`, { cache: "no-store" });
     if (!res.ok) { bodyEl.innerHTML = '<p class="dash-empty">Could not load this drill.</p>'; return; }
     const d = await res.json();
     const updated = new Date(d.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
