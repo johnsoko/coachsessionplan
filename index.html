@@ -1006,6 +1006,8 @@
   .lib-detail-meta { font-size: 13px; color: var(--ink-faint); margin-bottom: 14px; }
   .lib-detail-desc { font-size: 14.5px; line-height: 1.6; color: var(--ink); margin-bottom: 16px; white-space: pre-wrap; }
   .lib-detail-label { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+  .lib-detail-phases-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px 24px; }
+  .lib-detail-phases-grid .output-phase-block { margin-top: 0; }
 </style>
 </head>
 <body>
@@ -7750,40 +7752,56 @@ async function openLibraryDrillDetail(id) {
       </div>
     `;
     const phasesEl = document.getElementById("lib-detail-phases");
-    const phaseList = (Array.isArray(d.phases) && d.phases.length) ? d.phases : [{ surface: d.surface, scenes: d.scenes, noteBlocks: [d.notes || ""] }];
-    const multi = phaseList.length > 1;
-    phaseList.forEach((ph, idx) => {
-      const block = document.createElement("div");
-      block.className = "output-phase-block";
-      if (multi) {
+    const multi = Array.isArray(d.phases) && d.phases.length > 1;
+    if (!multi) {
+      // exactly one phase (or a legacy drill with no phases array at all)
+      // — same simple layout as before: one large preview near the top,
+      // Notes as its own separate section underneath, no phase label
+      const ph = (Array.isArray(d.phases) && d.phases.length) ? d.phases[0] : { surface: d.surface, scenes: d.scenes, noteBlocks: [d.notes || ""] };
+      const thumbWrap = document.createElement("div");
+      thumbWrap.className = "lib-detail-thumb";
+      thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, scenes: ph.scenes }, "lib-detail-thumb-inner"));
+      const notesLabel = document.createElement("div");
+      notesLabel.className = "lib-detail-label";
+      notesLabel.textContent = "Notes";
+      const notesBody = document.createElement("div");
+      notesBody.className = "lib-detail-desc";
+      const notesText = (ph.noteBlocks || []).filter(t => t.trim()).join(" ");
+      notesBody.textContent = notesText || "No notes yet.";
+      phasesEl.appendChild(thumbWrap);
+      phasesEl.appendChild(notesLabel);
+      phasesEl.appendChild(notesBody);
+    } else {
+      // more than one phase — a 2-column grid by default, each phase
+      // labeled with its own preview and notes, matching how the
+      // Output page lays out multiple phases
+      phasesEl.className = "lib-detail-phases-grid";
+      d.phases.forEach((ph, idx) => {
+        const block = document.createElement("div");
+        block.className = "output-phase-block";
         const label = document.createElement("div");
         label.className = "output-phase-label";
         label.textContent = ph.title || ("Phase " + (idx + 1));
         block.appendChild(label);
-      } else {
-        const label = document.createElement("div");
-        label.className = "lib-detail-label";
-        label.textContent = "Preview";
-        block.appendChild(label);
-      }
-      const thumbWrap = document.createElement("div");
-      thumbWrap.className = "lib-detail-thumb";
-      thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, scenes: ph.scenes }, "lib-detail-thumb-inner"));
-      block.appendChild(thumbWrap);
-      const notesBlocks = (ph.noteBlocks || []).filter(t => t.trim());
-      const notesLabel = document.createElement("div");
-      notesLabel.className = "lib-detail-label";
-      notesLabel.textContent = "Notes";
-      notesLabel.style.marginTop = "14px";
-      const notesBody = document.createElement("div");
-      notesBody.className = "output-phase-notes lib-detail-desc";
-      notesBody.innerHTML = notesBlocks.length
-        ? `<ul class="output-bullet-list">${notesBlocks.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`
-        : `<p class="output-empty">No notes yet.</p>`;
-      block.appendChild(notesLabel);
-      block.appendChild(notesBody);
-      phasesEl.appendChild(block);
-    });
+        const thumbWrap = document.createElement("div");
+        thumbWrap.className = "lib-detail-thumb";
+        thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, scenes: ph.scenes }, "lib-detail-thumb-inner"));
+        block.appendChild(thumbWrap);
+        const notesBlocks = (ph.noteBlocks || []).filter(t => t.trim());
+        const notesLabel = document.createElement("div");
+        notesLabel.className = "lib-detail-label";
+        notesLabel.textContent = "Notes";
+        notesLabel.style.marginTop = "14px";
+        const notesBody = document.createElement("div");
+        notesBody.className = "output-phase-notes lib-detail-desc";
+        notesBody.innerHTML = notesBlocks.length
+          ? `<ul class="output-bullet-list">${notesBlocks.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`
+          : `<p class="output-empty">No notes yet.</p>`;
+        block.appendChild(notesLabel);
+        block.appendChild(notesBody);
+        phasesEl.appendChild(block);
+      });
+    }
     document.getElementById("lib-detail-edit-btn").addEventListener("click", () => openStandaloneDrillEditorExisting(d.id));
     document.getElementById("lib-detail-del-btn").addEventListener("click", () => {
       deleteLibraryDrill(d.id, d.title, () => { showScreen("library"); renderLibraryGrid(); });
