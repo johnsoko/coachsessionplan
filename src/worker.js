@@ -1,14 +1,12 @@
-// Handles the save/load API for drills, backed by D1 + Clerk auth.
-// Everything that isn't an /api/ request just falls through to the
-// static site (the same index.html that was being served before this
-// file existed).
-
 import { createClerkClient } from "@clerk/backend";
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    // this API must always reflect the latest save — no caching layer
+    // (browser, Cloudflare edge, or any proxy in between) should ever
+    // be allowed to serve a stale response here
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
   });
 }
 
@@ -18,7 +16,6 @@ function newId() {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
 }
 
-// returns the signed-in Clerk userId, or null if not signed in
 async function getUserId(request, env) {
   if (!env.CLERK_SECRET_KEY || !env.CLERK_PUBLISHABLE_KEY) return null;
   const clerkClient = createClerkClient({
@@ -40,11 +37,8 @@ async function handleApi(request, env, url) {
   const parts = url.pathname.split("/").filter(Boolean); // ["api","drills", maybe ":id"]
 
   // GET /api/drill-library — list every library drill the signed-in user
-  // owns, for the Drill Library page. Includes surface/scenes directly so
-  // the grid can render thumbnails in one request instead of a separate
-  // fetch per card (that N+1 pattern got slower as the library grew, and
-  // the resulting network/CPU contention was likely also behind choppy
-  // playback on the detail page).
+  // owns, with just enough columns (pulled out of the JSON blob) for the
+  // library grid to render cards without a separate fetch per drill.
   if (request.method === "GET" && parts.length === 2 && parts[1] === "drill-library") {
     const userId = await getUserId(request, env);
     if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
@@ -63,17 +57,15 @@ async function handleApi(request, env, url) {
   }
 
   // GET /api/drill-library/:id — full detail for a single library drill
-  // (surface/scenes for the preview, plus notes/tags/creator).
   if (request.method === "GET" && parts.length === 3 && parts[1] === "drill-library") {
     const id = parts[2];
-    const row = await env.DB.prepare("SELECT id, title, created_at, updated_at, data FROM drill_library WHERE id = ?")
-      .bind(id).first();
+    const row = await env.DB.prepare("SELECT id, title, created_at, updated_at, data FROM drill_library WHERE id = ?").bind(id).first();
     if (!row) return jsonResponse({ error: "Not found" }, 404);
     return jsonResponse({ id: row.id, title: row.title, created_at: row.created_at, updated_at: row.updated_at, ...JSON.parse(row.data) });
   }
 
   // POST /api/drill-library — create a new library drill from a phase's
-  // saved data. Requires sign-in. Returns the new id.
+  // (or standalone drill's) data
   if (request.method === "POST" && parts.length === 2 && parts[1] === "drill-library") {
     const userId = await getUserId(request, env);
     if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
@@ -87,8 +79,7 @@ async function handleApi(request, env, url) {
   }
 
   // PUT /api/drill-library/:id — update an existing library drill (keeps
-  // it in sync with its source phase on later saves). Requires sign-in
-  // and ownership.
+  // the same id, e.g. so a linked phase stays pointed at the same entry)
   if (request.method === "PUT" && parts.length === 3 && parts[1] === "drill-library") {
     const userId = await getUserId(request, env);
     if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
@@ -106,10 +97,6 @@ async function handleApi(request, env, url) {
   }
 
   // DELETE /api/drill-library/:id — removes a drill from the library only.
-  // Practice plans that reference it via a phase's libraryDrillId are
-  // completely unaffected — each phase carries its own full drill data
-  // (surface/scenes) independently, it's never fetched from the library
-  // at use time, so there's nothing in any saved practice plan to break.
   if (request.method === "DELETE" && parts.length === 3 && parts[1] === "drill-library") {
     const userId = await getUserId(request, env);
     if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
@@ -123,8 +110,6 @@ async function handleApi(request, env, url) {
     return jsonResponse({ ok: true });
   }
 
-  // GET /api/drills — list every practice plan the signed-in user owns,
-  // for the dashboard. Requires sign-in.
   if (request.method === "GET" && parts.length === 2 && parts[1] === "drills") {
     const userId = await getUserId(request, env);
     if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
@@ -138,7 +123,6 @@ async function handleApi(request, env, url) {
     return jsonResponse({ drills: results });
   }
 
-  // POST /api/drills — create a new drill, returns its id. Requires sign-in.
   if (request.method === "POST" && parts.length === 2 && parts[1] === "drills") {
     const userId = await getUserId(request, env);
     if (!userId) return jsonResponse({ error: "Sign in required" }, 401);
