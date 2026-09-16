@@ -375,7 +375,7 @@
 
   /* ── NOTES VIEW ── */
   #view-notes { overflow-y: auto; justify-content: center; }
-  .notes-page { width: 100%; max-width: 1160px; padding: 44px 24px 200px; }
+  .notes-page { width: 100%; max-width: 1160px; padding: 44px 24px 320px; }
   .notes-title-input {
     width: 100%; border: none; background: transparent; font-family: var(--display); font-size: 34px;
     font-weight: 600; color: var(--ink); padding: 4px 0; margin-bottom: 28px; border-bottom: 1px solid transparent;
@@ -426,7 +426,8 @@
   .phase-note-card .phase-note-drill-title { font-weight: 600; font-size: 13px; text-align: center; }
   .phase-note-notes-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .phase-clips-label { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); }
-  .phase-clips-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .phase-clips-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px; }
+  .phase-clip-unit { display: flex; flex-direction: column; gap: 8px; width: 300px; flex-shrink: 0; }
   .phase-clip-card {
     position: relative; width: 300px; border-radius: 8px; overflow: hidden; background: #000;
     aspect-ratio: 16/9; flex-shrink: 0;
@@ -438,6 +439,8 @@
     justify-content: center; z-index: 2;
   }
   .phase-clip-remove:hover { background: var(--bib); }
+  .phase-clip-notes.note-blocks { min-height: 70px; font-size: 12.5px; }
+  .phase-clip-notes-readonly { font-size: 12.5px; }
   .add-clip-box {
     width: 300px; aspect-ratio: 16/9; flex-shrink: 0; border: 1.5px dashed var(--line-md); border-radius: 8px;
     background: var(--paper); display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -1747,7 +1750,7 @@
             Play Full Animation
           </button>
           <div id="output-phases-container"></div>
-          <div class="output-section" id="output-clips-section" style="margin-top:22px; margin-bottom:120px;">
+          <div class="output-section" id="output-clips-section" style="margin-top:22px; margin-bottom:160px;">
             <div class="output-section-label">Attached Clips</div>
             <div class="phase-clips-row" id="output-clips-row"></div>
           </div>
@@ -5444,18 +5447,25 @@ function buildClipEmbed(url) {
 function addClip(url) {
   const embed = buildClipEmbed(url);
   if (!embed) return false;
-  sessionClips.push({ id: nextId++, platform: embed.platform, url: url.trim() });
+  sessionClips.push({ id: nextId++, platform: embed.platform, url: url.trim(), noteBlocks: [""] });
   if (embed.platform === "instagram") ensureEmbedScript("https://www.instagram.com/embed.js", () => igScriptLoaded = true, igScriptLoaded);
   if (embed.platform === "twitter") ensureEmbedScript("https://platform.twitter.com/widgets.js", () => twScriptLoaded = true, twScriptLoaded);
   return true;
 }
 // builds the actual DOM for the session's clip row — shared between the
-// Details tab (editable, with a remove button) and Output (read-only)
+// Details tab (editable, with a remove button and its own editable notes
+// under each clip, same block editor the phase notes use) and Output
+// (read-only, notes shown as a plain bullet list like phase notes there)
 function renderClipsRow(container, editable) {
   container.innerHTML = "";
   sessionClips.forEach(clip => {
     const embed = buildClipEmbed(clip.url);
     if (!embed) return;
+    if (!clip.noteBlocks || !clip.noteBlocks.length) clip.noteBlocks = [""];
+
+    const unit = document.createElement("div");
+    unit.className = "phase-clip-unit";
+
     const card = document.createElement("div");
     card.className = "phase-clip-card";
     card.innerHTML = embed.html;
@@ -5470,7 +5480,24 @@ function renderClipsRow(container, editable) {
       });
       card.appendChild(rm);
     }
-    container.appendChild(card);
+    unit.appendChild(card);
+
+    if (editable) {
+      const notesWrap = document.createElement("div");
+      notesWrap.className = "phase-clip-notes note-blocks";
+      renderNoteBlocks(clip.noteBlocks, notesWrap);
+      unit.appendChild(notesWrap);
+    } else {
+      const blocks = clip.noteBlocks.filter(t => t.trim());
+      if (blocks.length) {
+        const n = document.createElement("div");
+        n.className = "phase-clip-notes-readonly";
+        n.innerHTML = `<ul class="output-bullet-list">${blocks.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`;
+        unit.appendChild(n);
+      }
+    }
+
+    container.appendChild(unit);
   });
   if (editable) {
     const addBox = document.createElement("button");
