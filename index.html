@@ -3850,7 +3850,7 @@ function drawShape(s, highlight) {
     const p1 = px(s.x1, s.y1), p2 = px(s.x2, s.y2);
     ctx.setLineDash(s.style === "pass" ? [3, 7] : []);
     if (s.curved) {
-      const bc = bezierControlFor(s);
+      const bc = s._partialControl || bezierControlFor(s);
       const cp = px(bc.x, bc.y);
       // trim the last bit off the curve's end so the arrowhead sits
       // cleanly at the tip rather than poking through it; the tangent
@@ -3930,6 +3930,22 @@ function bezierControlFor(s) {
     x: (m.x - (1-t)*(1-t)*p0x - t*t*p2x) / denom,
     y: (m.y - (1-t)*(1-t)*p0y - t*t*p2y) / denom
   };
+}
+// De Casteljau subdivision of a quadratic bezier at parameter t: splits
+// the curve into two and returns the endpoint and control point of the
+// [0,t] portion. Used to reveal a curved arrow smoothly ALONG its own
+// curve during playback — passing revealedShapeAt()'s straight-lerp
+// endpoint through the ORIGINAL curve's control point would just draw a
+// straight line that snaps into the true curve at 100%, which is the
+// bug this fixes.
+function partialCurve(s, t) {
+  const p0 = { x: s.x1, y: s.y1 };
+  const p2 = { x: s.x2, y: s.y2 };
+  const p1 = bezierControlFor(s);
+  const q0 = { x: p0.x + (p1.x - p0.x) * t, y: p0.y + (p1.y - p0.y) * t };
+  const q1 = { x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t };
+  const r  = { x: q0.x + (q1.x - q0.x) * t, y: q0.y + (q1.y - q0.y) * t };
+  return { end: r, control: q0 };
 }
 function shapeEndpoints(s) {
   if (s.style === "dribble" && s.points && s.points.length) {
@@ -4129,9 +4145,16 @@ function revealedShapeAt(s, progress) {
     const n = Math.max(2, Math.ceil(s.points.length * progress));
     return { ...s, points: s.points.slice(0, n) };
   }
-  // run/pass: grow the line from its start toward its end; simplified to
-  // a straight lerp even for curved lines during the reveal itself — it
-  // snaps to the true curve once fully drawn, which reads fine at speed
+  // run/pass: grow the line from its start toward its end. A curved
+  // arrow reveals along its own actual curve (via De Casteljau
+  // subdivision) rather than a straight lerp that would otherwise snap
+  // into the true curve only once fully drawn. partialCurve() reduces
+  // correctly to the full curve at progress===1, so there's no need to
+  // special-case that endpoint away from this branch.
+  if ((s.style === "run" || s.style === "pass") && s.curved) {
+    const { end, control } = partialCurve(s, progress);
+    return { ...s, x2: end.x, y2: end.y, curved: true, _partialControl: control };
+  }
   return { ...s, x2: s.x1 + (s.x2 - s.x1) * progress, y2: s.y1 + (s.y2 - s.y1) * progress, curved: false };
 }
 // mirrors renderShapes()'s draw order (zone-marker shapes underneath,
@@ -4671,9 +4694,10 @@ function phaseThumbHTML(ph, opts) {
     const color = s.color || "#F7F8F3";
     const width = Math.max(toVB(1), toVB(s.width || 2.4));
     // matches revealedShapeAt() in the main engine exactly: a dribble
-    // path just gets truncated to the same fraction of its points, and
-    // every other style grows its endpoint from x1,y1 toward x2,y2 (and
-    // is treated as straight, not curved, until it reaches full reveal)
+    // path just gets truncated to the same fraction of its points; a
+    // curved run/pass reveals smoothly ALONG its own curve (via De
+    // Casteljau subdivision) instead of growing as a straight line that
+    // only snaps into the true curve once fully drawn
     const progress = opts.shapeProgress && opts.shapeProgress[s.id] !== undefined ? opts.shapeProgress[s.id] : 1;
     if (s.style === "dribble" && s.points && s.points.length > 1) {
       const n = progress < 1 ? Math.max(2, Math.ceil(s.points.length * progress)) : s.points.length;
@@ -4681,12 +4705,23 @@ function phaseThumbHTML(ph, opts) {
       const d = pts.map((p, i) => { const q = pxAt(p.x, p.y); return (i===0?"M":"L") + q.x.toFixed(1) + " " + q.y.toFixed(1); }).join(" ");
       return `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-dasharray="${toVB(1)} ${toVB(6)}" stroke-linecap="round"/>`;
     }
-    const es = progress < 1 ? { ...s, x2: s.x1 + (s.x2 - s.x1) * progress, y2: s.y1 + (s.y2 - s.y1) * progress, curved: false } : s;
+    let es;
+    if ((s.style === "run" || s.style === "pass") && s.curved) {
+      // partialCurve() reduces correctly to the full curve at
+      // progress===1, so no need to special-case it away from here
+      const { end, control } = progress < 1 ? partialCurve(s, progress) : { end: { x: s.x2, y: s.y2 }, control: null };
+      es = { ...s, x2: end.x, y2: end.y, curved: true, _partialControl: control };
+    } else if (progress < 1) {
+      es = { ...s, x2: s.x1 + (s.x2 - s.x1) * progress, y2: s.y1 + (s.y2 - s.y1) * progress, curved: false };
+    } else {
+      es = s;
+    }
     if (s.style === "run" || s.style === "pass") {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
       const dash = s.style === "pass" ? `stroke-dasharray="${toVB(2)} ${toVB(5)}"` : "";
       const headLen = Math.max(toVB(8), width * 4);
-      const cp = es.curved ? pxAt(bezierControlFor(es).x, bezierControlFor(es).y) : p1;
+      const bc = es.curved ? (es._partialControl || bezierControlFor(es)) : null;
+      const cp = bc ? pxAt(bc.x, bc.y) : p1;
       const angle = es.curved ? Math.atan2(p2.y - cp.y, p2.x - cp.x) : Math.atan2(p2.y - p1.y, p2.x - p1.x);
       const trimX = p2.x - headLen * 0.7 * Math.cos(angle), trimY = p2.y - headLen * 0.7 * Math.sin(angle);
       const a1 = angle - 0.45, a2 = angle + 0.45;
