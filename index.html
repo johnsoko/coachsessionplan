@@ -4542,6 +4542,16 @@ function loadPhase(id) {
 // cloneCurrent true = Clone (copies the active scene's content too);
 // false = Next (blank single scene, but keeps the current field type)
 function addPhase(cloneCurrent) {
+  // a standalone drill is meant to be exactly one phase — its own save
+  // path (saveStandaloneDrill) only ever persists phases[0], so a second
+  // phase added here would animate and look completely normal right up
+  // until save, where it would silently vanish for good. Blocking the
+  // add here is what actually prevents that data loss, rather than
+  // just hiding the buttons that lead to it.
+  if (isStandaloneDrillMode) {
+    toast("A drill is a single phase — start a Practice Plan to add more activities");
+    return;
+  }
   saveActivePhase();
   const current = phases.find(p => p.id === activePhaseId);
   const ph = newPhaseObj(cloneCurrent ? current : null, current ? current.surface : "full");
@@ -5635,6 +5645,7 @@ function renderPhaseNotes() {
     dupBtn.title = "Duplicate";
     dupBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="2" y="4.5" width="7.5" height="8.5" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 4.5V3a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1V9a1 1 0 0 1-1 1H11" stroke="currentColor" stroke-width="1.2"/></svg>`;
     dupBtn.addEventListener("click", () => {
+      if (isStandaloneDrillMode) { toast("A drill is a single phase — start a Practice Plan to add more activities"); return; }
       const idx = phases.findIndex(p => p.id === ph.id);
       const clone = newPhaseObj(ph, ph.surface);
       clone.noteBlocks = [...ph.noteBlocks];
@@ -5652,7 +5663,8 @@ function renderPhaseNotes() {
       renderPhaseNotes();
     });
     if (libControl) actions.appendChild(libControl);
-    actions.appendChild(dupBtn); actions.appendChild(delBtn);
+    if (!isStandaloneDrillMode) actions.appendChild(dupBtn);
+    actions.appendChild(delBtn);
 
     card.appendChild(handle);
     if (!isStandaloneDrillMode) card.appendChild(timeWrap);
@@ -6082,6 +6094,11 @@ function renderImportPhaseRows() {
   document.getElementById("import-phase-next").disabled = importPhasePage >= totalPages - 1;
 }
 async function importDrillIntoPhases(id, title) {
+  if (isStandaloneDrillMode) {
+    toast("A drill is a single phase — start a Practice Plan to add more activities");
+    closeImportPhaseModal();
+    return;
+  }
   try {
     const res = await fetch(`/api/drill-library/${id}`);
     if (!res.ok) { toast("Could not load that drill"); return; }
@@ -6669,6 +6686,13 @@ function applyStandaloneDrillModeUI() {
   document.getElementById("title-input").placeholder = placeholder;
   document.getElementById("notes-title-input").placeholder = placeholder;
   document.getElementById("phases-tab-label").textContent = isStandaloneDrillMode ? "Phases" : "Activities";
+  // a drill is a single phase, period — its own save path only ever
+  // persists the first one, so hide the ways to add a second rather
+  // than let it quietly get lost the moment the drill is saved
+  document.getElementById("phase-next").style.display = isStandaloneDrillMode ? "none" : "flex";
+  document.getElementById("phase-clone").style.display = isStandaloneDrillMode ? "none" : "flex";
+  const importItems = [document.getElementById("phase-import"), document.getElementById("phase-import-mobile")];
+  importItems.forEach(el => { if (el) el.style.display = isStandaloneDrillMode ? "none" : ""; });
 }
 
 function getTags() {
@@ -6930,6 +6954,18 @@ async function getAuthToken() {
 
 async function saveStandaloneDrill() {
   saveActivePhase();
+  // safety net: the UI now prevents adding a second phase in drill mode,
+  // but a session already in this state (started before that guard
+  // existed) would otherwise have every phase after the first silently
+  // discarded below, with no indication anything was lost. Surfacing it
+  // here means it's a visible, cancellable choice instead of silent data
+  // loss on save.
+  if (phases.length > 1) {
+    const proceed = confirm(
+      `This drill has ${phases.length} phases, but a drill can only save its first one (${phaseNoun ? phaseNoun() + " 1" : "Phase 1"}) — the rest will NOT be saved.\n\nClick Cancel to go back and remove the extra phases first, or OK to save just the first phase.`
+    );
+    if (!proceed) return;
+  }
   const ph = phases[0];
   const title = document.getElementById("title-input").value.trim();
   if (!title) {
