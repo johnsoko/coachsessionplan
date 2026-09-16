@@ -3152,8 +3152,17 @@ function setTeamSize(team, size) {
 }
 function setTeamLabelMode(team, mode) {
   pushHistory();
+  const matched = activeTokensForTeam(team);
+  if (matched.length) {
+    // a specific player (or players) is selected — the badge mode
+    // change applies only to them, not the whole roster
+    matched.forEach(t => t.labelMode = mode);
+  } else {
+    // nothing selected — this is a team-wide change, matching how
+    // color/size already behave with no selection
+    tokens.forEach(t => { if (t.type === "player" && t.team === team) t.labelMode = mode; });
+  }
   teamDefaults[team].labelMode = mode;
-  tokens.forEach(t => { if (t.type === "player" && t.team === team) t.labelMode = mode; });
   renderTokens();
   syncTeamPopover(team);
 }
