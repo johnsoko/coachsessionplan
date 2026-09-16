@@ -375,7 +375,7 @@
 
   /* ── NOTES VIEW ── */
   #view-notes { overflow-y: auto; justify-content: center; }
-  .notes-page { width: 100%; max-width: 1160px; padding: 44px 24px 80px; }
+  .notes-page { width: 100%; max-width: 1160px; padding: 44px 24px 200px; }
   .notes-title-input {
     width: 100%; border: none; background: transparent; font-family: var(--display); font-size: 34px;
     font-weight: 600; color: var(--ink); padding: 4px 0; margin-bottom: 28px; border-bottom: 1px solid transparent;
@@ -428,7 +428,7 @@
   .phase-clips-label { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); }
   .phase-clips-row { display: flex; flex-wrap: wrap; gap: 10px; }
   .phase-clip-card {
-    position: relative; width: 220px; border-radius: 8px; overflow: hidden; background: #000;
+    position: relative; width: 300px; border-radius: 8px; overflow: hidden; background: #000;
     aspect-ratio: 16/9; flex-shrink: 0;
   }
   .phase-clip-card iframe, .phase-clip-card video { width: 100%; height: 100%; border: none; display: block; }
@@ -439,7 +439,7 @@
   }
   .phase-clip-remove:hover { background: var(--bib); }
   .add-clip-box {
-    width: 220px; aspect-ratio: 16/9; flex-shrink: 0; border: 1.5px dashed var(--line-md); border-radius: 8px;
+    width: 300px; aspect-ratio: 16/9; flex-shrink: 0; border: 1.5px dashed var(--line-md); border-radius: 8px;
     background: var(--paper); display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 8px; color: var(--ink-soft); font-size: 12px;
   }
@@ -1747,7 +1747,7 @@
             Play Full Animation
           </button>
           <div id="output-phases-container"></div>
-          <div class="output-section" id="output-clips-section" style="margin-top:22px;">
+          <div class="output-section" id="output-clips-section" style="margin-top:22px; margin-bottom:120px;">
             <div class="output-section-label">Attached Clips</div>
             <div class="phase-clips-row" id="output-clips-row"></div>
           </div>
