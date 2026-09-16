@@ -365,6 +365,13 @@
     border-radius: 6px; border: 1px solid var(--line-md); background: var(--paper); color: var(--ink-soft);
   }
   .tp-toggle-row button.active { background: var(--pitch); color: var(--paper-card); border-color: var(--pitch); }
+  .tp-badge-row { display: flex; gap: 4px; padding: 0 2px; align-items: stretch; }
+  .tp-badge-row .tp-toggle-row { flex: 1; padding: 0; }
+  .tp-eye-toggle {
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px;
+    border-radius: 6px; border: 1px solid var(--line-md); background: var(--paper); color: var(--ink-soft);
+  }
+  .tp-eye-toggle.badge-hidden { background: var(--pitch); color: var(--paper-card); border-color: var(--pitch); }
 
   /* ── NOTES VIEW ── */
   #view-notes { overflow-y: auto; justify-content: center; }
@@ -1456,10 +1463,12 @@
                 <span class="tp-size-val" data-team="light"></span>
               </div>
               <span class="tp-label">Badge</span>
-              <div class="tp-toggle-row" data-team="light">
-                <button data-mode="number">#</button>
-                <button data-mode="position">Pos</button>
-                <button data-mode="blank">Blank</button>
+              <div class="tp-badge-row">
+                <div class="tp-toggle-row" data-team="light">
+                  <button data-mode="number">#</button>
+                  <button data-mode="position">Pos</button>
+                </div>
+                <button class="tp-eye-toggle" data-team="light" title="Show/hide badge on the field"></button>
               </div>
               <input type="text" class="field-input tp-badge-value" data-team="light" placeholder="Number" style="margin-top:6px;">
               <span class="tp-label">Name label</span>
@@ -1484,10 +1493,12 @@
                 <span class="tp-size-val" data-team="dark"></span>
               </div>
               <span class="tp-label">Badge</span>
-              <div class="tp-toggle-row" data-team="dark">
-                <button data-mode="number">#</button>
-                <button data-mode="position">Pos</button>
-                <button data-mode="blank">Blank</button>
+              <div class="tp-badge-row">
+                <div class="tp-toggle-row" data-team="dark">
+                  <button data-mode="number">#</button>
+                  <button data-mode="position">Pos</button>
+                </div>
+                <button class="tp-eye-toggle" data-team="dark" title="Show/hide badge on the field"></button>
               </div>
               <input type="text" class="field-input tp-badge-value" data-team="dark" placeholder="Number" style="margin-top:6px;">
               <span class="tp-label">Name label</span>
@@ -1787,10 +1798,12 @@
       <span class="tp-label">Number</span>
       <input type="number" id="name-modal-number" class="field-input" min="1" max="99">
       <span class="tp-label">Badge</span>
-      <div class="tp-toggle-row" id="name-modal-badge-toggle">
-        <button data-mode="number">#</button>
-        <button data-mode="position">Pos</button>
-        <button data-mode="blank">Blank</button>
+      <div class="tp-badge-row">
+        <div class="tp-toggle-row" id="name-modal-badge-toggle">
+          <button data-mode="number">#</button>
+          <button data-mode="position">Pos</button>
+        </div>
+        <button class="tp-eye-toggle" id="name-modal-eye-toggle" title="Show/hide badge on the field"></button>
       </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="name-modal-cancel">Cancel</button>
@@ -1905,9 +1918,11 @@ let multiTokenIds = [];
 let multiShapeIds = [];
 
 const PLAYER_COLORS = ["#F7F8F3", "#1B211C", "#F4921B", "#0000FF", "#DE2D2D", "#FFDC00", "#1DEB1D", "#F045D2", "#00FFFF"];
+const EYE_VISIBLE_ICON = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/></svg>`;
+const EYE_HIDDEN_ICON = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.3"/><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`;
 const teamDefaults = {
-  light: { color: "#F7F8F3", size: 30, labelMode: "number", showNames: false, presetNum: null, presetPos: "", presetName: "" },
-  dark: { color: "#1B211C", size: 30, labelMode: "number", showNames: false, presetNum: null, presetPos: "", presetName: "" }
+  light: { color: "#F7F8F3", size: 30, labelMode: "number", badgeHidden: false, showNames: false, presetNum: null, presetPos: "", presetName: "" },
+  dark: { color: "#1B211C", size: 30, labelMode: "number", badgeHidden: false, showNames: false, presetNum: null, presetPos: "", presetName: "" }
 };
 // classic 4-4-2 shirt-number convention — numbers past 11 (extra subs,
 // duplicates, etc.) get a randomly assigned position instead
@@ -2492,6 +2507,7 @@ function addToken(type, x, y, team) {
     t.color = teamDefaults[t.team].color;
     t.size = teamDefaults[t.team].size;
     t.labelMode = teamDefaults[t.team].labelMode;
+    t.badgeHidden = teamDefaults[t.team].badgeHidden;
     t.showName = teamDefaults[t.team].showNames;
     t.name = preset.presetName || "";
     preset.presetName = "";
@@ -2737,7 +2753,8 @@ function applyFormation(key) {
     tokens.push({
       id: nextId++, type: "player", team, x, y, num, pos: p.pos,
       color: teamDefaults[team].color, size: teamDefaults[team].size,
-      labelMode: teamDefaults[team].labelMode, showName: teamDefaults[team].showNames, name: ""
+      labelMode: teamDefaults[team].labelMode, badgeHidden: teamDefaults[team].badgeHidden,
+      showName: teamDefaults[team].showNames, name: ""
     });
   });
   selectedTokenId = null; selectedShapeId = null;
@@ -2822,7 +2839,7 @@ function renderTokens() {
     let isEditing = false;
     if (t.type === "player") {
       const mode = t.labelMode || "number";
-      const label = mode === "number" ? String(t.num) : mode === "position" ? (t.pos || "") : "";
+      const label = t.badgeHidden ? "" : (mode === "number" ? String(t.num) : (t.pos || ""));
       el.textContent = label;
       const scaledSize = t.size * fieldScaleFactor();
       el.style.width = scaledSize + "px";
@@ -3106,28 +3123,31 @@ function syncTeamPopover(team) {
   const color = t ? t.color : teamDefaults[team].color;
   const size  = t ? t.size  : teamDefaults[team].size;
   const mode  = t ? (t.labelMode || "number") : teamDefaults[team].labelMode;
+  const badgeHidden = t ? !!t.badgeHidden : teamDefaults[team].badgeHidden;
   const showNames = teamDefaults[team].showNames;
   document.querySelectorAll(`.tp-swatch-row[data-team="${team}"] .tp-swatch`).forEach(s => s.classList.toggle("active", s.dataset.color === color));
   const sizeInput = document.querySelector(`.tp-size[data-team="${team}"]`);
   sizeInput.value = size;
   document.querySelector(`.tp-size-val[data-team="${team}"]`).textContent = size + "px";
   document.querySelectorAll(`.tp-toggle-row[data-team="${team}"] button`).forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+  const eyeBtn = document.querySelector(`.tp-eye-toggle[data-team="${team}"]`);
+  if (eyeBtn) {
+    eyeBtn.classList.toggle("badge-hidden", badgeHidden);
+    eyeBtn.innerHTML = badgeHidden ? EYE_HIDDEN_ICON : EYE_VISIBLE_ICON;
+    eyeBtn.title = badgeHidden ? "Show badge on the field" : "Hide badge on the field";
+  }
   const nameToggleId = team === "light" ? "tp-name-toggle-light" : "tp-name-toggle-dark";
   document.querySelectorAll(`#${nameToggleId} button`).forEach(b => b.classList.toggle("active", (b.dataset.shownames === "1") === showNames));
   // the badge-value field edits the number when Badge is set to #, or the
   // position text when set to Pos — same field, whichever is relevant.
   // With a single player selected, it edits that player directly; with
   // none selected, it presets the value the NEXT placed player will get.
-  // In Blank mode nothing is actually shown on the token, so the field
-  // has no value of its own — it always starts empty there.
   const badgeInput = document.querySelector(`.tp-badge-value[data-team="${team}"]`);
   const nameInput = document.querySelector(`.tp-name-value[data-team="${team}"]`);
   if (badgeInput) {
-    badgeInput.placeholder = mode === "position" ? "Position (e.g. CB)" : mode === "blank" ? "Number or position" : "Number";
+    badgeInput.placeholder = mode === "position" ? "Position (e.g. CB)" : "Number";
     badgeInput.disabled = matched.length > 1;
-    if (mode === "blank") {
-      badgeInput.value = "";
-    } else if (matched.length === 1) {
+    if (matched.length === 1) {
       badgeInput.value = mode === "position" ? (t.pos || "") : String(t.num);
     } else {
       badgeInput.value = mode === "position" ? teamDefaults[team].presetPos : (teamDefaults[team].presetNum != null ? String(teamDefaults[team].presetNum) : "");
@@ -3164,6 +3184,22 @@ function setTeamLabelMode(team, mode) {
     tokens.forEach(t => { if (t.type === "player" && t.team === team) t.labelMode = mode; });
   }
   teamDefaults[team].labelMode = mode;
+  renderTokens();
+  syncTeamPopover(team);
+}
+// same selected-vs-all pattern as the mode toggle above: shows/hides the
+// badge for just the selected player(s), or the whole roster when
+// nothing is selected — independent of which mode (#/Pos) is set, so
+// hiding the badge never loses track of which mode it'll return to
+function setTeamBadgeVisibility(team, hidden) {
+  pushHistory();
+  const matched = activeTokensForTeam(team);
+  if (matched.length) {
+    matched.forEach(t => t.badgeHidden = hidden);
+  } else {
+    tokens.forEach(t => { if (t.type === "player" && t.team === team) t.badgeHidden = hidden; });
+  }
+  teamDefaults[team].badgeHidden = hidden;
   renderTokens();
   syncTeamPopover(team);
 }
@@ -3363,6 +3399,10 @@ function initTeamPopovers() {
     document.querySelectorAll(`.tp-toggle-row[data-team="${team}"] button`).forEach(btn => {
       btn.addEventListener("click", () => setTeamLabelMode(team, btn.dataset.mode));
     });
+    const eyeToggleBtn = document.querySelector(`.tp-eye-toggle[data-team="${team}"]`);
+    if (eyeToggleBtn) {
+      eyeToggleBtn.addEventListener("click", () => setTeamBadgeVisibility(team, !eyeToggleBtn.classList.contains("badge-hidden")));
+    }
     const nameToggleId = team === "light" ? "tp-name-toggle-light" : "tp-name-toggle-dark";
     document.querySelectorAll(`#${nameToggleId} button`).forEach(btn => {
       btn.addEventListener("click", () => setTeamShowNames(team, btn.dataset.shownames === "1"));
@@ -3371,14 +3411,12 @@ function initTeamPopovers() {
     if (badgeInput) {
       badgeInput.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") badgeInput.blur(); });
       // restrict what can actually be typed to match the active mode —
-      // # only takes digits, Pos only takes letters, Blank is unrestricted.
-      // Filtering as-you-type (rather than validating after the fact)
-      // means there's never a mismatched value to silently lose track of.
+      // # only takes digits, Pos only takes letters. Filtering as-you-type
+      // (rather than validating after the fact) means there's never a
+      // mismatched value to silently lose track of.
       badgeInput.addEventListener("input", () => {
         const mode = teamDefaults[team].labelMode;
-        const filtered = mode === "number" ? badgeInput.value.replace(/[^0-9]/g, "")
-                        : mode === "position" ? badgeInput.value.replace(/[^a-zA-Z]/g, "")
-                        : badgeInput.value;
+        const filtered = mode === "position" ? badgeInput.value.replace(/[^a-zA-Z]/g, "") : badgeInput.value.replace(/[^0-9]/g, "");
         if (filtered !== badgeInput.value) badgeInput.value = filtered;
       });
       badgeInput.addEventListener("change", () => {
@@ -3388,22 +3426,11 @@ function initTeamPopovers() {
         if (matched.length === 1) {
           const t = matched[0];
           pushHistory();
-          const tMode = t.labelMode || "number";
-          if (tMode === "position") {
+          if ((t.labelMode || "number") === "position") {
             t.pos = val;
-          } else if (tMode === "number") {
+          } else {
             const n = parseInt(val, 10);
             if (Number.isFinite(n)) t.num = Math.max(1, Math.min(99, n));
-          } else {
-            // Blank mode has no badge of its own to show — but whatever is
-            // typed here still routes into # or Pos's own value, purely so
-            // it's already there and correct if the mode is switched later.
-            if (/^[0-9]+$/.test(val)) {
-              const n = parseInt(val, 10);
-              if (Number.isFinite(n)) t.num = Math.max(1, Math.min(99, n));
-            } else if (/^[a-zA-Z]+$/.test(val)) {
-              t.pos = val;
-            }
           }
           renderTokens();
           renderPhaseThumbActive();
@@ -3412,16 +3439,9 @@ function initTeamPopovers() {
           // of this team will get when placed
           if (mode === "position") {
             teamDefaults[team].presetPos = val;
-          } else if (mode === "number") {
+          } else {
             const n = parseInt(val, 10);
             teamDefaults[team].presetNum = Number.isFinite(n) ? Math.max(1, Math.min(99, n)) : null;
-          } else {
-            if (/^[0-9]+$/.test(val)) {
-              const n = parseInt(val, 10);
-              teamDefaults[team].presetNum = Number.isFinite(n) ? Math.max(1, Math.min(99, n)) : null;
-            } else if (/^[a-zA-Z]+$/.test(val)) {
-              teamDefaults[team].presetPos = val;
-            }
           }
         }
         syncTeamPopover(team);
@@ -4660,7 +4680,7 @@ function phaseThumbHTML(ph, opts) {
     if (t.type === "player") {
       const r = toVB(t.size || 22) / 2;
       const mode = t.labelMode || "number";
-      const label = mode === "number" ? String(t.num) : mode === "position" ? (t.pos || "") : "";
+      const label = t.badgeHidden ? "" : (mode === "number" ? String(t.num) : (t.pos || ""));
       const textC = textColorFor(c);
       const fontSize = Math.max(toVB(6), r * (label.length > 1 ? 0.96 : 1.16));
       const circle = `<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${c}"/>`;
@@ -6244,6 +6264,10 @@ function openNameModal(id) {
   document.getElementById("name-modal-number").value = t.num;
   const mode = t.labelMode || "number";
   document.querySelectorAll("#name-modal-badge-toggle button").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+  const eyeBtn = document.getElementById("name-modal-eye-toggle");
+  eyeBtn.classList.toggle("badge-hidden", !!t.badgeHidden);
+  eyeBtn.innerHTML = t.badgeHidden ? EYE_HIDDEN_ICON : EYE_VISIBLE_ICON;
+  eyeBtn.title = t.badgeHidden ? "Show badge on the field" : "Hide badge on the field";
   document.getElementById("name-modal-overlay").classList.add("open");
   requestAnimationFrame(() => { input.focus(); input.select(); });
 }
@@ -6260,17 +6284,26 @@ function saveNameModal() {
     const num = Number.isFinite(numRaw) ? Math.max(1, Math.min(99, numRaw)) : t.num;
     const activeBadgeBtn = document.querySelector("#name-modal-badge-toggle button.active");
     const mode = activeBadgeBtn ? activeBadgeBtn.dataset.mode : (t.labelMode || "number");
-    if (val !== (t.name || "") || num !== t.num || mode !== (t.labelMode || "number")) {
+    const badgeHidden = document.getElementById("name-modal-eye-toggle").classList.contains("badge-hidden");
+    if (val !== (t.name || "") || num !== t.num || mode !== (t.labelMode || "number") || badgeHidden !== !!t.badgeHidden) {
       pushHistory();
       t.name = val;
       t.num = num;
       t.labelMode = mode;
+      t.badgeHidden = badgeHidden;
       renderTokens();
       renderPhaseThumbActive();
     }
   }
   closeNameModal();
 }
+document.getElementById("name-modal-eye-toggle").addEventListener("click", () => {
+  const eyeBtn = document.getElementById("name-modal-eye-toggle");
+  const hidden = !eyeBtn.classList.contains("badge-hidden");
+  eyeBtn.classList.toggle("badge-hidden", hidden);
+  eyeBtn.innerHTML = hidden ? EYE_HIDDEN_ICON : EYE_VISIBLE_ICON;
+  eyeBtn.title = hidden ? "Show badge on the field" : "Hide badge on the field";
+});
 document.getElementById("name-modal-save").addEventListener("click", saveNameModal);
 document.getElementById("name-modal-cancel").addEventListener("click", closeNameModal);
 document.getElementById("name-modal-overlay").addEventListener("click", e => {
