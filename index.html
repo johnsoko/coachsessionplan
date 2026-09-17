@@ -872,7 +872,7 @@
   /* ═════════════════════════════════════════════════════════════════════
      DASHBOARD
   ═════════════════════════════════════════════════════════════════════ */
-  #dashboard-screen { display: flex; min-height: 100vh; }
+  #dashboard-screen { display: flex; height: 100vh; }
   .dash-sidebar {
     width: 220px; flex-shrink: 0; background: var(--paper-card); border-right: 1px solid var(--line);
     padding: 20px 14px; display: flex; flex-direction: column;
@@ -986,7 +986,7 @@
   /* ═════════════════════════════════════════════════════════════════════
      DRILL LIBRARY
   ═════════════════════════════════════════════════════════════════════ */
-  #library-screen { display: flex; min-height: 100vh; }
+  #library-screen { display: flex; height: 100vh; }
   .lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
   .lib-card {
     display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
@@ -1006,6 +1006,15 @@
   .lib-card-desc { font-size: 12.5px; color: var(--ink-soft); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; flex: 1; }
   .lib-card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
   .lib-card-tag { font-size: 11px; font-weight: 600; background: var(--pitch-tint); color: var(--pitch-deep); border-radius: 5px; padding: 3px 8px; }
+  .lib-pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 4px 0 20px; }
+  .lib-pagination:empty { display: none; }
+  .lib-pagination button {
+    display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 7px;
+    border: 1px solid var(--line-md); background: var(--paper-card); color: var(--ink-soft);
+  }
+  .lib-pagination button:hover:not(:disabled) { background: var(--paper-raised); color: var(--ink); }
+  .lib-pagination button:disabled { opacity: 0.35; cursor: default; }
+  .lib-pagination span { font-size: 13px; color: var(--ink-soft); font-weight: 500; min-width: 90px; text-align: center; }
 
   #library-detail-screen { min-height: 100vh; height: 100vh; overflow-y: auto; }
   .lib-detail-topbar { padding: 18px 30px; border-bottom: 1px solid var(--line); }
@@ -1200,8 +1209,18 @@
       <div class="dash-filter-tag-list" id="lib-tag-list"></div>
     </div>
     <div class="dash-main">
-      <div class="dash-header"><h1>Drill Library</h1></div>
+      <div class="dash-header">
+        <h1>Drill Library</h1>
+        <select id="lib-sort-select" class="field-input" style="width:auto; max-width:170px;">
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="title-az">Title A-Z</option>
+          <option value="title-za">Title Z-A</option>
+        </select>
+      </div>
+      <div class="lib-pagination" id="lib-pagination-top"></div>
       <div class="lib-grid" id="lib-grid"><p class="dash-empty">Loading…</p></div>
+      <div class="lib-pagination" id="lib-pagination-bottom"></div>
     </div>
   </div>
 
@@ -7737,6 +7756,9 @@ document.getElementById("home-nav-library").addEventListener("click", () => {
 
 let allLibraryDrills = [];
 let selectedLibraryTags = new Set();
+let libraryPage = 0;
+let librarySortMode = "newest";
+const LIBRARY_PAGE_SIZE = 36;
 
 async function renderLibraryGrid() {
   const gridEl = document.getElementById("lib-grid");
@@ -7768,17 +7790,34 @@ function applyLibraryFilters() {
     if (selectedLibraryTags.size && !d.tags.some(t => selectedLibraryTags.has(t))) return false;
     return true;
   });
+  const sorted = filtered.slice().sort((a, b) => {
+    if (librarySortMode === "newest") return b.updated_at - a.updated_at;
+    if (librarySortMode === "oldest") return a.updated_at - b.updated_at;
+    const at = (a.title || "").toLowerCase(), bt = (b.title || "").toLowerCase();
+    if (librarySortMode === "title-az") return at < bt ? -1 : at > bt ? 1 : 0;
+    if (librarySortMode === "title-za") return at > bt ? -1 : at < bt ? 1 : 0;
+    return 0;
+  });
   const gridEl = document.getElementById("lib-grid");
+  const topEl = document.getElementById("lib-pagination-top");
+  const bottomEl = document.getElementById("lib-pagination-bottom");
   if (!allLibraryDrills.length) {
     gridEl.innerHTML = '<p class="dash-empty">No drills saved yet — check a drill\'s box and save its practice plan to add it here.</p>';
+    topEl.innerHTML = ""; bottomEl.innerHTML = "";
     return;
   }
-  if (!filtered.length) {
+  if (!sorted.length) {
     gridEl.innerHTML = '<p class="dash-empty">No drills match your search/filter.</p>';
+    topEl.innerHTML = ""; bottomEl.innerHTML = "";
     return;
   }
+  const totalPages = Math.max(1, Math.ceil(sorted.length / LIBRARY_PAGE_SIZE));
+  libraryPage = Math.max(0, Math.min(libraryPage, totalPages - 1));
+  const pageItems = sorted.slice(libraryPage * LIBRARY_PAGE_SIZE, (libraryPage + 1) * LIBRARY_PAGE_SIZE);
+  renderLibraryPagination(topEl, totalPages);
+  renderLibraryPagination(bottomEl, totalPages);
   gridEl.innerHTML = "";
-  filtered.forEach(d => {
+  pageItems.forEach(d => {
     const card = document.createElement("div");
     card.className = "lib-card";
     const updated = new Date(d.updated_at).toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
@@ -7803,6 +7842,25 @@ function applyLibraryFilters() {
     // per-card follow-up fetch needed to render the thumbnail
     document.getElementById("lib-thumb-" + d.id).appendChild(createAnimatedThumb({ surface: d.surface, scenes: d.scenes }, "lib-card-thumb-inner"));
   });
+}
+// builds one set of back/page/forward controls into the given container —
+// called once for the row above the grid and once for the row below,
+// so a long list of results doesn't force scrolling back to the top
+// just to move to the next page
+function renderLibraryPagination(container, totalPages) {
+  if (totalPages <= 1) { container.innerHTML = ""; return; }
+  container.innerHTML = "";
+  const backBtn = document.createElement("button");
+  backBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2.5L4 7l5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  backBtn.disabled = libraryPage === 0;
+  backBtn.addEventListener("click", () => { libraryPage--; applyLibraryFilters(); });
+  const label = document.createElement("span");
+  label.textContent = `Page ${libraryPage + 1} of ${totalPages}`;
+  const fwdBtn = document.createElement("button");
+  fwdBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 2.5l5 4.5-5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  fwdBtn.disabled = libraryPage >= totalPages - 1;
+  fwdBtn.addEventListener("click", () => { libraryPage++; applyLibraryFilters(); });
+  container.appendChild(backBtn); container.appendChild(label); container.appendChild(fwdBtn);
 }
 
 async function deleteLibraryDrill(id, title, onDone) {
@@ -7833,6 +7891,7 @@ function renderLibraryTagList() {
     chip.addEventListener("click", () => {
       const tag = chip.dataset.tag;
       if (selectedLibraryTags.has(tag)) selectedLibraryTags.delete(tag); else selectedLibraryTags.add(tag);
+      libraryPage = 0;
       renderLibraryTagList();
       applyLibraryFilters();
     });
@@ -7946,6 +8005,7 @@ async function openLibraryDrillDetail(id) {
 
 document.getElementById("dash-nav-library").addEventListener("click", () => {
   showScreen("library");
+  libraryPage = 0;
   renderLibraryGrid();
 });
 document.getElementById("lib-nav-home").addEventListener("click", () => {
@@ -7955,8 +8015,13 @@ document.getElementById("lib-nav-home").addEventListener("click", () => {
 document.getElementById("lib-detail-back-btn").addEventListener("click", () => {
   showScreen("library");
 });
-document.getElementById("lib-search-input").addEventListener("input", applyLibraryFilters);
+document.getElementById("lib-search-input").addEventListener("input", () => { libraryPage = 0; applyLibraryFilters(); });
 document.getElementById("lib-tag-search-input").addEventListener("input", renderLibraryTagList);
+document.getElementById("lib-sort-select").addEventListener("change", e => {
+  librarySortMode = e.target.value;
+  libraryPage = 0;
+  applyLibraryFilters();
+});
 
 document.getElementById("dash-new-plan-btn").addEventListener("click", seedFreshDrill);
 document.getElementById("add-timeslot-btn").addEventListener("click", () => {
