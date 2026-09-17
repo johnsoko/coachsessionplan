@@ -3586,15 +3586,9 @@ function initArrowPopover() {
         // brand new one, which left the selected arrow untouched
         pushHistory();
         matched.forEach(s => {
-          // dribble paths use a points array instead of x1,y1,x2,y2 —
-          // convert between the two representations so switching styles
-          // never leaves a shape with neither, which would render nothing
-          if (newStyle === "dribble" && (!s.points || s.points.length < 2)) {
-            s.points = [{ x: s.x1, y: s.y1 }, { x: s.x2, y: s.y2 }];
-          } else if (s.style === "dribble" && newStyle !== "dribble" && s.points && s.points.length >= 2) {
-            s.x1 = s.points[0].x; s.y1 = s.points[0].y;
-            s.x2 = s.points[s.points.length - 1].x; s.y2 = s.points[s.points.length - 1].y;
-          }
+          // all three arrow kinds share the same x1,y1,x2,y2 (+curve)
+          // shape now — dribble's zigzag is purely a rendering style,
+          // so switching between them is just relabeling, no conversion
           s.style = newStyle;
         });
         renderShapes();
@@ -3860,33 +3854,47 @@ function drawShape(s, highlight) {
   const width = (s.width || drawDefaults.width) * fieldScaleFactor();
   ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
 
-  if (s.style === "run" || s.style === "pass") {
+  if (s.style === "run" || s.style === "pass" || s.style === "dribble") {
     const p1 = px(s.x1, s.y1), p2 = px(s.x2, s.y2);
     ctx.setLineDash(s.style === "pass" ? [3, 7] : []);
+    const headLen = 8 + width*1.8;
+    let angle, lx2, ly2, cp;
     if (s.curved) {
       const bc = s._partialControl || bezierControlFor(s);
-      const cp = px(bc.x, bc.y);
+      cp = px(bc.x, bc.y);
       // trim the last bit off the curve's end so the arrowhead sits
       // cleanly at the tip rather than poking through it; the tangent
       // there runs from the (derived) control point to the endpoint
-      const angle = Math.atan2(p2.y-cp.y, p2.x-cp.x);
-      const headLen = 8 + width*1.8;
-      const lx2 = p2.x - headLen*0.8*Math.cos(angle), ly2 = p2.y - headLen*0.8*Math.sin(angle);
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.quadraticCurveTo(cp.x, cp.y, lx2, ly2); ctx.stroke();
-      ctx.setLineDash([]);
-      drawArrowhead(p2.x, p2.y, angle, headLen, color);
+      angle = Math.atan2(p2.y-cp.y, p2.x-cp.x);
+      lx2 = p2.x - headLen*0.8*Math.cos(angle); ly2 = p2.y - headLen*0.8*Math.sin(angle);
     } else {
-      const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x);
-      const headLen = 8 + width*1.8;
-      const lx2 = p2.x - headLen*0.8*Math.cos(angle), ly2 = p2.y - headLen*0.8*Math.sin(angle);
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(lx2, ly2); ctx.stroke();
-      ctx.setLineDash([]);
-      drawArrowhead(p2.x, p2.y, angle, headLen, color);
+      angle = Math.atan2(p2.y-p1.y, p2.x-p1.x);
+      lx2 = p2.x - headLen*0.8*Math.cos(angle); ly2 = p2.y - headLen*0.8*Math.sin(angle);
     }
-  } else if (s.style === "dribble" && s.points && s.points.length > 1) {
-    ctx.setLineDash([1, 8]);
-    strokeSmooth(s.points.map(p => px(p.x, p.y)));
+    if (s.style === "dribble") {
+      // small zigzag traced along the same straight-or-curved path the
+      // line would otherwise follow — a rendering style only, not a
+      // different underlying shape, so it curves/resizes/drags exactly
+      // like a run or pass arrow
+      const amplitude = 4 + width * 0.6;
+      const approxLen = s.curved
+        ? Math.hypot(cp.x-p1.x, cp.y-p1.y) + Math.hypot(lx2-cp.x, ly2-cp.y)
+        : Math.hypot(lx2-p1.x, ly2-p1.y);
+      const segments = Math.max(4, Math.round(approxLen / 9));
+      const getPointAtT = s.curved
+        ? (t) => ({ x: (1-t)*(1-t)*p1.x + 2*(1-t)*t*cp.x + t*t*lx2, y: (1-t)*(1-t)*p1.y + 2*(1-t)*t*cp.y + t*t*ly2 })
+        : (t) => ({ x: p1.x + (lx2-p1.x)*t, y: p1.y + (ly2-p1.y)*t });
+      const zz = zigzagPoints(getPointAtT, segments, amplitude);
+      ctx.beginPath();
+      zz.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+      ctx.stroke();
+    } else if (s.curved) {
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.quadraticCurveTo(cp.x, cp.y, lx2, ly2); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(lx2, ly2); ctx.stroke();
+    }
     ctx.setLineDash([]);
+    drawArrowhead(p2.x, p2.y, angle, headLen, color);
   } else if (SHAPE_KINDS.includes(s.style)) {
     const p1 = px(s.x1, s.y1), p2 = px(s.x2, s.y2);
     ctx.setLineDash(s.dashed ? [6, 4] : []);
@@ -3961,13 +3969,33 @@ function partialCurve(s, t) {
   const r  = { x: q0.x + (q1.x - q0.x) * t, y: q0.y + (q1.y - q0.y) * t };
   return { end: r, control: q0 };
 }
-function shapeEndpoints(s) {
-  if (s.style === "dribble" && s.points && s.points.length) {
-    const first = s.points[0], last = s.points[s.points.length - 1];
-    return [{ x: first.x, y: first.y, role: "start" }, { x: last.x, y: last.y, role: "end" }];
+// Samples a straight or curved path (via getPointAtT(t) for t in [0,1])
+// at evenly-spaced points and offsets them alternately left/right of the
+// path's own local direction, producing the zigzag pattern used for
+// dribble arrows. Works identically whether the underlying path is
+// straight or curved, since each offset is perpendicular to the path's
+// OWN tangent at that point rather than one fixed direction. The first
+// and last points are left un-offset so the zigzag starts and ends
+// exactly on the line, connecting cleanly to the start dot and arrowhead.
+function zigzagPoints(getPointAtT, segments, amplitude) {
+  const pts = [];
+  const dt = 0.01;
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const p = getPointAtT(t);
+    if (i === 0 || i === segments) { pts.push(p); continue; }
+    const a = getPointAtT(Math.max(0, t - dt)), b = getPointAtT(Math.min(1, t + dt));
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    const side = (i % 2 === 0) ? 1 : -1;
+    pts.push({ x: p.x + nx * amplitude * side, y: p.y + ny * amplitude * side });
   }
+  return pts;
+}
+function shapeEndpoints(s) {
   const eps = [{ x: s.x1, y: s.y1, role: "start" }, { x: s.x2, y: s.y2, role: "end" }];
-  if ((s.style === "run" || s.style === "pass") && s.curved) {
+  if ((s.style === "run" || s.style === "pass" || s.style === "dribble") && s.curved) {
     const c = curveMidpoint(s);
     eps.push({ x: c.x, y: c.y, role: "control" });
   }
@@ -4004,9 +4032,6 @@ function startShapeResize(s, role) {
       const centerPx = px(cx, cy);
       const mousePx = px(p.x, p.y);
       s.rotation = Math.round(Math.atan2(mousePx.y - centerPx.y, mousePx.x - centerPx.x) * 180 / Math.PI + 90);
-    } else if (s.style === "dribble" && s.points && s.points.length) {
-      const idx = role === "start" ? 0 : s.points.length - 1;
-      s.points[idx] = { x: p.x, y: p.y };
     } else if (role === "start") { s.x1 = p.x; s.y1 = p.y; }
     else if (role === "end") { s.x2 = p.x; s.y2 = p.y; }
     else if (role === "control") { s.cx = p.x; s.cy = p.y; }
@@ -4025,11 +4050,8 @@ function startShapeResize(s, role) {
   document.addEventListener("touchend", onUp);
 }
 function translateShape(s, dx, dy) {
-  if (s.style === "dribble" && s.points) { s.points.forEach(pt => { pt.x += dx; pt.y += dy; }); }
-  else {
-    s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy;
-    if (s.curved && s.cx != null) { s.cx += dx; s.cy += dy; }
-  }
+  s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy;
+  if (s.curved && s.cx != null) { s.cx += dx; s.cy += dy; }
 }
 function selectAndMaybeMoveShape(shape, startPct) {
   if (blockIfScene1InAnimate()) return;
@@ -4155,17 +4177,14 @@ function finishMarqueeSelect(x1, y1, x2, y2) {
 }
 
 function revealedShapeAt(s, progress) {
-  if (s.style === "dribble" && s.points && s.points.length) {
-    const n = Math.max(2, Math.ceil(s.points.length * progress));
-    return { ...s, points: s.points.slice(0, n) };
-  }
-  // run/pass: grow the line from its start toward its end. A curved
-  // arrow reveals along its own actual curve (via De Casteljau
+  // run/pass/dribble: grow the line from its start toward its end. A
+  // curved arrow reveals along its own actual curve (via De Casteljau
   // subdivision) rather than a straight lerp that would otherwise snap
   // into the true curve only once fully drawn. partialCurve() reduces
   // correctly to the full curve at progress===1, so there's no need to
-  // special-case that endpoint away from this branch.
-  if ((s.style === "run" || s.style === "pass") && s.curved) {
+  // special-case that endpoint away from this branch. Dribble's zigzag
+  // is applied at draw time on top of whatever endpoint this produces.
+  if ((s.style === "run" || s.style === "pass" || s.style === "dribble") && s.curved) {
     const { end, control } = partialCurve(s, progress);
     return { ...s, x2: end.x, y2: end.y, curved: true, _partialControl: control };
   }
@@ -4205,7 +4224,6 @@ function deleteShape(id) {
   renderShapes(); renderPhaseThumbActive();
 }
 function shapeMidpoint(s) {
-  if (s.style === "dribble" && s.points) { const mid = s.points[Math.floor(s.points.length/2)]; return px(mid.x, mid.y); }
   return px((s.x1+s.x2)/2, (s.y1+s.y2)/2);
 }
 function showShapeToolbar(id) {}
@@ -4220,16 +4238,13 @@ function hitTestShape(s, x, y, tolerance) {
   const hf = fieldScaleFactor();
   const lineTol = (tolerance != null ? tolerance : 10) * hf;
   const padTol = (tolerance != null ? tolerance * 0.6 : 6) * hf;
-  if (s.style === "dribble" && s.points) {
-    return s.points.some(pt => { const pp = px(pt.x, pt.y); return Math.hypot(pp.x-p.x, pp.y-p.y) < lineTol; });
-  }
   const p1 = px(s.x1, s.y1), p2 = px(s.x2, s.y2);
   if (SHAPE_KINDS.includes(s.style)) {
     const minX = Math.min(p1.x, p2.x) - padTol, maxX = Math.max(p1.x, p2.x) + padTol;
     const minY = Math.min(p1.y, p2.y) - padTol, maxY = Math.max(p1.y, p2.y) + padTol;
     return p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
   }
-  if ((s.style === "run" || s.style === "pass") && s.curved) {
+  if ((s.style === "run" || s.style === "pass" || s.style === "dribble") && s.curved) {
     const bc = bezierControlFor(s);
     const cp = px(bc.x, bc.y);
     let minDist = Infinity;
@@ -4370,21 +4385,30 @@ function onStageMove(e) {
     ctx.restore();
     return;
   }
-  if (arrowStyle === "dribble") freehand.push(p);
   renderShapes();
   ctx.save();
   ctx.strokeStyle = drawDefaults.color; ctx.lineWidth = drawDefaults.width * hf; ctx.lineCap = "round"; ctx.lineJoin = "round";
-  if (arrowStyle === "dribble") { ctx.setLineDash([1,8]); strokeSmooth(freehand.map(pt => px(pt.x, pt.y))); }
-  else {
-    ctx.setLineDash(arrowStyle === "pass" ? [3,7] : []);
-    const p1 = px(drawStart.x, drawStart.y), p2 = px(p.x, p.y);
-    const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x);
-    const headLen = (8 + drawDefaults.width*1.8) * hf;
-    const lx2 = p2.x - headLen*0.8*Math.cos(angle), ly2 = p2.y - headLen*0.8*Math.sin(angle);
+  ctx.setLineDash(arrowStyle === "pass" ? [3,7] : []);
+  const p1 = px(drawStart.x, drawStart.y), p2 = px(p.x, p.y);
+  const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x);
+  const headLen = (8 + drawDefaults.width*1.8) * hf;
+  const lx2 = p2.x - headLen*0.8*Math.cos(angle), ly2 = p2.y - headLen*0.8*Math.sin(angle);
+  if (arrowStyle === "dribble") {
+    // small zigzag along the straight line up to the arrowhead — segment
+    // count scales with the line's own length so short and long drags
+    // both get a consistent-looking zigzag density, not stretched teeth
+    const amplitude = (4 + drawDefaults.width * 0.6) * hf;
+    const lineLen = Math.hypot(lx2 - p1.x, ly2 - p1.y);
+    const segments = Math.max(4, Math.round(lineLen / (9 * hf)));
+    const zz = zigzagPoints(t => ({ x: p1.x + (lx2 - p1.x) * t, y: p1.y + (ly2 - p1.y) * t }), segments, amplitude);
+    ctx.beginPath();
+    zz.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+    ctx.stroke();
+  } else {
     ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(lx2,ly2); ctx.stroke();
-    ctx.setLineDash([]);
-    drawArrowhead(p2.x, p2.y, angle, headLen, drawDefaults.color);
   }
+  ctx.setLineDash([]);
+  drawArrowhead(p2.x, p2.y, angle, headLen, drawDefaults.color);
   ctx.restore();
 }
 function onStageUp(e) {
@@ -4408,13 +4432,12 @@ function onStageUp(e) {
     const dist = Math.hypot(p.x-drawStart.x, p.y-drawStart.y);
     if (dist < 2) { noShapeCreated(); return; }
     shape = { id: nextId++, style: shapeKind, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: shapeDefaults.color, width: shapeSizeMemory[shapeKind], fill: shapeDefaults.fill };
-  } else if (arrowStyle === "dribble") {
-    freehand.push(p);
-    if (freehand.length < 3) { noShapeCreated(); return; }
-    shape = { id: nextId++, style: "dribble", points: freehand.slice(), color: drawDefaults.color, width: drawDefaults.width };
   } else {
     const dist = Math.hypot(p.x-drawStart.x, p.y-drawStart.y);
     if (dist < 2) { noShapeCreated(); return; }
+    // dribble now works exactly like run/pass — a simple two-point drag,
+    // draggable/curvable the same way — the zigzag is purely a rendering
+    // style, not a different underlying shape
     shape = { id: nextId++, style: arrowStyle, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: drawDefaults.color, width: drawDefaults.width, curved: drawDefaults.curved };
     if (shape.curved) { shape.cx = (shape.x1 + shape.x2) / 2; shape.cy = (shape.y1 + shape.y2) / 2; }
   }
@@ -4602,8 +4625,7 @@ function mirrorCurrentPhase() {
     const clone = newSceneObj(sc);
     clone.tokens.forEach(t => { t.x = 100 - t.x; });
     clone.shapes.forEach(s => {
-      if (s.style === "dribble" && s.points) s.points.forEach(p => { p.x = 100 - p.x; });
-      else { s.x1 = 100 - s.x1; s.x2 = 100 - s.x2; if (s.curved && s.cx != null) s.cx = 100 - s.cx; }
+      s.x1 = 100 - s.x1; s.x2 = 100 - s.x2; if (s.curved && s.cx != null) s.cx = 100 - s.cx;
     });
     return clone;
   });
@@ -4707,20 +4729,13 @@ function phaseThumbHTML(ph, opts) {
   const shapeMarkup = shapesInOrder.map(s => {
     const color = s.color || "#F7F8F3";
     const width = Math.max(toVB(1), toVB(s.width || 2.4));
-    // matches revealedShapeAt() in the main engine exactly: a dribble
-    // path just gets truncated to the same fraction of its points; a
-    // curved run/pass reveals smoothly ALONG its own curve (via De
+    // matches revealedShapeAt() in the main engine exactly: a curved
+    // run/pass/dribble reveals smoothly ALONG its own curve (via De
     // Casteljau subdivision) instead of growing as a straight line that
     // only snaps into the true curve once fully drawn
     const progress = opts.shapeProgress && opts.shapeProgress[s.id] !== undefined ? opts.shapeProgress[s.id] : 1;
-    if (s.style === "dribble" && s.points && s.points.length > 1) {
-      const n = progress < 1 ? Math.max(2, Math.ceil(s.points.length * progress)) : s.points.length;
-      const pts = s.points.slice(0, n);
-      const d = pts.map((p, i) => { const q = pxAt(p.x, p.y); return (i===0?"M":"L") + q.x.toFixed(1) + " " + q.y.toFixed(1); }).join(" ");
-      return `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-dasharray="${toVB(1)} ${toVB(6)}" stroke-linecap="round"/>`;
-    }
     let es;
-    if ((s.style === "run" || s.style === "pass") && s.curved) {
+    if ((s.style === "run" || s.style === "pass" || s.style === "dribble") && s.curved) {
       // partialCurve() reduces correctly to the full curve at
       // progress===1, so no need to special-case it away from here
       const { end, control } = progress < 1 ? partialCurve(s, progress) : { end: { x: s.x2, y: s.y2 }, control: null };
@@ -4730,7 +4745,7 @@ function phaseThumbHTML(ph, opts) {
     } else {
       es = s;
     }
-    if (s.style === "run" || s.style === "pass") {
+    if (s.style === "run" || s.style === "pass" || s.style === "dribble") {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
       const dash = s.style === "pass" ? `stroke-dasharray="${toVB(2)} ${toVB(5)}"` : "";
       const headLen = Math.max(toVB(8), width * 4);
@@ -4741,9 +4756,27 @@ function phaseThumbHTML(ph, opts) {
       const a1 = angle - 0.45, a2 = angle + 0.45;
       const hx1 = p2.x - headLen * Math.cos(a1), hy1 = p2.y - headLen * Math.sin(a1);
       const hx2 = p2.x - headLen * Math.cos(a2), hy2 = p2.y - headLen * Math.sin(a2);
-      const body = es.curved
-        ? `<path d="M${p1.x} ${p1.y} Q ${cp.x} ${cp.y} ${trimX} ${trimY}" fill="none" stroke="${color}" stroke-width="${width}" ${dash} stroke-linecap="round"/>`
-        : `<line x1="${p1.x}" y1="${p1.y}" x2="${trimX}" y2="${trimY}" stroke="${color}" stroke-width="${width}" ${dash} stroke-linecap="round"/>`;
+      let body;
+      if (s.style === "dribble") {
+        // small zigzag traced along the same straight-or-curved path up
+        // to the arrowhead — purely a rendering style, so it curves and
+        // reveals exactly like a run/pass arrow otherwise would
+        const amplitude = Math.max(toVB(3), width * 1.8);
+        const approxLen = es.curved
+          ? Math.hypot(cp.x-p1.x, cp.y-p1.y) + Math.hypot(trimX-cp.x, trimY-cp.y)
+          : Math.hypot(trimX-p1.x, trimY-p1.y);
+        const segments = Math.max(4, Math.round(approxLen / toVB(9)));
+        const getPointAtT = es.curved
+          ? (t) => ({ x: (1-t)*(1-t)*p1.x + 2*(1-t)*t*cp.x + t*t*trimX, y: (1-t)*(1-t)*p1.y + 2*(1-t)*t*cp.y + t*t*trimY })
+          : (t) => ({ x: p1.x + (trimX-p1.x)*t, y: p1.y + (trimY-p1.y)*t });
+        const zz = zigzagPoints(getPointAtT, segments, amplitude);
+        const d = zz.map((pt, i) => (i===0?"M":"L") + pt.x.toFixed(1) + " " + pt.y.toFixed(1)).join(" ");
+        body = `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      } else {
+        body = es.curved
+          ? `<path d="M${p1.x} ${p1.y} Q ${cp.x} ${cp.y} ${trimX} ${trimY}" fill="none" stroke="${color}" stroke-width="${width}" ${dash} stroke-linecap="round"/>`
+          : `<line x1="${p1.x}" y1="${p1.y}" x2="${trimX}" y2="${trimY}" stroke="${color}" stroke-width="${width}" ${dash} stroke-linecap="round"/>`;
+      }
       const head = `<polygon points="${p2.x},${p2.y} ${hx1},${hy1} ${hx2},${hy2}" fill="${color}"/>`;
       return body + head;
     }
@@ -6802,10 +6835,28 @@ function repairPhaseSceneIdContinuity(ph) {
     reconcile(ph.scenes[i-1].shapes, ph.scenes[i].shapes, s => s.style);
   }
 }
+// dribble used to be a freehand path (a "points" array) rather than a
+// simple two-point line like run/pass. A drill saved before that changed
+// still has shapes in that old shape — this converts them to the new
+// x1,y1,x2,y2 form (using the original path's own first/last points as
+// the new start/end) so they keep rendering correctly, just as a
+// straight/curved zigzag arrow instead of their old freehand wiggle.
+function migrateLegacyDribbleShapes(ph) {
+  (ph.scenes || []).forEach(sc => {
+    (sc.shapes || []).forEach(s => {
+      if (s.style === "dribble" && Array.isArray(s.points) && s.points.length >= 2 && s.x1 == null) {
+        s.x1 = s.points[0].x; s.y1 = s.points[0].y;
+        s.x2 = s.points[s.points.length - 1].x; s.y2 = s.points[s.points.length - 1].y;
+        delete s.points;
+      }
+    });
+  });
+}
 function loadAppState(data) {
   if (data.title != null) document.getElementById("title-input").value = data.title;
   if (Array.isArray(data.phases) && data.phases.length) phases = data.phases;
   phases.forEach(repairPhaseSceneIdContinuity);
+  phases.forEach(migrateLegacyDribbleShapes);
   if (data.phaseNextId) phaseNextId = data.phaseNextId;
   if (data.sceneNextId) sceneNextId = data.sceneNextId;
   if (data.nextId) nextId = data.nextId;
@@ -7599,6 +7650,7 @@ async function openStandaloneDrillEditorExisting(id) {
       // plan does, no id remapping needed
       phases = data.phases;
       phases.forEach(repairPhaseSceneIdContinuity);
+      phases.forEach(migrateLegacyDribbleShapes);
       const maxPhaseId = Math.max(0, ...phases.map(p => p.id));
       const maxSceneId = Math.max(0, ...phases.flatMap(p => p.scenes.map(s => s.id)));
       const maxTokenShapeId = Math.max(0, ...phases.flatMap(p => p.scenes.flatMap(s => [...s.tokens, ...s.shapes].map(o => o.id))));
@@ -7630,6 +7682,7 @@ async function openStandaloneDrillEditorExisting(id) {
         noteBlocks: [data.notes || ""], title: data.title || "", duration: "", dimensions: data.dimensions || ""
       };
       repairPhaseSceneIdContinuity(ph); // in case this specific drill was saved with the id-mismatch corruption before the underlying bug was fixed
+      migrateLegacyDribbleShapes(ph);
       phases = [ph];
     }
     sessionClips = Array.isArray(data.clips) ? data.clips : [];
