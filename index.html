@@ -3303,6 +3303,14 @@ function activeTokensOfType(type) {
   return tokens.filter(t => ids.includes(t.id) && t.type === type);
 }
 function activeShapesOfKind(kinds) {
+  // with a drawing tool still armed, a "selected" shape is just what's
+  // left over from finishing the last draw (kept selected so its
+  // endpoint handles are immediately draggable) — not a deliberate
+  // re-selection to edit. Treating it as one here would mean clicking a
+  // different style/color/width to set up the NEXT shape instead
+  // retroactively edits the one just drawn. Only Select's own deliberate
+  // selection should route a popover edit to an existing shape.
+  if (currentTool === "arrow" || currentTool === "shape") return [];
   const ids = selectedIds().s;
   return shapes.filter(s => ids.includes(s.id) && kinds.includes(s.style));
 }
@@ -4482,7 +4490,12 @@ function onStageDown(e) {
       selectedShapeId = null; selectedTokenId = null;
       multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
       hideShapeToolbar();
-      closeAllPopovers();
+      // NOT closeAllPopovers() here: with the arrow/shape tool still
+      // armed, the only way something was left selected at this point is
+      // the shape just finished drawing (its own popover is already the
+      // correct one showing) — closing it would force reopening the
+      // popover before every single line, defeating the point of being
+      // able to just click a different style and keep drawing
       renderShapes(); renderTokens();
     }
     pushHistory();
