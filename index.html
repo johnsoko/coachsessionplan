@@ -6594,9 +6594,20 @@ async function importDrillIntoPhases(id, title) {
       tokens: (sc.tokens || []).map(t => ({ ...t, id: remapId(t.id) })),
       shapes: (sc.shapes || []).map(s => ({ ...s, id: remapId(s.id) }))
     }));
+    const srcPh = (Array.isArray(data.phases) && data.phases.length) ? data.phases[0] : null;
     const newPhase = {
       id: phaseNextId++, surface: data.surface || "full", scenes, activeSceneId: scenes[0].id,
-      noteBlocks: [data.notes || ""], title: title || "", duration: "", dimensions: data.dimensions || "",
+      title: title || "", duration: srcPh ? (srcPh.duration || "") : "", dimensions: data.dimensions || "",
+      objective: srcPh ? (srcPh.objective || "") : "",
+      load: srcPh ? (srcPh.load || "") : "",
+      loadColor: srcPh ? (srcPh.loadColor || DEFAULT_LOAD_COLOR) : DEFAULT_LOAD_COLOR,
+      // prefer the source phase's own structured blocks (title + separate
+      // lines each) over the flat search/preview "notes" string, which
+      // has already lost that structure — falling back to it only for a
+      // drill saved before Block Information existed at all
+      infoBlocks: srcPh && srcPh.infoBlocks
+        ? srcPh.infoBlocks.map(b => ({...b, id: nextId++}))
+        : (data.notes ? [{ id: nextId++, enabled: true, title: "", lines: [data.notes], placeholder: "Notes" }] : defaultInfoBlocks()),
       libraryDrillId: id
     };
     saveActivePhase();
