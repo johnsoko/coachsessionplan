@@ -1537,7 +1537,10 @@
               </div>
               <span class="tp-label">Badge</span>
               <div class="tp-badge-row">
-                <span style="font-size:12.5px; color:var(--ink-soft);">Show badge on the field</span>
+                <div class="tp-toggle-row" data-team="light">
+                  <button data-mode="number">#</button>
+                  <button data-mode="position">Pos</button>
+                </div>
                 <button class="tp-eye-toggle" data-team="light" title="Show/hide badge on the field"></button>
               </div>
               <p class="tp-hint">Double-click a player to edit its number, name, color, and more.</p>
@@ -1846,14 +1849,6 @@
           <span class="tp-label" style="margin-top:0;">Text</span>
           <div class="tp-swatch-row" id="name-modal-textcolor-row"></div>
         </div>
-      </div>
-      <span class="tp-label">Badge</span>
-      <div class="tp-badge-row">
-        <div class="tp-toggle-row" id="name-modal-badge-toggle">
-          <button data-mode="number">#</button>
-          <button data-mode="position">Pos</button>
-        </div>
-        <button class="tp-eye-toggle" id="name-modal-eye-toggle" title="Show/hide badge on the field"></button>
       </div>
       <span class="tp-label">Highlight</span>
       <div class="tp-toggle-row" id="name-modal-highlight-toggle">
@@ -6662,12 +6657,6 @@ function openNameModal(id) {
   const input = document.getElementById("name-modal-input");
   input.value = t.name || "";
   document.getElementById("name-modal-number").value = t.num;
-  const mode = t.labelMode || "number";
-  document.querySelectorAll("#name-modal-badge-toggle button").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
-  const eyeBtn = document.getElementById("name-modal-eye-toggle");
-  eyeBtn.classList.toggle("badge-hidden", !!t.badgeHidden);
-  eyeBtn.innerHTML = t.badgeHidden ? EYE_HIDDEN_ICON : EYE_VISIBLE_ICON;
-  eyeBtn.title = t.badgeHidden ? "Show badge on the field" : "Hide badge on the field";
   document.querySelectorAll("#name-modal-color-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === t.color));
   const textColor = t.badgeTextColor || textColorFor(t.color);
   document.querySelectorAll("#name-modal-textcolor-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === textColor));
@@ -6691,9 +6680,6 @@ function saveNameModal() {
     const val = document.getElementById("name-modal-input").value.trim();
     const numRaw = parseInt(document.getElementById("name-modal-number").value, 10);
     const num = Number.isFinite(numRaw) ? Math.max(1, Math.min(99, numRaw)) : t.num;
-    const activeBadgeBtn = document.querySelector("#name-modal-badge-toggle button.active");
-    const mode = activeBadgeBtn ? activeBadgeBtn.dataset.mode : (t.labelMode || "number");
-    const badgeHidden = document.getElementById("name-modal-eye-toggle").classList.contains("badge-hidden");
     const colorSwatch = document.querySelector("#name-modal-color-row .tp-swatch.active");
     const color = colorSwatch ? colorSwatch.dataset.color : t.color;
     const textSwatch = document.querySelector("#name-modal-textcolor-row .tp-swatch.active");
@@ -6702,15 +6688,13 @@ function saveNameModal() {
     const highlighted = activeHighlightBtn ? activeHighlightBtn.dataset.highlight === "1" : !!t.highlighted;
     const opacityRaw = parseInt(document.getElementById("name-modal-opacity").value, 10);
     const opacity = Number.isFinite(opacityRaw) ? opacityRaw : (t.opacity != null ? t.opacity : 100);
-    const changed = val !== (t.name || "") || num !== t.num || mode !== (t.labelMode || "number") ||
-      badgeHidden !== !!t.badgeHidden || color !== t.color || badgeTextColor !== t.badgeTextColor ||
+    const changed = val !== (t.name || "") || num !== t.num ||
+      color !== t.color || badgeTextColor !== t.badgeTextColor ||
       highlighted !== !!t.highlighted || opacity !== (t.opacity != null ? t.opacity : 100);
     if (changed) {
       pushHistory();
       t.name = val;
       t.num = num;
-      t.labelMode = mode;
-      t.badgeHidden = badgeHidden;
       t.color = color;
       t.badgeTextColor = badgeTextColor;
       t.highlighted = highlighted;
@@ -6741,22 +6725,10 @@ function sendTokenToBack(id) {
   renderTokens();
   renderPhaseThumbActive();
 }
-document.getElementById("name-modal-eye-toggle").addEventListener("click", () => {
-  const eyeBtn = document.getElementById("name-modal-eye-toggle");
-  const hidden = !eyeBtn.classList.contains("badge-hidden");
-  eyeBtn.classList.toggle("badge-hidden", hidden);
-  eyeBtn.innerHTML = hidden ? EYE_HIDDEN_ICON : EYE_VISIBLE_ICON;
-  eyeBtn.title = hidden ? "Show badge on the field" : "Hide badge on the field";
-});
 document.getElementById("name-modal-save").addEventListener("click", saveNameModal);
 document.getElementById("name-modal-cancel").addEventListener("click", closeNameModal);
 document.getElementById("name-modal-overlay").addEventListener("click", e => {
   if (e.target.id === "name-modal-overlay") closeNameModal();
-});
-document.querySelectorAll("#name-modal-badge-toggle button").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll("#name-modal-badge-toggle button").forEach(b => b.classList.toggle("active", b === btn));
-  });
 });
 document.querySelectorAll("#name-modal-highlight-toggle button").forEach(btn => {
   btn.addEventListener("click", () => {
