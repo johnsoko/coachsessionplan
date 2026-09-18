@@ -1829,7 +1829,7 @@
           </div>
           <div class="output-title" id="output-title">Overload to finish</div>
           <div class="output-section" id="output-description-section" style="margin-top:0; padding-top:0; border-top:none; margin-bottom:22px;">
-            <div class="output-section-label">Drill Description</div>
+            <div class="output-section-label" id="output-description-label">Drill Description</div>
             <div id="output-description-text"></div>
           </div>
           <button class="btn btn-primary" id="output-play-full-btn">
@@ -5174,6 +5174,10 @@ function renderOutputContent() {
   if (!container) return; // not on the Output view yet
 
   document.getElementById("output-description-section").style.display = outputSettings.showDescription ? "block" : "none";
+  // same field/label swap as the Details tab: "Session Overview" for a
+  // practice plan, "Drill Description" for a single standalone drill
+  const descLabel = document.getElementById("output-description-label");
+  if (descLabel) descLabel.textContent = isStandaloneDrillMode ? "Drill Description" : "Session Overview";
   const descText = document.getElementById("output-description-text");
   if (descText) {
     const blocks = (drillDescriptionBlocks || []).filter(t => t.trim());
