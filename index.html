@@ -545,6 +545,31 @@
   #draw-panel-toggle { margin: 16px 16px 0; flex-shrink: 0; }
   #animate-timeline-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   #animate-timeline-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 18px; }
+  #phase-detail-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #phase-detail-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 18px; }
+  .pd-setup-box { border: 1px solid var(--line-md); border-radius: 10px; padding: 14px; margin-bottom: 22px; }
+  .pd-setup-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+  .pd-duration-row { display: flex; align-items: center; gap: 8px; }
+  .pd-duration-row input { width: 72px; flex-shrink: 0; }
+  .pd-unit { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+  .pd-players-readout { text-align: right; }
+  .pd-players-value { font-family: var(--display); font-size: 19px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+  .pd-players-label { font-size: 11px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; }
+  .pd-load-row { display: flex; align-items: center; gap: 8px; }
+  .pd-load-row input { flex: 1; }
+  .pd-load-swatch { width: 34px; height: 34px; border-radius: 8px; border: 1.5px solid var(--line-md); flex-shrink: 0; }
+  .pd-blocks-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .pd-block { border: 1px solid var(--line-md); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .pd-block-head { display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--paper-raised); }
+  .pd-block-head input[type="checkbox"] { flex-shrink: 0; width: 16px; height: 16px; }
+  .pd-block-title { flex: 1; border: none; background: var(--paper-card); border-radius: 6px; padding: 8px 10px; font-weight: 700; font-size: 13.5px; color: var(--ink); font-family: var(--body); }
+  .pd-block-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .pd-block-actions button { width: 26px; height: 26px; border-radius: 6px; border: none; background: var(--paper-card); color: var(--ink-soft); display: flex; align-items: center; justify-content: center; }
+  .pd-block-actions button:hover { background: var(--pitch-tint); color: var(--pitch-deep); }
+  .pd-block-actions button:disabled { opacity: 0.3; cursor: default; }
+  .pd-block-actions button.pd-block-delete:hover { background: rgba(179,69,44,0.14); color: #B3452C; }
+  .pd-block-text { width: 100%; border: none; padding: 10px; font-size: 13px; font-family: var(--body); color: var(--ink); resize: vertical; min-height: 70px; }
+  .pd-block.disabled { opacity: 0.55; }
   #toolkit h3 { font-family: var(--display); font-size: 18px; font-weight: 600; margin-bottom: 16px; }
   .stub-check { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--ink-soft); margin-bottom: 22px; }
   .stub-check input { width: 15px; height: 15px; accent-color: var(--pitch); }
@@ -1446,6 +1471,12 @@
       <div id="draw-main-row">
       <div id="canvas-area">
         <div class="animate-mode-badge" id="animate-mode-badge" style="display:none;">Animate Mode</div>
+        <div class="canvas-toolbar">
+          <div class="animate-panel-toggle" id="right-panel-toggle" style="width:220px; margin-bottom:0;">
+            <button data-panel="toolkit" class="active">Toolkit</button>
+            <button data-panel="detail">Panel</button>
+          </div>
+        </div>
         <div class="canvas-inner">
           <div id="pitch-stage">
             <svg id="pitch-svg" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -1708,6 +1739,45 @@
               <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M4 2.5v9l8-4.5z" fill="currentColor"/></svg>
               Play Full
             </button>
+          </div>
+        </div>
+        <div id="phase-detail-panel" style="display:none;">
+          <div id="phase-detail-scroll">
+            <div class="notes-field" style="margin-bottom:18px;">
+              <label>Block Title</label>
+              <input type="text" class="field-input" id="pd-title" placeholder="e.g. Part 1">
+            </div>
+            <div class="pd-setup-box">
+              <div class="pd-setup-row">
+                <div>
+                  <label class="tp-label" style="margin-top:0;">Duration</label>
+                  <div class="pd-duration-row">
+                    <input type="number" class="field-input" id="pd-duration" min="0" step="5">
+                    <span class="pd-unit">min</span>
+                  </div>
+                </div>
+                <div class="pd-players-readout">
+                  <div class="pd-players-value" id="pd-players-value">–</div>
+                  <div class="pd-players-label">Players</div>
+                </div>
+              </div>
+              <label class="tp-label">Load</label>
+              <div class="pd-load-row">
+                <input type="text" class="field-input" id="pd-load" placeholder="Optional">
+                <button class="pd-load-swatch" id="pd-load-swatch" title="Load color"></button>
+                <input type="color" id="pd-load-color-input" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;">
+              </div>
+            </div>
+            <div class="notes-field">
+              <label>Practice Overview / Objective</label>
+              <textarea class="field-input" id="pd-objective" rows="3" placeholder="Concise summary shown on Session Overview"></textarea>
+            </div>
+            <div class="notes-divider" style="margin:22px 0;"></div>
+            <div class="pd-blocks-header">
+              <label class="tp-label" style="margin:0;">Block Information</label>
+              <button class="btn btn-ghost" id="pd-add-block">Add Information</button>
+            </div>
+            <div id="pd-blocks-list"></div>
           </div>
         </div>
       </div>
@@ -4559,6 +4629,15 @@ function newSceneObj(contentSrc) {
 }
 // contentSrc here is a whole PHASE to copy the active scene's content
 // from (or null for blank); surfaceSrc always supplies the field type
+const DEFAULT_LOAD_COLOR = "#3B6FB6";
+// two blocks every phase starts with — title is left blank so the coach's
+// own wording shows through, with the label itself as a placeholder hint
+function defaultInfoBlocks() {
+  return [
+    { id: nextId++, enabled: true, title: "", text: "", placeholder: "Organisation" },
+    { id: nextId++, enabled: true, title: "", text: "", placeholder: "Coaching Points" }
+  ];
+}
 function newPhaseObj(contentSrc, surfaceSrc) {
   // Clone copies just the drill setup (always Scene 1 specifically, never
   // whichever scene happened to be active) as a fresh single-scene phase
@@ -4569,7 +4648,11 @@ function newPhaseObj(contentSrc, surfaceSrc) {
   return {
     id: phaseNextId++, surface: surfaceSrc || "full", scenes: [scene], activeSceneId: scene.id,
     noteBlocks: [""], title: contentSrc ? (contentSrc.title || "") : "", duration: contentSrc ? (contentSrc.duration || "") : "",
-    dimensions: contentSrc ? (contentSrc.dimensions || "") : ""
+    dimensions: contentSrc ? (contentSrc.dimensions || "") : "",
+    objective: contentSrc ? (contentSrc.objective || "") : "",
+    load: contentSrc ? (contentSrc.load || "") : "",
+    loadColor: contentSrc ? (contentSrc.loadColor || DEFAULT_LOAD_COLOR) : DEFAULT_LOAD_COLOR,
+    infoBlocks: contentSrc && contentSrc.infoBlocks ? contentSrc.infoBlocks.map(b => ({...b, id: nextId++})) : defaultInfoBlocks()
   };
 }
 function saveActiveScene() {
@@ -4664,9 +4747,11 @@ function loadPhase(id) {
   applySurface(ph.surface || "full");
   renderTokens(); renderShapes();
   renderPhaseList();
-  // safe to call even outside Animate mode — these elements just sit
-  // hidden until that view is shown, so this keeps it ready either way
+  // safe to call even outside Animate mode/Panel view — these elements
+  // just sit hidden until that view is shown, so this keeps them ready
+  // either way rather than only refreshing on-demand when switched to
   if (typeof refreshAnimatePanel === "function") refreshAnimatePanel();
+  if (typeof renderPhaseDetailPanel === "function") renderPhaseDetailPanel();
 }
 // cloneCurrent true = Clone (copies the active scene's content too);
 // false = Next (blank single scene, but keeps the current field type)
@@ -5951,6 +6036,176 @@ function refreshAnimatePanel() {
   updatePlaybackUIVisibility();
 }
 
+/* ─────────────────────────────────────────────────────────
+   PHASE DETAIL PANEL — the right toolkit's "Panel" view.
+   A focused editor for the active phase's own metadata (title,
+   duration, load, objective) plus a reorderable set of titled
+   free-text blocks (Organisation, Coaching Points, etc.),
+   separate from the Details tab's plain per-phase notes.
+───────────────────────────────────────────────────────── */
+let rightPanelMode = "toolkit"; // "toolkit" | "detail"
+function ensurePhaseDetailFields(ph) {
+  if (ph.objective == null) ph.objective = "";
+  if (ph.load == null) ph.load = "";
+  if (!ph.loadColor) ph.loadColor = DEFAULT_LOAD_COLOR;
+  if (!ph.infoBlocks || !ph.infoBlocks.length) ph.infoBlocks = defaultInfoBlocks();
+}
+// "4 + 2 GK" style readout — outfield player count, plus goalkeepers
+// counted separately, based on the phase's own currently active scene
+function computePlayersReadout(ph) {
+  const sc = ph.scenes.find(s => s.id === ph.activeSceneId) || ph.scenes[0];
+  if (!sc) return "–";
+  const players = sc.tokens.filter(t => t.type === "player");
+  if (!players.length) return "–";
+  const gk = players.filter(t => t.pos === "GK").length;
+  const outfield = players.length - gk;
+  return gk ? `${outfield} + ${gk} GK` : String(outfield);
+}
+function renderPhaseDetailPanel() {
+  const panel = document.getElementById("phase-detail-panel");
+  if (!panel) return;
+  const ph = phases.find(p => p.id === activePhaseId);
+  if (!ph) return;
+  ensurePhaseDetailFields(ph);
+  document.getElementById("pd-title").value = ph.title || "";
+  document.getElementById("pd-duration").value = ph.duration || "";
+  document.getElementById("pd-players-value").textContent = computePlayersReadout(ph);
+  document.getElementById("pd-load").value = ph.load || "";
+  document.getElementById("pd-load-swatch").style.background = ph.loadColor;
+  document.getElementById("pd-load-color-input").value = ph.loadColor;
+  document.getElementById("pd-objective").value = ph.objective || "";
+  renderPhaseDetailBlocks(ph);
+}
+function renderPhaseDetailBlocks(ph) {
+  const list = document.getElementById("pd-blocks-list");
+  list.innerHTML = "";
+  ph.infoBlocks.forEach((block, idx) => {
+    const card = document.createElement("div");
+    card.className = "pd-block" + (block.enabled === false ? " disabled" : "");
+
+    const head = document.createElement("div");
+    head.className = "pd-block-head";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = block.enabled !== false;
+    checkbox.title = "Include this block";
+    checkbox.addEventListener("change", () => {
+      block.enabled = checkbox.checked;
+      card.classList.toggle("disabled", !checkbox.checked);
+    });
+
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.className = "pd-block-title";
+    titleInput.placeholder = block.placeholder || "Block title";
+    titleInput.value = block.title || "";
+    titleInput.addEventListener("input", () => { block.title = titleInput.value; });
+
+    const actions = document.createElement("div");
+    actions.className = "pd-block-actions";
+    const upBtn = document.createElement("button");
+    upBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M3.5 8.5L7 5l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    upBtn.title = "Move up";
+    upBtn.disabled = idx === 0;
+    upBtn.addEventListener("click", () => {
+      [ph.infoBlocks[idx - 1], ph.infoBlocks[idx]] = [ph.infoBlocks[idx], ph.infoBlocks[idx - 1]];
+      renderPhaseDetailBlocks(ph);
+    });
+    const downBtn = document.createElement("button");
+    downBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M3.5 5.5L7 9l3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    downBtn.title = "Move down";
+    downBtn.disabled = idx === ph.infoBlocks.length - 1;
+    downBtn.addEventListener("click", () => {
+      [ph.infoBlocks[idx], ph.infoBlocks[idx + 1]] = [ph.infoBlocks[idx + 1], ph.infoBlocks[idx]];
+      renderPhaseDetailBlocks(ph);
+    });
+    const delBtn = document.createElement("button");
+    delBtn.className = "pd-block-delete";
+    delBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+    delBtn.title = "Delete block";
+    delBtn.addEventListener("click", () => {
+      ph.infoBlocks.splice(idx, 1);
+      renderPhaseDetailBlocks(ph);
+    });
+    actions.appendChild(upBtn); actions.appendChild(downBtn); actions.appendChild(delBtn);
+
+    head.appendChild(checkbox); head.appendChild(titleInput); head.appendChild(actions);
+
+    const textarea = document.createElement("textarea");
+    textarea.className = "pd-block-text field-input";
+    textarea.rows = 3;
+    textarea.value = block.text || "";
+    textarea.placeholder = "Write notes here…";
+    textarea.addEventListener("input", () => { block.text = textarea.value; });
+
+    card.appendChild(head);
+    card.appendChild(textarea);
+    list.appendChild(card);
+  });
+}
+document.getElementById("pd-title").addEventListener("input", e => {
+  const ph = phases.find(p => p.id === activePhaseId);
+  if (!ph) return;
+  ph.title = e.target.value;
+  renderPhaseThumbActive();
+});
+document.getElementById("pd-duration").addEventListener("input", e => {
+  const ph = phases.find(p => p.id === activePhaseId);
+  if (!ph) return;
+  ph.duration = e.target.value;
+});
+document.getElementById("pd-load").addEventListener("input", e => {
+  const ph = phases.find(p => p.id === activePhaseId);
+  if (!ph) return;
+  ph.load = e.target.value;
+});
+document.getElementById("pd-load-swatch").addEventListener("click", () => {
+  document.getElementById("pd-load-color-input").click();
+});
+document.getElementById("pd-load-color-input").addEventListener("input", e => {
+  const ph = phases.find(p => p.id === activePhaseId);
+  if (!ph) return;
+  ph.loadColor = e.target.value;
+  document.getElementById("pd-load-swatch").style.background = e.target.value;
+});
+document.getElementById("pd-objective").addEventListener("input", e => {
+  const ph = phases.find(p => p.id === activePhaseId);
+  if (!ph) return;
+  ph.objective = e.target.value;
+});
+document.getElementById("pd-add-block").addEventListener("click", () => {
+  const ph = phases.find(p => p.id === activePhaseId);
+  if (!ph) return;
+  ensurePhaseDetailFields(ph);
+  ph.infoBlocks.push({ id: nextId++, enabled: true, title: "", text: "", placeholder: "Block title" });
+  renderPhaseDetailBlocks(ph);
+});
+// mirrors the Toolkit/Animate toggle this panel is modeled on: swaps
+// which content the shared right column shows without touching the
+// top-level Create/Animate mode itself. Selecting Panel shows the phase
+// detail editor no matter which of those two modes is currently active;
+// selecting Toolkit restores whichever content that mode normally shows.
+document.getElementById("right-panel-toggle").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-panel]");
+  if (!btn) return;
+  rightPanelMode = btn.dataset.panel;
+  document.querySelectorAll("#right-panel-toggle button").forEach(b => b.classList.toggle("active", b === btn));
+  applyRightPanelContent();
+  if (rightPanelMode === "detail") renderPhaseDetailPanel();
+});
+// centralizes which of the three right-column contents is visible —
+// called on mode switch and on toggling Toolkit/Panel, so the two
+// independent axes (Create/Animate mode, Toolkit/Panel toggle) never
+// fight over which one last set display directly
+function applyRightPanelContent() {
+  const isAnimate = currentMode === "animate";
+  const showDetail = rightPanelMode === "detail";
+  document.getElementById("draw-tools-content").style.display = (!showDetail && !isAnimate) ? "block" : "none";
+  document.getElementById("animate-timeline-panel").style.display = (!showDetail && isAnimate) ? "flex" : "none";
+  document.getElementById("phase-detail-panel").style.display = showDetail ? "flex" : "none";
+}
+
 /* ── playback engine ── */
 function easeInOut(t) { return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2; }
 function setAnimateProgress(pct) {
@@ -6454,8 +6709,8 @@ function switchMode(mode) {
     if (el) el.style.display = (m === mode || (m === "draw" && mode === "animate")) ? "flex" : "none";
   });
   const isAnimate = mode === "animate";
-  document.getElementById("draw-tools-content").style.display = isAnimate ? "none" : "block";
-  document.getElementById("animate-timeline-panel").style.display = isAnimate ? "flex" : "none";
+  applyRightPanelContent();
+  if (rightPanelMode === "detail") renderPhaseDetailPanel();
   // phase management (Next/Clone/Mirror/Import) stays a Create-only set of
   // tools — Animate's left panel is just for browsing/selecting phases
   document.querySelector(".phase-actions").classList.toggle("phase-actions-hidden", isAnimate);
