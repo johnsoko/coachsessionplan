@@ -5587,7 +5587,7 @@ async function playFullAnimationModal() {
 
   for (let i = 0; i < phases.length && !isDone(); i++) {
     const ph = phases[i];
-    label.textContent = phaseNoun() + " " + (i + 1) + " of " + phases.length;
+    label.textContent = phaseDisplayTitle(ph, i) + " (" + (i + 1) + " of " + phases.length + ")";
     setStageRatio(ph);
     if (showTitles) {
       renderTitleSlide(ph, i);
@@ -6096,7 +6096,7 @@ function renderNoteBlocks(blocks, wrap) {
 function refreshAnimatePanel() {
   const ph = phases.find(p => p.id === activePhaseId);
   const idx = phases.findIndex(p => p.id === activePhaseId);
-  document.getElementById("animate-phase-title").textContent = phaseNoun() + " " + (idx + 1);
+  document.getElementById("animate-phase-title").textContent = (ph && (ph.title || "").trim()) || (phaseNoun() + " " + (idx + 1));
   renderSceneTimeline();
   renderAnimateOutputPhaseLists();
   setAnimateProgress(0);
