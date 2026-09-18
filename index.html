@@ -344,6 +344,10 @@
     border-color: var(--line-md);
     box-shadow: 0 10px 22px -14px rgba(27,33,28,0.25);
   }
+  /* Field lists every surface at once rather than paging — taller and
+     scrollable so all options stay reachable instead of getting clipped */
+  #field-popover.open { max-height: 360px; overflow-y: auto; }
+  #field-popover .tk-btn { flex-shrink: 0; }
   .arrow-opt { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
   .shape-kind-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 4px; }
   .shape-kind-row .arrow-opt { justify-content: center; padding: 8px 4px; border: 1px solid var(--line); border-radius: 8px; }
@@ -1442,17 +1446,6 @@
       <div id="draw-main-row">
       <div id="canvas-area">
         <div class="animate-mode-badge" id="animate-mode-badge" style="display:none;">Animate Mode</div>
-        <div class="canvas-toolbar">
-          <div class="surface-pager">
-            <button class="surface-page-arrow" id="surface-page-prev" title="Previous options">
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M9 3.5L5 7.5l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-            <div class="surface-toggle" id="surface-toggle"></div>
-            <button class="surface-page-arrow" id="surface-page-next" title="More options">
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M6 3.5l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-          </div>
-        </div>
         <div class="canvas-inner">
           <div id="pitch-stage">
             <svg id="pitch-svg" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -1580,6 +1573,17 @@
               </label>
               <div class="formation-grid" id="formation-grid"></div>
             </div>
+          </div>
+        </div>
+
+        <div class="tk-section-label" id="tk-sec-field">Add Field</div>
+        <div class="tk-stack">
+          <div style="position:relative;">
+            <button class="tk-btn" data-tool="field" id="field-tool" style="width:100%;">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2.5" y="3" width="13" height="12" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M9 3v12M2.5 9h13" stroke="currentColor" stroke-width="1.2"/></svg>
+              Field
+            </button>
+            <div class="team-popover" id="field-popover"></div>
           </div>
         </div>
 
@@ -2280,25 +2284,14 @@ const SURFACE_LIST = [
   { key: "sixgrid", label: "6 Grid" },
   { key: "blank", label: "Blank" }
 ];
-const SURFACE_PAGE_SIZE = 4;
-let surfacePage = 0;
-function renderSurfacePage(direction) {
-  const totalPages = Math.ceil(SURFACE_LIST.length / SURFACE_PAGE_SIZE);
-  surfacePage = Math.max(0, Math.min(surfacePage, totalPages - 1));
-  const start = surfacePage * SURFACE_PAGE_SIZE;
-  const pageItems = SURFACE_LIST.slice(start, start + SURFACE_PAGE_SIZE);
-  const container = document.getElementById("surface-toggle");
-  container.innerHTML = pageItems
-    .map(s => `<button data-surface="${s.key}" class="${s.key === surface ? "active" : ""}">${s.label}</button>`)
+// lists every surface as a single scrollable panel now that Field has its
+// own toolkit popover, rather than paging four at a time above the canvas
+function renderFieldPopover() {
+  const container = document.getElementById("field-popover");
+  container.innerHTML = SURFACE_LIST
+    .map(s => `<button class="tk-btn" data-surface="${s.key}" style="width:100%;">${s.label}</button>`)
     .join("");
-  container.classList.remove("slide-next", "slide-prev");
-  if (direction) {
-    // force a reflow so the class re-triggers even if it was just removed
-    void container.offsetWidth;
-    container.classList.add(direction === "next" ? "slide-next" : "slide-prev");
-  }
-  document.getElementById("surface-page-prev").disabled = surfacePage === 0;
-  document.getElementById("surface-page-next").disabled = surfacePage >= totalPages - 1;
+  container.querySelectorAll("button[data-surface]").forEach(b => b.classList.toggle("active", b.dataset.surface === surface));
 }
 // swaps x/y for a token or shape — used when switching between a
 // horizontal and vertical surface so existing placements rotate with it
@@ -2325,12 +2318,7 @@ function applySurface(name) {
   const svg = document.getElementById("pitch-svg");
   svg.setAttribute("viewBox", s.viewBox);
   svg.innerHTML = STRIPES_DEFS + s.markup;
-  // jump the pager to whichever page this surface lives on, so switching
-  // to a phase using a surface from a different page shows it correctly
-  // highlighted rather than leaving the pager on wherever it last was
-  const idx = SURFACE_LIST.findIndex(sf => sf.key === name);
-  if (idx !== -1) surfacePage = Math.floor(idx / SURFACE_PAGE_SIZE);
-  renderSurfacePage();
+  renderFieldPopover();
   requestAnimationFrame(resizeCanvas);
 }
 
@@ -2492,16 +2480,17 @@ const TOOL_POPOVER_IDS = { arrow: "arrow-popover", player: "player-popover", equ
 document.querySelectorAll(".tk-btn[data-tool]").forEach(btn => {
   btn.addEventListener("click", e => {
     const tool = btn.dataset.tool;
-    // Formations isn't a canvas placement tool — it's just a panel of
-    // one-off actions — so it toggles its panel directly rather than
-    // going through setTool() (which would arm a (nonexistent) "formations"
-    // tool for clicks on the pitch)
-    if (tool === "formations") {
-      const popover = document.getElementById("formations-popover");
+    // Formations and Field aren't canvas placement tools — they're just
+    // panels of one-off actions — so they toggle their panel directly
+    // rather than going through setTool() (which would arm a (nonexistent)
+    // "formations"/"field" tool for clicks on the pitch)
+    if (tool === "formations" || tool === "field") {
+      const popoverId = tool + "-popover";
+      const popover = document.getElementById(popoverId);
       const wasOpen = popover.classList.contains("open");
       closeAllPopovers();
       btn.classList.toggle("active", !wasOpen);
-      if (!wasOpen) { popover.classList.add("open"); focusOpenPanel("formations-popover"); }
+      if (!wasOpen) { popover.classList.add("open"); focusOpenPanel(popoverId); }
       return;
     }
     const popoverId = TOOL_POPOVER_IDS[tool];
@@ -2528,15 +2517,15 @@ document.addEventListener("click", e => {
   // only clicking elsewhere in the app (outside the toolkit and the canvas)
   // should. Panels close via the rules in setTool/showPopoverForToken etc.
   if (!e.target.closest(".tk-btn") && !e.target.closest(".arrow-popover") && !e.target.closest(".team-popover") && !e.target.closest("#pitch-stage") && !e.target.closest("#objects-list")) closeAllPopovers();
-  // clicking the empty space around the field (not the field itself, and
-  // not the surface picker) means the user's done with whatever tool was
-  // armed — jump back to Select so they don't have to go find that button
-  if (e.target.closest("#canvas-area") && !e.target.closest("#pitch-stage") && !e.target.closest(".canvas-toolbar") && currentTool !== "select") {
+  // clicking the empty space around the field (not the field itself) means
+  // the user's done with whatever tool was armed — jump back to Select so
+  // they don't have to go find that button
+  if (e.target.closest("#canvas-area") && !e.target.closest("#pitch-stage") && currentTool !== "select") {
     setTool("select");
   }
 });
 
-document.getElementById("surface-toggle").addEventListener("click", e => {
+document.getElementById("field-popover").addEventListener("click", e => {
   const btn = e.target.closest("button[data-surface]");
   if (!btn) return;
   const newSurface = btn.dataset.surface;
@@ -2560,8 +2549,6 @@ document.getElementById("surface-toggle").addEventListener("click", e => {
   saveActivePhase();
   renderPhaseThumbActive();
 });
-document.getElementById("surface-page-prev").addEventListener("click", () => { surfacePage--; renderSurfacePage("prev"); });
-document.getElementById("surface-page-next").addEventListener("click", () => { surfacePage++; renderSurfacePage("next"); });
 
 /* ─────────────────────────────────────────────────────────
    PITCH STAGE — coordinate helpers
@@ -3220,7 +3207,7 @@ function hideTokenToolbar() {}
 function hideToolbars() {}
 
 function closeAllPopovers() {
-  ["arrow-popover", "player-popover", "equipment-popover", "shape-popover", "text-popover", "ball-popover", "formations-popover"].forEach(id => {
+  ["arrow-popover", "player-popover", "equipment-popover", "shape-popover", "text-popover", "ball-popover", "formations-popover", "field-popover"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.remove("open");
   });
