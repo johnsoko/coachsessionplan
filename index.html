@@ -7312,7 +7312,10 @@ function phaseInfoBlocksText(ph) {
     .trim();
 }
 function loadAppState(data) {
-  if (data.title != null) document.getElementById("title-input").value = data.title;
+  if (data.title != null) {
+    document.getElementById("title-input").value = data.title;
+    document.getElementById("notes-title-input").value = data.title;
+  }
   if (Array.isArray(data.phases) && data.phases.length) phases = data.phases;
   if (data.phaseNextId) phaseNextId = data.phaseNextId;
   if (data.sceneNextId) sceneNextId = data.sceneNextId;
