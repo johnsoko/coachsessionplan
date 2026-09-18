@@ -5198,11 +5198,11 @@ function renderOutputContent() {
     })() : null;
 
     const notes = outputSettings.showPhaseNotes ? (() => {
-      const blocks = (ph.noteBlocks || []).filter(t => t.trim());
+      const blocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (b.text || "").trim());
       const n = document.createElement("div");
       n.className = "output-phase-notes";
       n.innerHTML = blocks.length
-        ? `<ul class="output-bullet-list">${blocks.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`
+        ? `<ul class="output-bullet-list">${blocks.map(b => `<li>${b.title ? `<strong>${escapeHtml(b.title)}:</strong> ` : ""}${escapeHtml(b.text)}</li>`).join("")}</ul>`
         : `<p class="output-empty">No notes for this phase.</p>`;
       return n;
     })() : null;
@@ -5862,19 +5862,15 @@ function renderPhaseNotes() {
     exerciseWrap.appendChild(dimensionsInput);
     exerciseWrap.appendChild(thumb);
 
-    const notesWrap = document.createElement("div");
-    notesWrap.className = "phase-note-notes note-blocks";
-    renderNoteBlocks(ph.noteBlocks, notesWrap);
-
     // Panel's Block Information (Organisation, Coaching Points, etc.) is
     // the same ph.infoBlocks data the Panel view edits — rendering it
     // fresh here means any block added, retitled, or edited there shows
     // up here automatically the next time Details is viewed, with no
     // separate copy to keep in sync. Editing here writes back to the
-    // very same block objects, so it flows both ways.
+    // very same block objects, so it flows both ways. This replaces the
+    // old freeform notes text area now that blocks cover that need.
     const notesCol = document.createElement("div");
     notesCol.className = "phase-note-notes-col";
-    notesCol.appendChild(notesWrap);
     if (ph.infoBlocks && ph.infoBlocks.length) {
       const infoWrap = document.createElement("div");
       infoWrap.className = "phase-note-infoblocks";
@@ -5894,6 +5890,12 @@ function renderPhaseNotes() {
         infoWrap.appendChild(row);
       });
       if (infoWrap.children.length) notesCol.appendChild(infoWrap);
+    }
+    if (!notesCol.children.length) {
+      const empty = document.createElement("p");
+      empty.style.cssText = "margin:0; color:var(--ink-faint); font-style:italic; font-size:12.5px;";
+      empty.textContent = "No block information yet — add some from the Panel in Create.";
+      notesCol.appendChild(empty);
     }
 
     const actions = document.createElement("div");
@@ -7272,14 +7274,41 @@ function migrateLegacyDribbleShapes(ph) {
     });
   });
 }
+// phase notes used to be a plain freeform text list (noteBlocks) before
+// the Panel's titled Block Information blocks replaced that UI. A phase
+// saved with real noteBlocks content before that change still has it
+// sitting there, invisible now that nothing reads or edits noteBlocks
+// anymore — this carries it forward into a normal info block (titled
+// "Notes") the one time a phase is loaded, so nothing written is lost,
+// then clears the old field so it isn't migrated again on a later load.
+function migrateLegacyNoteBlocks(ph) {
+  const text = (ph.noteBlocks || []).filter(t => (t || "").trim()).join(" ").trim();
+  if (!text) return;
+  if (!ph.infoBlocks) ph.infoBlocks = [];
+  ph.infoBlocks.push({ id: nextId++, enabled: true, title: "Notes", text, placeholder: "Notes" });
+  ph.noteBlocks = [""];
+}
+// combined plain-text summary of a phase's enabled Block Information —
+// for the handful of places that need a single flat "notes" string
+// (search snippets, drill library exports, older single-field Notes
+// displays) rather than the structured title+text list the Panel and
+// Details actually show
+function phaseInfoBlocksText(ph) {
+  return (ph.infoBlocks || [])
+    .filter(b => b.enabled !== false && ((b.title || "").trim() || (b.text || "").trim()))
+    .map(b => (b.title ? b.title + ": " : "") + (b.text || ""))
+    .join(" ")
+    .trim();
+}
 function loadAppState(data) {
   if (data.title != null) document.getElementById("title-input").value = data.title;
   if (Array.isArray(data.phases) && data.phases.length) phases = data.phases;
-  phases.forEach(repairPhaseSceneIdContinuity);
-  phases.forEach(migrateLegacyDribbleShapes);
   if (data.phaseNextId) phaseNextId = data.phaseNextId;
   if (data.sceneNextId) sceneNextId = data.sceneNextId;
   if (data.nextId) nextId = data.nextId;
+  phases.forEach(repairPhaseSceneIdContinuity);
+  phases.forEach(migrateLegacyDribbleShapes);
+  phases.forEach(migrateLegacyNoteBlocks);
   if (Array.isArray(data.drillDescriptionBlocks)) drillDescriptionBlocks = data.drillDescriptionBlocks;
   if (data.outputSettings) Object.assign(outputSettings, data.outputSettings);
   if (Array.isArray(data.sessionClips)) sessionClips = data.sessionClips;
@@ -7486,7 +7515,7 @@ async function saveStandaloneDrill() {
       // new. The full multi-phase drill — everything actually needed to
       // reopen and keep editing it — lives in `phases` below.
       surface: ph.surface, scenes: ph.scenes,
-      notes: (ph.noteBlocks || []).filter(t => t.trim()).join(" "),
+      notes: phaseInfoBlocksText(ph),
       description: (drillDescriptionBlocks || []).filter(t => t.trim()).join(" "),
       dimensions: ph.dimensions || "",
       tags: getTags(), creatorName,
@@ -7569,7 +7598,7 @@ async function syncPhasesToLibrary() {
   const headers = { "content-type": "application/json" };
   if (token) headers["authorization"] = "Bearer " + token;
   for (const ph of toSync) {
-    const notes = (ph.noteBlocks || []).filter(t => t.trim()).join(" ");
+    const notes = phaseInfoBlocksText(ph);
     const description = (drillDescriptionBlocks || []).filter(t => t.trim()).join(" ");
     const creatorName = (typeof Clerk !== "undefined" && Clerk.user)
       ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
@@ -8082,6 +8111,7 @@ async function openStandaloneDrillEditorExisting(id) {
       phaseNextId = data.phaseNextId || (maxPhaseId + 1);
       sceneNextId = data.sceneNextId || (maxSceneId + 1);
       nextId = data.nextId || (maxTokenShapeId + 1);
+      phases.forEach(migrateLegacyNoteBlocks);
     } else {
       // legacy single-phase drill (saved before multi-phase support) —
       // preserve the original token/shape ids across scenes — the tween
@@ -8108,6 +8138,7 @@ async function openStandaloneDrillEditorExisting(id) {
       };
       repairPhaseSceneIdContinuity(ph); // in case this specific drill was saved with the id-mismatch corruption before the underlying bug was fixed
       migrateLegacyDribbleShapes(ph);
+      migrateLegacyNoteBlocks(ph);
       phases = [ph];
     }
     sessionClips = Array.isArray(data.clips) ? data.clips : [];
@@ -8338,7 +8369,7 @@ async function openLibraryDrillDetail(id) {
       // exactly one phase (or a legacy drill with no phases array at all)
       // — same simple layout as before: one large preview near the top,
       // Notes as its own separate section underneath, no phase label
-      const ph = (Array.isArray(d.phases) && d.phases.length) ? d.phases[0] : { surface: d.surface, scenes: d.scenes, noteBlocks: [d.notes || ""] };
+      const ph = (Array.isArray(d.phases) && d.phases.length) ? d.phases[0] : { surface: d.surface, scenes: d.scenes, infoBlocks: d.notes ? [{ enabled: true, title: "", text: d.notes }] : [] };
       const thumbWrap = document.createElement("div");
       thumbWrap.className = "lib-detail-thumb";
       thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, scenes: ph.scenes }, "lib-detail-thumb-inner"));
@@ -8347,7 +8378,7 @@ async function openLibraryDrillDetail(id) {
       notesLabel.textContent = "Notes";
       const notesBody = document.createElement("div");
       notesBody.className = "lib-detail-desc";
-      const notesText = (ph.noteBlocks || []).filter(t => t.trim()).join(" ");
+      const notesText = phaseInfoBlocksText(ph);
       notesBody.textContent = notesText || "No notes yet.";
       phasesEl.appendChild(thumbWrap);
       phasesEl.appendChild(notesLabel);
@@ -8368,7 +8399,7 @@ async function openLibraryDrillDetail(id) {
         thumbWrap.className = "lib-detail-thumb";
         thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, scenes: ph.scenes }, "lib-detail-thumb-inner"));
         block.appendChild(thumbWrap);
-        const notesBlocks = (ph.noteBlocks || []).filter(t => t.trim());
+        const notesBlocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (b.text || "").trim());
         const notesLabel = document.createElement("div");
         notesLabel.className = "lib-detail-label";
         notesLabel.textContent = "Notes";
@@ -8376,7 +8407,7 @@ async function openLibraryDrillDetail(id) {
         const notesBody = document.createElement("div");
         notesBody.className = "output-phase-notes lib-detail-desc";
         notesBody.innerHTML = notesBlocks.length
-          ? `<ul class="output-bullet-list">${notesBlocks.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`
+          ? `<ul class="output-bullet-list">${notesBlocks.map(b => `<li>${b.title ? `<strong>${escapeHtml(b.title)}:</strong> ` : ""}${escapeHtml(b.text)}</li>`).join("")}</ul>`
           : `<p class="output-empty">No notes yet.</p>`;
         block.appendChild(notesLabel);
         block.appendChild(notesBody);
