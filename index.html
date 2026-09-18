@@ -1877,7 +1877,7 @@
         <div class="notes-divider"></div>
 
         <div class="notes-field">
-          <label>Drill Description</label>
+          <label id="drill-description-label">Drill Description</label>
           <div class="note-blocks" id="drill-description-blocks"></div>
         </div>
 
@@ -5979,6 +5979,11 @@ function renderDrillDescriptionBlocks() {
   if (!wrap) return;
   if (!drillDescriptionBlocks.length) drillDescriptionBlocks = [""];
   renderNoteBlocks(drillDescriptionBlocks, wrap);
+  // same field either way — just called "Session Overview" for a practice
+  // plan (covering the whole session) vs "Drill Description" for a single
+  // standalone drill, matching how phaseNoun() already renames "Phase" too
+  const label = document.getElementById("drill-description-label");
+  if (label) label.textContent = isStandaloneDrillMode ? "Drill Description" : "Session Overview";
 }
 let draggedBlock = null; // { blocks, index }
 function focusNoteBlock(wrap, idx) {
