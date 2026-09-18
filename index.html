@@ -442,7 +442,7 @@
   .phase-note-notes-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .phase-note-infoblocks { display: flex; flex-direction: column; gap: 8px; }
   .phase-note-infoblock-label { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink-faint); margin-bottom: 3px; }
-  .phase-note-infoblock-text { font-size: 12px; padding: 6px 8px; resize: vertical; min-height: 40px; width: 100%; }
+  .phase-note-infoblock-lines.note-blocks { border: none; background: transparent; padding: 0; min-height: 0; }
   .phase-clips-label { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); }
   .phase-clips-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px; }
   .phase-clip-unit { display: flex; flex-direction: column; gap: 8px; width: 420px; flex-shrink: 0; }
@@ -571,7 +571,7 @@
   .pd-block-actions button:hover { background: var(--pitch-tint); color: var(--pitch-deep); }
   .pd-block-actions button:disabled { opacity: 0.3; cursor: default; }
   .pd-block-actions button.pd-block-delete:hover { background: rgba(179,69,44,0.14); color: #B3452C; }
-  .pd-block-text { width: 100%; border: none; padding: 10px; font-size: 13px; font-family: var(--body); color: var(--ink); resize: vertical; min-height: 70px; }
+  .pd-block-lines.note-blocks { border: none; background: transparent; padding: 8px 10px; min-height: 60px; }
   .pd-block.disabled { opacity: 0.55; }
   #toolkit h3 { font-family: var(--display); font-size: 18px; font-weight: 600; margin-bottom: 16px; }
   .stub-check { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--ink-soft); margin-bottom: 22px; }
@@ -697,7 +697,6 @@
   .output-info-block { margin-bottom: 12px; }
   .output-info-block:last-child { margin-bottom: 0; }
   .output-info-block-title { font-size: 11.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 3px; }
-  .output-info-block-text { font-size: 13.5px; color: var(--ink-soft); line-height: 1.6; white-space: pre-wrap; }
   #output-phases-container.layout-rows .output-phase-block { display: flex; gap: 30px; align-items: flex-start; }
   #output-phases-container.layout-rows .output-phase-block .output-phase-thumb-wrap { width: 300px; flex-shrink: 0; margin-bottom: 0; }
   #output-phases-container.layout-rows .output-phase-block .output-phase-side { flex: 1; min-width: 0; }
@@ -4641,9 +4640,20 @@ const DEFAULT_LOAD_COLOR = "#3B6FB6";
 // own wording shows through, with the label itself as a placeholder hint
 function defaultInfoBlocks() {
   return [
-    { id: nextId++, enabled: true, title: "", text: "", placeholder: "Organisation" },
-    { id: nextId++, enabled: true, title: "", text: "", placeholder: "Coaching Points" }
+    { id: nextId++, enabled: true, title: "", lines: [""], placeholder: "Organisation" },
+    { id: nextId++, enabled: true, title: "", lines: [""], placeholder: "Coaching Points" }
   ];
+}
+// blocks saved before notes became line-by-line (like the drill
+// description editor) still have a single `text` string — split it into
+// `lines` the first time the block is touched so nothing written is lost
+function ensureBlockLines(block) {
+  if (!Array.isArray(block.lines)) {
+    const legacy = Array.isArray(block.text) ? block.text.join("\n") : (block.text || "");
+    block.lines = legacy ? legacy.split("\n") : [""];
+    delete block.text;
+  }
+  if (!block.lines.length) block.lines = [""];
 }
 function newPhaseObj(contentSrc, surfaceSrc) {
   // Clone copies just the drill setup (always Scene 1 specifically, never
@@ -5202,11 +5212,11 @@ function renderOutputContent() {
     })() : null;
 
     const notes = outputSettings.showPhaseNotes ? (() => {
-      const blocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (b.text || "").trim());
+      const blocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (Array.isArray(b.lines) ? b.lines : [b.text || ""]).some(l => (l || "").trim()));
       const n = document.createElement("div");
       n.className = "output-phase-notes";
       n.innerHTML = blocks.length
-        ? blocks.map(b => `<div class="output-info-block">${(b.title || b.placeholder) ? `<div class="output-info-block-title">${escapeHtml(b.title || b.placeholder)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
+        ? blocks.map(b => renderInfoBlockHTML(b)).join("")
         : `<p class="output-empty">No notes for this phase.</p>`;
       return n;
     })() : null;
@@ -5878,19 +5888,17 @@ function renderPhaseNotes() {
     if (ph.infoBlocks && ph.infoBlocks.length) {
       const infoWrap = document.createElement("div");
       infoWrap.className = "phase-note-infoblocks";
-      ph.infoBlocks.filter(b => b.enabled !== false && ((b.title || "").trim() || (b.text || "").trim())).forEach(block => {
+      ph.infoBlocks.forEach(b => ensureBlockLines(b));
+      ph.infoBlocks.filter(b => b.enabled !== false && ((b.title || "").trim() || b.lines.some(l => (l || "").trim()))).forEach(block => {
         const row = document.createElement("div");
         row.className = "phase-note-infoblock";
         const label = document.createElement("div");
         label.className = "phase-note-infoblock-label";
         label.textContent = block.title || block.placeholder || "Block";
-        const text = document.createElement("textarea");
-        text.className = "field-input phase-note-infoblock-text";
-        text.rows = 2;
-        text.value = block.text || "";
-        text.placeholder = "Write notes here…";
-        text.addEventListener("input", () => { block.text = text.value; });
-        row.appendChild(label); row.appendChild(text);
+        const linesWrap = document.createElement("div");
+        linesWrap.className = "phase-note-infoblock-lines note-blocks";
+        renderNoteBlocks(block.lines, linesWrap);
+        row.appendChild(label); row.appendChild(linesWrap);
         infoWrap.appendChild(row);
       });
       if (infoWrap.children.length) notesCol.appendChild(infoWrap);
@@ -6171,15 +6179,13 @@ function renderPhaseDetailBlocks(ph) {
 
     head.appendChild(checkbox); head.appendChild(titleInput); head.appendChild(actions);
 
-    const textarea = document.createElement("textarea");
-    textarea.className = "pd-block-text field-input";
-    textarea.rows = 3;
-    textarea.value = block.text || "";
-    textarea.placeholder = "Write notes here…";
-    textarea.addEventListener("input", () => { block.text = textarea.value; });
+    ensureBlockLines(block);
+    const linesWrap = document.createElement("div");
+    linesWrap.className = "pd-block-lines note-blocks";
+    renderNoteBlocks(block.lines, linesWrap);
 
     card.appendChild(head);
-    card.appendChild(textarea);
+    card.appendChild(linesWrap);
     list.appendChild(card);
   });
 }
@@ -6217,7 +6223,7 @@ document.getElementById("pd-add-block").addEventListener("click", () => {
   const ph = phases.find(p => p.id === activePhaseId);
   if (!ph) return;
   ensurePhaseDetailFields(ph);
-  ph.infoBlocks.push({ id: nextId++, enabled: true, title: "", text: "", placeholder: "Block title" });
+  ph.infoBlocks.push({ id: nextId++, enabled: true, title: "", lines: [""], placeholder: "Block title" });
   renderPhaseDetailBlocks(ph);
 });
 // mirrors the Toolkit/Animate toggle this panel is modeled on: swaps
@@ -7297,10 +7303,25 @@ function migrateLegacyNoteBlocks(ph) {
 // (search snippets, drill library exports, older single-field Notes
 // displays) rather than the structured title+text list the Panel and
 // Details actually show
+// one info block's read-only markup for Output/Library: title as a label
+// (falling back to its placeholder name), body lines as a bulleted list —
+// each line is its own bullet, matching how it's edited (one line per
+// block, like the drill description editor)
+function renderInfoBlockHTML(b) {
+  const titleLabel = b.title || b.placeholder;
+  const lines = (Array.isArray(b.lines) ? b.lines : [b.text || ""]).filter(l => (l || "").trim());
+  const titleHtml = titleLabel ? `<div class="output-info-block-title">${escapeHtml(titleLabel)}</div>` : "";
+  const bodyHtml = `<ul class="output-bullet-list">${lines.map(l => `<li>${escapeHtml(l)}</li>`).join("")}</ul>`;
+  return `<div class="output-info-block">${titleHtml}${bodyHtml}</div>`;
+}
 function phaseInfoBlocksText(ph) {
   return (ph.infoBlocks || [])
-    .filter(b => b.enabled !== false && ((b.title || "").trim() || (b.text || "").trim()))
-    .map(b => { const label = b.title || b.placeholder; return (label ? label + ": " : "") + (b.text || ""); })
+    .filter(b => b.enabled !== false && ((b.title || "").trim() || (Array.isArray(b.lines) ? b.lines : [b.text || ""]).some(l => (l || "").trim())))
+    .map(b => {
+      const label = b.title || b.placeholder;
+      const body = (Array.isArray(b.lines) ? b.lines : [b.text || ""]).filter(l => (l || "").trim()).join(" ");
+      return (label ? label + ": " : "") + body;
+    })
     .join(" ")
     .trim();
 }
@@ -8382,9 +8403,9 @@ async function openLibraryDrillDetail(id) {
       notesLabel.textContent = "Notes";
       const notesBody = document.createElement("div");
       notesBody.className = "lib-detail-desc";
-      const notesBlocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (b.text || "").trim());
+      const notesBlocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (Array.isArray(b.lines) ? b.lines : [b.text || ""]).some(l => (l || "").trim()));
       notesBody.innerHTML = notesBlocks.length
-        ? notesBlocks.map(b => `<div class="output-info-block">${(b.title || b.placeholder) ? `<div class="output-info-block-title">${escapeHtml(b.title || b.placeholder)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
+        ? notesBlocks.map(b => renderInfoBlockHTML(b)).join("")
         : `<p class="output-empty">No notes yet.</p>`;
       phasesEl.appendChild(thumbWrap);
       phasesEl.appendChild(notesLabel);
@@ -8405,7 +8426,7 @@ async function openLibraryDrillDetail(id) {
         thumbWrap.className = "lib-detail-thumb";
         thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, scenes: ph.scenes }, "lib-detail-thumb-inner"));
         block.appendChild(thumbWrap);
-        const notesBlocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (b.text || "").trim());
+        const notesBlocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (Array.isArray(b.lines) ? b.lines : [b.text || ""]).some(l => (l || "").trim()));
         const notesLabel = document.createElement("div");
         notesLabel.className = "lib-detail-label";
         notesLabel.textContent = "Notes";
@@ -8413,7 +8434,7 @@ async function openLibraryDrillDetail(id) {
         const notesBody = document.createElement("div");
         notesBody.className = "output-phase-notes lib-detail-desc";
         notesBody.innerHTML = notesBlocks.length
-          ? notesBlocks.map(b => `<div class="output-info-block">${(b.title || b.placeholder) ? `<div class="output-info-block-title">${escapeHtml(b.title || b.placeholder)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
+          ? notesBlocks.map(b => renderInfoBlockHTML(b)).join("")
           : `<p class="output-empty">No notes yet.</p>`;
         block.appendChild(notesLabel);
         block.appendChild(notesBody);
