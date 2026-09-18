@@ -361,6 +361,9 @@
   .tp-swatch { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15); }
   .tp-swatch.active { border-color: var(--bib); }
   .tp-size-row { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
+  .tp-qty-row { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
+  .tp-qty-row input[type="number"] { width: 64px; flex-shrink: 0; text-align: center; }
+  .tp-qty-row button { flex: 1; white-space: nowrap; }
   .tp-size-row input[type="range"] { flex: 1; min-width: 0; width: 100%; accent-color: var(--pitch); }
   .tp-size-val { font-size: 11px; color: var(--ink-faint); width: 26px; text-align: right; }
   .tp-toggle-row { display: flex; gap: 4px; padding: 0 2px; }
@@ -1508,13 +1511,18 @@
         <div class="tk-section-label" id="tk-sec-players">Add Players</div>
         <div class="tk-stack">
           <div style="position:relative;">
-            <button class="tk-btn" data-tool="home" id="home-tool" style="width:100%;">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1B211C"/><text x="9" y="12.3" font-family="'Barlow Condensed', sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#F7F8F3">H</text></svg>
-              Home player
+            <button class="tk-btn" data-tool="player" id="player-tool" style="width:100%;">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1B211C"/></svg>
+              Players
             </button>
-            <div class="team-popover" id="home-popover">
+            <div class="team-popover" id="player-popover">
               <span class="tp-label" style="margin-top:0;">Color</span>
               <div class="tp-swatch-row" data-team="light"></div>
+              <span class="tp-label">Quantity</span>
+              <div class="tp-qty-row">
+                <input type="number" class="field-input" id="player-qty-input" min="1" max="22" value="5">
+                <button class="btn btn-primary" id="insert-players-btn">Insert Players</button>
+              </div>
               <span class="tp-label">Size</span>
               <div class="tp-size-row">
                 <input type="range" class="tp-size" data-team="light" min="10" max="42" step="2">
@@ -1535,36 +1543,6 @@
                 <button data-shownames="1">On</button>
               </div>
               <input type="text" class="field-input tp-name-value" data-team="light" placeholder="Player name" maxlength="24" style="margin-top:6px;">
-            </div>
-          </div>
-          <div style="position:relative;">
-            <button class="tk-btn" data-tool="away" id="away-tool" style="width:100%;">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1B211C"/><text x="9" y="12.3" font-family="'Barlow Condensed', sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#F7F8F3">A</text></svg>
-              Away player
-            </button>
-            <div class="team-popover" id="away-popover">
-              <span class="tp-label" style="margin-top:0;">Color</span>
-              <div class="tp-swatch-row" data-team="dark"></div>
-              <span class="tp-label">Size</span>
-              <div class="tp-size-row">
-                <input type="range" class="tp-size" data-team="dark" min="10" max="42" step="2">
-                <span class="tp-size-val" data-team="dark"></span>
-              </div>
-              <span class="tp-label">Badge</span>
-              <div class="tp-badge-row">
-                <div class="tp-toggle-row" data-team="dark">
-                  <button data-mode="number">#</button>
-                  <button data-mode="position">Pos</button>
-                </div>
-                <button class="tp-eye-toggle" data-team="dark" title="Show/hide badge on the field"></button>
-              </div>
-              <input type="text" class="field-input tp-badge-value" data-team="dark" placeholder="Number" style="margin-top:6px;">
-              <span class="tp-label">Name label</span>
-              <div class="tp-toggle-row" id="tp-name-toggle-dark">
-                <button data-shownames="0" class="active">Off</button>
-                <button data-shownames="1">On</button>
-              </div>
-              <input type="text" class="field-input tp-name-value" data-team="dark" placeholder="Player name" maxlength="24" style="margin-top:6px;">
             </div>
           </div>
           <div style="position:relative;">
@@ -2459,8 +2437,7 @@ function setTool(tool, keepPanelOpen) {
   const hint = document.getElementById("hint-pill");
   const hints = {
     select: null,
-    home: "Click to place a home player",
-    away: "Click to place an away player",
+    player: "Set a quantity and press Insert Players",
     equipment: "Click to place equipment",
     ball: "Click to place a ball",
     arrow: "Click and drag to draw",
@@ -2491,7 +2468,7 @@ function focusOpenPanel(id) {
   el.addEventListener("transitionend", onEnd);
   setTimeout(run, 320);
 }
-const TOOL_POPOVER_IDS = { arrow: "arrow-popover", home: "home-popover", away: "away-popover", equipment: "equipment-popover", shape: "shape-popover", text: "text-popover", ball: "ball-popover" };
+const TOOL_POPOVER_IDS = { arrow: "arrow-popover", player: "player-popover", equipment: "equipment-popover", shape: "shape-popover", text: "text-popover", ball: "ball-popover" };
 document.querySelectorAll(".tk-btn[data-tool]").forEach(btn => {
   btn.addEventListener("click", e => {
     const tool = btn.dataset.tool;
@@ -2516,8 +2493,7 @@ document.querySelectorAll(".tk-btn[data-tool]").forEach(btn => {
     }
     setTool(tool);
     if (tool === "arrow") { document.getElementById("arrow-popover").classList.add("open"); syncArrowPopover(); focusOpenPanel("arrow-popover"); }
-    else if (tool === "home") { document.getElementById("home-popover").classList.add("open"); syncTeamPopover("light"); focusOpenPanel("home-popover"); }
-    else if (tool === "away") { document.getElementById("away-popover").classList.add("open"); syncTeamPopover("dark"); focusOpenPanel("away-popover"); }
+    else if (tool === "player") { document.getElementById("player-popover").classList.add("open"); syncTeamPopover("light"); focusOpenPanel("player-popover"); }
     else if (tool === "equipment") { document.getElementById("equipment-popover").classList.add("open"); syncEquipmentPopover(); focusOpenPanel("equipment-popover"); }
     else if (tool === "shape") { document.getElementById("shape-popover").classList.add("open"); syncShapePopover(); focusOpenPanel("shape-popover"); }
     else if (tool === "text") { document.getElementById("text-popover").classList.add("open"); syncTextPopover(); focusOpenPanel("text-popover"); }
@@ -2615,6 +2591,31 @@ function addToken(type, x, y, team) {
   tokens.push(t);
   renderTokens();
   return t;
+}
+// places `count` players at once in a simple centered grid — replaces the
+// old click-once-per-player placement now that a coach can just type how
+// many they want. Wraps into extra rows once a row would get too crowded,
+// spacing rows so a wrapped layout still stays roughly centered vertically.
+function insertPlayersBulk(count) {
+  count = Math.max(1, Math.min(30, Math.round(count) || 0));
+  pushHistory();
+  const maxPerRow = 8;
+  const rowSpacingX = 8; // percent units between players in a row
+  const rows = Math.ceil(count / maxPerRow);
+  const rowSpacingY = rows > 1 ? Math.min(16, 60 / (rows - 1)) : 0;
+  const startY = 50 - (rowSpacingY * (rows - 1)) / 2;
+  let placed = 0;
+  for (let r = 0; r < rows && placed < count; r++) {
+    const inThisRow = Math.min(maxPerRow, count - placed);
+    const startX = 50 - (rowSpacingX * (inThisRow - 1)) / 2;
+    for (let c = 0; c < inThisRow; c++) {
+      const x = Math.max(4, Math.min(96, startX + c * rowSpacingX));
+      const y = Math.max(6, Math.min(94, startY + r * rowSpacingY));
+      addToken("player", x, y, "light");
+      placed++;
+    }
+  }
+  renderPhaseThumbActive();
 }
 function addEquipmentToken(kind, x, y) {
   const size = equipmentSizeMemory[kind] != null ? equipmentSizeMemory[kind] : equipmentDefaults.size;
@@ -3197,7 +3198,7 @@ function hideTokenToolbar() {}
 function hideToolbars() {}
 
 function closeAllPopovers() {
-  ["arrow-popover", "home-popover", "away-popover", "equipment-popover", "shape-popover", "text-popover", "ball-popover", "formations-popover"].forEach(id => {
+  ["arrow-popover", "player-popover", "equipment-popover", "shape-popover", "text-popover", "ball-popover", "formations-popover"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.remove("open");
   });
@@ -3224,7 +3225,7 @@ function activeShapesOfKind(kinds) {
 }
 
 function syncTeamPopover(team) {
-  const matched = activeTokensForTeam(team);
+  const matched = activeTokensOfType("player");
   const t = matched[0];
   const color = t ? t.color : teamDefaults[team].color;
   const size  = t ? t.size  : teamDefaults[team].size;
@@ -3266,55 +3267,55 @@ function syncTeamPopover(team) {
 }
 function setTeamColor(team, color) {
   pushHistory();
-  const matched = activeTokensForTeam(team);
+  const matched = activeTokensOfType("player");
   if (matched.length) { matched.forEach(t => t.color = color); renderTokens(); }
   teamDefaults[team].color = color;
   syncTeamPopover(team);
 }
 function setTeamSize(team, size) {
-  const matched = activeTokensForTeam(team);
+  const matched = activeTokensOfType("player");
   if (matched.length) { matched.forEach(t => t.size = size); renderTokens(); }
   teamDefaults[team].size = size;
   syncTeamPopover(team);
 }
 function setTeamLabelMode(team, mode) {
   pushHistory();
-  const matched = activeTokensForTeam(team);
+  const matched = activeTokensOfType("player");
   if (matched.length) {
     // a specific player (or players) is selected — the badge mode
     // change applies only to them, not the whole roster
     matched.forEach(t => t.labelMode = mode);
   } else {
-    // nothing selected — this is a team-wide change, matching how
-    // color/size already behave with no selection
-    tokens.forEach(t => { if (t.type === "player" && t.team === team) t.labelMode = mode; });
+    // nothing selected — apply to every player on the field, since
+    // there's just one shared set of players now, not separate teams
+    tokens.forEach(t => { if (t.type === "player") t.labelMode = mode; });
   }
   teamDefaults[team].labelMode = mode;
   renderTokens();
   syncTeamPopover(team);
 }
 // same selected-vs-all pattern as the mode toggle above: shows/hides the
-// badge for just the selected player(s), or the whole roster when
-// nothing is selected — independent of which mode (#/Pos) is set, so
-// hiding the badge never loses track of which mode it'll return to
+// badge for just the selected player(s), or every player when nothing is
+// selected — independent of which mode (#/Pos) is set, so hiding the
+// badge never loses track of which mode it'll return to
 function setTeamBadgeVisibility(team, hidden) {
   pushHistory();
-  const matched = activeTokensForTeam(team);
+  const matched = activeTokensOfType("player");
   if (matched.length) {
     matched.forEach(t => t.badgeHidden = hidden);
   } else {
-    tokens.forEach(t => { if (t.type === "player" && t.team === team) t.badgeHidden = hidden; });
+    tokens.forEach(t => { if (t.type === "player") t.badgeHidden = hidden; });
   }
   teamDefaults[team].badgeHidden = hidden;
   renderTokens();
   syncTeamPopover(team);
 }
-// name labels are a team-wide setting too, same as the badge mode —
-// toggling it updates every player of that team on the field right away
+// name labels are a shared setting too, same as the badge mode —
+// toggling it updates every player on the field right away
 function setTeamShowNames(team, show) {
   pushHistory();
   teamDefaults[team].showNames = show;
-  tokens.forEach(t => { if (t.type === "player" && t.team === team) t.showName = show; });
+  tokens.forEach(t => { if (t.type === "player") t.showName = show; });
   renderTokens();
   syncTeamPopover(team);
 }
@@ -3491,7 +3492,7 @@ function setBallSize(size) {
 }
 
 function initTeamPopovers() {
-  ["light", "dark"].forEach(team => {
+  ["light"].forEach(team => {
     const row = document.querySelector(`.tp-swatch-row[data-team="${team}"]`);
     PLAYER_COLORS.forEach(c => {
       const s = document.createElement("div");
@@ -3526,7 +3527,7 @@ function initTeamPopovers() {
         if (filtered !== badgeInput.value) badgeInput.value = filtered;
       });
       badgeInput.addEventListener("change", () => {
-        const matched = activeTokensForTeam(team);
+        const matched = activeTokensOfType("player");
         const mode = teamDefaults[team].labelMode;
         const val = badgeInput.value.trim();
         if (matched.length === 1) {
@@ -3557,7 +3558,7 @@ function initTeamPopovers() {
     if (nameInput) {
       nameInput.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") nameInput.blur(); });
       nameInput.addEventListener("change", () => {
-        const matched = activeTokensForTeam(team);
+        const matched = activeTokensOfType("player");
         if (matched.length === 1) {
           pushHistory();
           matched[0].name = nameInput.value.trim();
@@ -3705,10 +3706,9 @@ function showPopoverForToken(t) {
   closeAllPopovers();
   if (!t || !toolsPanelVisible()) return;
   if (t.type === "player") {
-    const team = t.team === "dark" ? "away" : "home";
-    document.getElementById(team + "-popover").classList.add("open");
-    syncTeamPopover(t.team);
-    focusOpenPanel(team + "-popover");
+    document.getElementById("player-popover").classList.add("open");
+    syncTeamPopover("light");
+    focusOpenPanel("player-popover");
   } else if (t.type === "equipment") {
     document.getElementById("equipment-popover").classList.add("open");
     syncEquipmentPopover();
@@ -3742,14 +3742,13 @@ function showPopoverForSelection() {
   const selTokens = tokens.filter(t => ids.t.includes(t.id));
   const selShapes = shapes.filter(s => ids.s.includes(s.id));
   if (selTokens.length && !selShapes.length) {
-    const kinds = new Set(selTokens.map(t => t.type === "player" ? "player-" + t.team : t.type));
+    const kinds = new Set(selTokens.map(t => t.type));
     if (kinds.size !== 1) return;
     const t0 = selTokens[0];
     if (t0.type === "player") {
-      const team = t0.team === "dark" ? "away" : "home";
-      document.getElementById(team + "-popover").classList.add("open");
-      syncTeamPopover(t0.team);
-      focusOpenPanel(team + "-popover");
+      document.getElementById("player-popover").classList.add("open");
+      syncTeamPopover("light");
+      focusOpenPanel("player-popover");
     } else if (t0.type === "equipment") {
       document.getElementById("equipment-popover").classList.add("open");
       syncEquipmentPopover();
@@ -4351,7 +4350,9 @@ function onStageDown(e) {
     }
   }
 
-  const PLACEMENT = { home: ["player","light"], away: ["player","dark"], ball: ["ball"] };
+  // players are placed in bulk via the Quantity + Insert Players button in
+  // the Players popover now, rather than by repeated clicks on the field
+  const PLACEMENT = { ball: ["ball"] };
   if (PLACEMENT[currentTool]) {
     e.preventDefault(); pushHistory();
     const [type, team] = PLACEMENT[currentTool];
@@ -6298,12 +6299,9 @@ document.getElementById("phase-import-mobile").addEventListener("click", openImp
 function objectGroupDefs() {
   const icon = (svg) => svg;
   return [
-    { key: "home", label: "Home Players",
-      tok: t => t.type === "player" && t.team === "light",
-      icon: icon(`<svg width="16" height="16" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1B211C"/><text x="9" y="12.3" font-family="'Barlow Condensed',sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#F7F8F3">H</text></svg>`) },
-    { key: "away", label: "Away Players",
-      tok: t => t.type === "player" && t.team === "dark",
-      icon: icon(`<svg width="16" height="16" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1B211C"/><text x="9" y="12.3" font-family="'Barlow Condensed',sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#F7F8F3">A</text></svg>`) },
+    { key: "players", label: "Players",
+      tok: t => t.type === "player",
+      icon: icon(`<svg width="16" height="16" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="#1B211C"/></svg>`) },
     { key: "ball", label: "Balls",
       tok: t => t.type === "ball",
       icon: icon(`<svg width="16" height="16" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.6"/><path d="M9 5.5l2.4 1.7-.9 2.8H7.5l-.9-2.8z" stroke="currentColor" stroke-width="1.1"/></svg>`) },
@@ -7268,6 +7266,11 @@ async function loadDrillFromUrl() {
    INIT
 ═════════════════════════════════════════════════════════════════════ */
 initTeamPopovers();
+document.getElementById("insert-players-btn").addEventListener("click", () => {
+  const qtyInput = document.getElementById("player-qty-input");
+  insertPlayersBulk(parseInt(qtyInput.value, 10));
+  setTool("select");
+});
 initEquipmentPopover();
 initArrowPopover();
 initShapePopover();
