@@ -5197,7 +5197,7 @@ function renderOutputContent() {
     const label = outputSettings.showPhaseTitles ? (() => {
       const l = document.createElement("div");
       l.className = "output-phase-label";
-      l.textContent = phaseNoun() + " " + (idx + 1);
+      l.textContent = (ph.title || "").trim() || (phaseNoun() + " " + (idx + 1));
       return l;
     })() : null;
 
@@ -8399,7 +8399,7 @@ async function openLibraryDrillDetail(id) {
         block.className = "output-phase-block";
         const label = document.createElement("div");
         label.className = "output-phase-label";
-        label.textContent = ph.title || ("Phase " + (idx + 1));
+        label.textContent = (ph.title || "").trim() || ("Phase " + (idx + 1));
         block.appendChild(label);
         const thumbWrap = document.createElement("div");
         thumbWrap.className = "lib-detail-thumb";
