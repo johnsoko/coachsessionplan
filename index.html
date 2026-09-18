@@ -440,6 +440,9 @@
   .phase-note-exercise { display: flex; flex-direction: column; gap: 6px; }
   .phase-note-card .phase-note-drill-title { font-weight: 600; font-size: 13px; text-align: center; }
   .phase-note-notes-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .phase-note-infoblocks { display: flex; flex-direction: column; gap: 8px; }
+  .phase-note-infoblock-label { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink-faint); margin-bottom: 3px; }
+  .phase-note-infoblock-text { font-size: 12px; padding: 6px 8px; resize: vertical; min-height: 40px; width: 100%; }
   .phase-clips-label { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); }
   .phase-clips-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px; }
   .phase-clip-unit { display: flex; flex-direction: column; gap: 8px; width: 420px; flex-shrink: 0; }
@@ -5863,6 +5866,36 @@ function renderPhaseNotes() {
     notesWrap.className = "phase-note-notes note-blocks";
     renderNoteBlocks(ph.noteBlocks, notesWrap);
 
+    // Panel's Block Information (Organisation, Coaching Points, etc.) is
+    // the same ph.infoBlocks data the Panel view edits — rendering it
+    // fresh here means any block added, retitled, or edited there shows
+    // up here automatically the next time Details is viewed, with no
+    // separate copy to keep in sync. Editing here writes back to the
+    // very same block objects, so it flows both ways.
+    const notesCol = document.createElement("div");
+    notesCol.className = "phase-note-notes-col";
+    notesCol.appendChild(notesWrap);
+    if (ph.infoBlocks && ph.infoBlocks.length) {
+      const infoWrap = document.createElement("div");
+      infoWrap.className = "phase-note-infoblocks";
+      ph.infoBlocks.filter(b => b.enabled !== false && ((b.title || "").trim() || (b.text || "").trim())).forEach(block => {
+        const row = document.createElement("div");
+        row.className = "phase-note-infoblock";
+        const label = document.createElement("div");
+        label.className = "phase-note-infoblock-label";
+        label.textContent = block.title || block.placeholder || "Block";
+        const text = document.createElement("textarea");
+        text.className = "field-input phase-note-infoblock-text";
+        text.rows = 2;
+        text.value = block.text || "";
+        text.placeholder = "Write notes here…";
+        text.addEventListener("input", () => { block.text = text.value; });
+        row.appendChild(label); row.appendChild(text);
+        infoWrap.appendChild(row);
+      });
+      if (infoWrap.children.length) notesCol.appendChild(infoWrap);
+    }
+
     const actions = document.createElement("div");
     actions.className = "phase-note-row-actions";
     let libControl = null;
@@ -5912,7 +5945,7 @@ function renderPhaseNotes() {
 
     card.appendChild(handle);
     if (!isStandaloneDrillMode) card.appendChild(timeWrap);
-    card.appendChild(exerciseWrap); card.appendChild(notesWrap); card.appendChild(actions);
+    card.appendChild(exerciseWrap); card.appendChild(notesCol); card.appendChild(actions);
 
     // only the grip handle arms dragging — otherwise a draggable=true row
     // can swallow clicks/typing in its inputs, textareas, and buttons as
