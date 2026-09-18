@@ -83,6 +83,8 @@
   .btn-primary:hover { background: var(--bib-deep); }
   .btn-ghost { background: transparent; color: var(--ink-soft); border: 1.5px solid var(--line-md); }
   .btn-ghost:hover { background: var(--paper-raised); }
+  .btn-danger { background: rgba(179,69,44,0.14); color: #B3452C; }
+  .btn-danger:hover { background: rgba(179,69,44,0.24); }
 
   .dd-wrap { position: relative; }
   .save-split { display: flex; align-items: stretch; }
@@ -253,6 +255,7 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.25); z-index: 5;
   }
   .token.dragging { cursor: grabbing; z-index: 20; }
+  .token.token-highlighted { box-shadow: 0 0 0 3px #FFDC00, 0 2px 6px rgba(0,0,0,0.25); }
   .rotation-handle-dot {
     position: absolute; width: 12px; height: 12px; border-radius: 50%;
     background: var(--bib); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.35);
@@ -357,6 +360,7 @@
   .arrow-opt:hover:not(.selected) { background: var(--paper-raised); }
 
   .tp-label { font-size: 11px; font-weight: 600; color: var(--ink-soft); display: block; margin: 4px 2px 6px; }
+  .tp-hint { font-size: 12px; color: var(--ink-faint); line-height: 1.4; margin: 10px 2px 0; }
   .tp-swatch-row { display: flex; gap: 6px; padding: 0 2px; flex-wrap: wrap; }
   .tp-swatch { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15); }
   .tp-swatch.active { border-color: var(--bib); }
@@ -687,6 +691,9 @@
   }
   .modal-card h4 { font-family: var(--display); font-size: 18px; font-weight: 600; margin-bottom: 14px; }
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .modal-divider { height: 1px; background: var(--line); margin: 16px 0; }
+  .modal-arrange-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .modal-arrange-grid .btn { justify-content: center; width: 100%; }
   .modal-card-wide { width: 720px; max-width: 92vw; }
   .full-animation-card { width: 780px; max-width: 94vw; }
   .full-animation-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
@@ -1530,19 +1537,10 @@
               </div>
               <span class="tp-label">Badge</span>
               <div class="tp-badge-row">
-                <div class="tp-toggle-row" data-team="light">
-                  <button data-mode="number">#</button>
-                  <button data-mode="position">Pos</button>
-                </div>
+                <span style="font-size:12.5px; color:var(--ink-soft);">Show badge on the field</span>
                 <button class="tp-eye-toggle" data-team="light" title="Show/hide badge on the field"></button>
               </div>
-              <input type="text" class="field-input tp-badge-value" data-team="light" placeholder="Number" style="margin-top:6px;">
-              <span class="tp-label">Name label</span>
-              <div class="tp-toggle-row" id="tp-name-toggle-light">
-                <button data-shownames="0" class="active">Off</button>
-                <button data-shownames="1">On</button>
-              </div>
-              <input type="text" class="field-input tp-name-value" data-team="light" placeholder="Player name" maxlength="24" style="margin-top:6px;">
+              <p class="tp-hint">Double-click a player to edit its number, name, color, and more.</p>
             </div>
           </div>
           <div style="position:relative;">
@@ -1835,10 +1833,20 @@
   <div class="modal-overlay" id="name-modal-overlay">
     <div class="modal-card">
       <h4>Edit Player</h4>
-      <span class="tp-label" style="margin-top:0;">Name</span>
-      <input type="text" id="name-modal-input" class="field-input" placeholder="e.g. Messi" maxlength="24">
-      <span class="tp-label">Number</span>
+      <span class="tp-label" style="margin-top:0;">Number</span>
       <input type="number" id="name-modal-number" class="field-input" min="1" max="99">
+      <span class="tp-label">Name</span>
+      <input type="text" id="name-modal-input" class="field-input" placeholder="e.g. Messi" maxlength="24">
+      <div style="display:flex; gap:18px; margin-top:6px;">
+        <div style="flex:1;">
+          <span class="tp-label" style="margin-top:0;">Colour</span>
+          <div class="tp-swatch-row" id="name-modal-color-row"></div>
+        </div>
+        <div style="flex:1;">
+          <span class="tp-label" style="margin-top:0;">Text</span>
+          <div class="tp-swatch-row" id="name-modal-textcolor-row"></div>
+        </div>
+      </div>
       <span class="tp-label">Badge</span>
       <div class="tp-badge-row">
         <div class="tp-toggle-row" id="name-modal-badge-toggle">
@@ -1846,6 +1854,23 @@
           <button data-mode="position">Pos</button>
         </div>
         <button class="tp-eye-toggle" id="name-modal-eye-toggle" title="Show/hide badge on the field"></button>
+      </div>
+      <span class="tp-label">Highlight</span>
+      <div class="tp-toggle-row" id="name-modal-highlight-toggle">
+        <button data-highlight="0" class="active">Off</button>
+        <button data-highlight="1">On</button>
+      </div>
+      <span class="tp-label">Opacity</span>
+      <div class="tp-size-row">
+        <input type="range" id="name-modal-opacity" min="20" max="100" step="5">
+        <span class="tp-size-val" id="name-modal-opacity-val"></span>
+      </div>
+      <div class="modal-divider"></div>
+      <div class="modal-arrange-grid">
+        <button class="btn btn-ghost" id="name-modal-front">Bring to Front</button>
+        <button class="btn btn-ghost" id="name-modal-back">Send to Back</button>
+        <button class="btn btn-ghost" id="name-modal-duplicate">Duplicate</button>
+        <button class="btn btn-danger" id="name-modal-delete">Delete</button>
       </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="name-modal-cancel">Cancel</button>
@@ -2952,8 +2977,10 @@ function renderTokens() {
       el.style.width = scaledSize + "px";
       el.style.height = scaledSize + "px";
       el.style.background = t.color;
-      el.style.color = textColorFor(t.color);
+      el.style.color = t.badgeTextColor || textColorFor(t.color);
       el.style.fontSize = Math.max(8, Math.round(scaledSize * (label.length > 1 ? 0.48 : 0.58))) + "px";
+      el.style.opacity = (t.opacity != null ? t.opacity : 100) / 100;
+      el.classList.toggle("token-highlighted", !!t.highlighted);
       el.addEventListener("dblclick", ev => { ev.stopPropagation(); openNameModal(t.id); });
     } else if (t.type === "equipment") {
       applyEquipmentStyle(el, t);
@@ -6624,8 +6651,8 @@ function toast(msg) {
 }
 
 /* ─────────────────────────────────────────────────────────
-   PLAYER NAME MODAL — double-click a player dot to set the
-   name shown in its optional name label
+   PLAYER EDIT MODAL — double-click a player dot to edit its
+   number, name, colors, badge, highlight, opacity, and layer
 ───────────────────────────────────────────────────────── */
 let nameModalTokenId = null;
 function openNameModal(id) {
@@ -6641,6 +6668,15 @@ function openNameModal(id) {
   eyeBtn.classList.toggle("badge-hidden", !!t.badgeHidden);
   eyeBtn.innerHTML = t.badgeHidden ? EYE_HIDDEN_ICON : EYE_VISIBLE_ICON;
   eyeBtn.title = t.badgeHidden ? "Show badge on the field" : "Hide badge on the field";
+  document.querySelectorAll("#name-modal-color-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === t.color));
+  const textColor = t.badgeTextColor || textColorFor(t.color);
+  document.querySelectorAll("#name-modal-textcolor-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === textColor));
+  const highlighted = !!t.highlighted;
+  document.querySelectorAll("#name-modal-highlight-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.highlight === "1") === highlighted));
+  const opacityInput = document.getElementById("name-modal-opacity");
+  const opacity = t.opacity != null ? t.opacity : 100;
+  opacityInput.value = opacity;
+  document.getElementById("name-modal-opacity-val").textContent = opacity + "%";
   document.getElementById("name-modal-overlay").classList.add("open");
   requestAnimationFrame(() => { input.focus(); input.select(); });
 }
@@ -6658,17 +6694,52 @@ function saveNameModal() {
     const activeBadgeBtn = document.querySelector("#name-modal-badge-toggle button.active");
     const mode = activeBadgeBtn ? activeBadgeBtn.dataset.mode : (t.labelMode || "number");
     const badgeHidden = document.getElementById("name-modal-eye-toggle").classList.contains("badge-hidden");
-    if (val !== (t.name || "") || num !== t.num || mode !== (t.labelMode || "number") || badgeHidden !== !!t.badgeHidden) {
+    const colorSwatch = document.querySelector("#name-modal-color-row .tp-swatch.active");
+    const color = colorSwatch ? colorSwatch.dataset.color : t.color;
+    const textSwatch = document.querySelector("#name-modal-textcolor-row .tp-swatch.active");
+    const badgeTextColor = textSwatch ? textSwatch.dataset.color : t.badgeTextColor;
+    const activeHighlightBtn = document.querySelector("#name-modal-highlight-toggle button.active");
+    const highlighted = activeHighlightBtn ? activeHighlightBtn.dataset.highlight === "1" : !!t.highlighted;
+    const opacityRaw = parseInt(document.getElementById("name-modal-opacity").value, 10);
+    const opacity = Number.isFinite(opacityRaw) ? opacityRaw : (t.opacity != null ? t.opacity : 100);
+    const changed = val !== (t.name || "") || num !== t.num || mode !== (t.labelMode || "number") ||
+      badgeHidden !== !!t.badgeHidden || color !== t.color || badgeTextColor !== t.badgeTextColor ||
+      highlighted !== !!t.highlighted || opacity !== (t.opacity != null ? t.opacity : 100);
+    if (changed) {
       pushHistory();
       t.name = val;
       t.num = num;
       t.labelMode = mode;
       t.badgeHidden = badgeHidden;
+      t.color = color;
+      t.badgeTextColor = badgeTextColor;
+      t.highlighted = highlighted;
+      t.opacity = opacity;
       renderTokens();
       renderPhaseThumbActive();
     }
   }
   closeNameModal();
+}
+// moves a token to the end (front) or start (back) of the tokens array —
+// render order follows array order, so this is all stacking needs
+function bringTokenToFront(id) {
+  const idx = tokens.findIndex(t => t.id === id);
+  if (idx === -1 || idx === tokens.length - 1) return;
+  pushHistory();
+  const [t] = tokens.splice(idx, 1);
+  tokens.push(t);
+  renderTokens();
+  renderPhaseThumbActive();
+}
+function sendTokenToBack(id) {
+  const idx = tokens.findIndex(t => t.id === id);
+  if (idx === -1 || idx === 0) return;
+  pushHistory();
+  const [t] = tokens.splice(idx, 1);
+  tokens.unshift(t);
+  renderTokens();
+  renderPhaseThumbActive();
 }
 document.getElementById("name-modal-eye-toggle").addEventListener("click", () => {
   const eyeBtn = document.getElementById("name-modal-eye-toggle");
@@ -6686,6 +6757,49 @@ document.querySelectorAll("#name-modal-badge-toggle button").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll("#name-modal-badge-toggle button").forEach(b => b.classList.toggle("active", b === btn));
   });
+});
+document.querySelectorAll("#name-modal-highlight-toggle button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#name-modal-highlight-toggle button").forEach(b => b.classList.toggle("active", b === btn));
+  });
+});
+PLAYER_COLORS.forEach(c => {
+  const s = document.createElement("div");
+  s.className = "tp-swatch"; s.style.background = c; s.dataset.color = c;
+  s.addEventListener("click", () => {
+    document.querySelectorAll("#name-modal-color-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw === s));
+  });
+  document.getElementById("name-modal-color-row").appendChild(s);
+});
+// badge text really only ever needs to be light or dark for contrast —
+// this mirrors the same two values textColorFor() already auto-picks
+// from, just exposed as an explicit override
+["#1B211C", "#F7F8F3"].forEach(c => {
+  const s = document.createElement("div");
+  s.className = "tp-swatch"; s.style.background = c; s.dataset.color = c;
+  s.addEventListener("click", () => {
+    document.querySelectorAll("#name-modal-textcolor-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw === s));
+  });
+  document.getElementById("name-modal-textcolor-row").appendChild(s);
+});
+document.getElementById("name-modal-opacity").addEventListener("input", e => {
+  document.getElementById("name-modal-opacity-val").textContent = e.target.value + "%";
+});
+document.getElementById("name-modal-front").addEventListener("click", () => {
+  if (nameModalTokenId != null) bringTokenToFront(nameModalTokenId);
+});
+document.getElementById("name-modal-back").addEventListener("click", () => {
+  if (nameModalTokenId != null) sendTokenToBack(nameModalTokenId);
+});
+document.getElementById("name-modal-duplicate").addEventListener("click", () => {
+  if (nameModalTokenId == null) return;
+  duplicateToken(nameModalTokenId);
+  closeNameModal();
+});
+document.getElementById("name-modal-delete").addEventListener("click", () => {
+  if (nameModalTokenId == null) return;
+  deleteToken(nameModalTokenId);
+  closeNameModal();
 });
 document.getElementById("name-modal-number").addEventListener("keydown", e => {
   e.stopPropagation();
