@@ -694,6 +694,10 @@
   .output-phase-block:first-child { margin-top: 0; }
   .output-phase-block .output-phase-label { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--ink); margin: 0 0 12px; }
   .output-phase-notes { margin-top: 4px; }
+  .output-info-block { margin-bottom: 12px; }
+  .output-info-block:last-child { margin-bottom: 0; }
+  .output-info-block-title { font-size: 11.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 3px; }
+  .output-info-block-text { font-size: 13.5px; color: var(--ink-soft); line-height: 1.6; white-space: pre-wrap; }
   #output-phases-container.layout-rows .output-phase-block { display: flex; gap: 30px; align-items: flex-start; }
   #output-phases-container.layout-rows .output-phase-block .output-phase-thumb-wrap { width: 300px; flex-shrink: 0; margin-bottom: 0; }
   #output-phases-container.layout-rows .output-phase-block .output-phase-side { flex: 1; min-width: 0; }
@@ -5202,7 +5206,7 @@ function renderOutputContent() {
       const n = document.createElement("div");
       n.className = "output-phase-notes";
       n.innerHTML = blocks.length
-        ? `<ul class="output-bullet-list">${blocks.map(b => `<li>${b.title ? `<strong>${escapeHtml(b.title)}:</strong> ` : ""}${escapeHtml(b.text)}</li>`).join("")}</ul>`
+        ? blocks.map(b => `<div class="output-info-block">${b.title ? `<div class="output-info-block-title">${escapeHtml(b.title)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
         : `<p class="output-empty">No notes for this phase.</p>`;
       return n;
     })() : null;
@@ -8378,8 +8382,10 @@ async function openLibraryDrillDetail(id) {
       notesLabel.textContent = "Notes";
       const notesBody = document.createElement("div");
       notesBody.className = "lib-detail-desc";
-      const notesText = phaseInfoBlocksText(ph);
-      notesBody.textContent = notesText || "No notes yet.";
+      const notesBlocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (b.text || "").trim());
+      notesBody.innerHTML = notesBlocks.length
+        ? notesBlocks.map(b => `<div class="output-info-block">${b.title ? `<div class="output-info-block-title">${escapeHtml(b.title)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
+        : `<p class="output-empty">No notes yet.</p>`;
       phasesEl.appendChild(thumbWrap);
       phasesEl.appendChild(notesLabel);
       phasesEl.appendChild(notesBody);
@@ -8407,7 +8413,7 @@ async function openLibraryDrillDetail(id) {
         const notesBody = document.createElement("div");
         notesBody.className = "output-phase-notes lib-detail-desc";
         notesBody.innerHTML = notesBlocks.length
-          ? `<ul class="output-bullet-list">${notesBlocks.map(b => `<li>${b.title ? `<strong>${escapeHtml(b.title)}:</strong> ` : ""}${escapeHtml(b.text)}</li>`).join("")}</ul>`
+          ? notesBlocks.map(b => `<div class="output-info-block">${b.title ? `<div class="output-info-block-title">${escapeHtml(b.title)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
           : `<p class="output-empty">No notes yet.</p>`;
         block.appendChild(notesLabel);
         block.appendChild(notesBody);
