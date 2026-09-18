@@ -268,6 +268,7 @@
   .token.eq-largegoal { border-radius: 2px; background: none; border-style: solid; box-shadow: none; }
   .token.eq-dummy     { border-radius: 7px 7px 3px 3px; box-shadow: none; }
   .token.eq-ladder    { border-radius: 2px; border-style: solid; box-shadow: none; }
+  .token.eq-pole      { border-radius: 3px; box-shadow: none; }
   .token.text  { width: auto; height: auto; border-radius: 0; box-shadow: none; background: none; font-family: var(--display); font-weight: 700; white-space: nowrap; padding: 2px 4px; }
   .token.text[contenteditable="true"] { outline: 1.5px dashed var(--bib); outline-offset: 3px; cursor: text; min-width: 26px; min-height: 1.2em; }
   .token.text[contenteditable="true"]:empty::before { content: "Type…"; opacity: 0.5; }
@@ -1251,6 +1252,10 @@
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="3" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 7h7M5.5 10h7M5.5 13h4" stroke="currentColor" stroke-width="1.3"/></svg>
         Details
       </button>
+      <button class="mode-tab" data-mode="animate">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M5.5 3.5v11l9-5.5z" fill="currentColor"/></svg>
+        Animate
+      </button>
       <button class="mode-tab" data-mode="output">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="3" y="4" width="12" height="8" rx="1.3" stroke="currentColor" stroke-width="1.4"/><path d="M6.5 15h5M9 12v3" stroke="currentColor" stroke-width="1.4"/></svg>
         Output
@@ -1265,6 +1270,7 @@
       <div class="dropdown-menu" id="mobile-mode-menu">
         <div class="dropdown-item" data-mode="draw">Create</div>
         <div class="dropdown-item" data-mode="notes">Details</div>
+        <div class="dropdown-item" data-mode="animate">Animate</div>
         <div class="dropdown-item" data-mode="output">Output</div>
       </div>
     </div>
@@ -1451,10 +1457,6 @@
       </div>
 
       <div id="toolkit">
-        <div class="animate-panel-toggle" id="draw-panel-toggle">
-          <button data-panel="tools" class="active">Toolkit</button>
-          <button data-panel="timeline">Animate</button>
-        </div>
         <div id="draw-tools-content">
         <button class="tk-btn tk-btn-select active" data-tool="select" title="Select">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4 3l9 6.2-3.6.7 2 3.7-1.6.9-2-3.7-2.5 2.7z" fill="currentColor"/></svg>
@@ -1629,6 +1631,9 @@
                 <div class="arrow-opt" data-kind="ladder" title="Speed ladder">
                   <svg width="16" height="14" viewBox="0 0 16 14"><rect x="1" y="3" width="14" height="8" rx="1" stroke="#1B211C" stroke-width="1.3" fill="none"/><line x1="4" y1="3" x2="4" y2="11" stroke="#1B211C" stroke-width="1.1"/><line x1="7.3" y1="3" x2="7.3" y2="11" stroke="#1B211C" stroke-width="1.1"/><line x1="10.6" y1="3" x2="10.6" y2="11" stroke="#1B211C" stroke-width="1.1"/></svg>
                 </div>
+                <div class="arrow-opt" data-kind="pole" title="Training pole">
+                  <svg width="3" height="14" viewBox="0 0 297.5 1488.9"><path d="M 148.3,2.4 C 139.5,6.8 133.3,15.8 129.5,29.4 C 128.0,34.9 127.5,90.5 123.6,709.2 C 120.9,1155.3 119.1,1383.2 118.4,1383.7 C 96.1,1399.1 84.5,1405.8 55.5,1420.2 C 29.8,1433.0 19.2,1439.6 12.9,1446.7 C 5.2,1455.5 0.1,1470.0 0,1483.2 L 0,1488.9 L 148.8,1488.7 L 297.5,1488.4 L 297.3,1481.9 C 296.5,1461.8 288.5,1447.3 272.2,1436.6 C 268.5,1434.1 252.9,1425.8 237.5,1418.1 C 212.0,1405.2 181.8,1387.3 178.4,1382.8 C 177.7,1381.8 178.5,1188.1 181.5,706.0 C 184.1,285.4 185.3,28.7 184.8,25.6 C 183.0,15.7 176.1,6.1 168.1,2.3 C 166.1,1.3 162.0,0.4 159.0,0.1 C 154.5,-0.2 152.5,0.3 148.3,2.4" fill="#1B211C"/></svg>
+                </div>
               </div>
               <div style="height:1px;background:var(--line);margin:6px 2px;"></div>
               <span class="tp-label" style="margin-top:0;">Color</span>
@@ -1733,10 +1738,6 @@
         <button class="mobile-tool-btn" data-mobiletool="tools">
           <svg width="19" height="19" viewBox="0 0 18 18" fill="none"><path d="M3 12.5l7-7 2.5 2.5-7 7H3v-2.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10.5 4.5L13.5 7.5" stroke="currentColor" stroke-width="1.4"/></svg>
           Tools
-        </button>
-        <button class="mobile-tool-btn" data-mobiletool="animate">
-          <svg width="19" height="19" viewBox="0 0 18 18" fill="none"><path d="M5.5 3.5v11l9-5.5z" fill="currentColor"/></svg>
-          Animate
         </button>
       </div>
       <div class="mobile-sheet-overlay" id="mobile-sheet-overlay"></div>
@@ -2020,13 +2021,13 @@ function nextAvailableNumber(team) {
 const equipmentDefaults = { color: "#E2892B", size: 24 };
 // each equipment kind gets its own starting size when first placed, since
 // a cone and a large goal obviously shouldn't render at the same scale
-const EQUIPMENT_DEFAULT_SIZES = { cone: 14, flatcone: 14, minigoal: 32, largegoal: 32, dummy: 24, ladder: 24 };
+const EQUIPMENT_DEFAULT_SIZES = { cone: 14, flatcone: 14, minigoal: 32, largegoal: 32, dummy: 24, ladder: 24, pole: 30 };
 // remembers the last size actually used per kind — starts from the
 // defaults above, then updates as the user resizes things, so the slider
 // (and the next piece placed) reflects "what I used last for this kind"
 // rather than snapping back to the original default every time
 let equipmentSizeMemory = { ...EQUIPMENT_DEFAULT_SIZES };
-const EQUIPMENT_KINDS = ["cone", "flatcone", "minigoal", "largegoal", "dummy", "ladder"];
+const EQUIPMENT_KINDS = ["cone", "flatcone", "minigoal", "largegoal", "dummy", "ladder", "pole"];
 const drawDefaults  = { color: "#F7F8F3", width: 2.6, curved: false };
 const shapeDefaults = { color: "#F7F8F3", width: 2.4, fill: false, dashed: false };
 // same per-kind "last used" memory as equipment, applied to circle/
@@ -2915,6 +2916,15 @@ function applyEquipmentStyle(el, t) {
       el.style.background = `repeating-linear-gradient(90deg, ${c} 0 3px, transparent 3px 9px)`;
       el.style.borderColor = c; el.style.borderWidth = "2px";
       break;
+    case "pole":
+      el.style.width = Math.round(s * 0.2) + "px"; el.style.height = s + "px";
+      el.style.background = c;
+      el.style.maskImage = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 297.5 1488.9'%3E%3Cpath d='M 148.3,2.4 C 139.5,6.8 133.3,15.8 129.5,29.4 C 128.0,34.9 127.5,90.5 123.6,709.2 C 120.9,1155.3 119.1,1383.2 118.4,1383.7 C 96.1,1399.1 84.5,1405.8 55.5,1420.2 C 29.8,1433.0 19.2,1439.6 12.9,1446.7 C 5.2,1455.5 0.1,1470.0 0,1483.2 L 0,1488.9 L 148.8,1488.7 L 297.5,1488.4 L 297.3,1481.9 C 296.5,1461.8 288.5,1447.3 272.2,1436.6 C 268.5,1434.1 252.9,1425.8 237.5,1418.1 C 212.0,1405.2 181.8,1387.3 178.4,1382.8 C 177.7,1381.8 178.5,1188.1 181.5,706.0 C 184.1,285.4 185.3,28.7 184.8,25.6 C 183.0,15.7 176.1,6.1 168.1,2.3 C 166.1,1.3 162.0,0.4 159.0,0.1 C 154.5,-0.2 152.5,0.3 148.3,2.4'/%3E%3C/svg%3E\")";
+      el.style.webkitMaskImage = el.style.maskImage;
+      el.style.maskSize = "contain"; el.style.webkitMaskSize = "contain";
+      el.style.maskRepeat = "no-repeat"; el.style.webkitMaskRepeat = "no-repeat";
+      el.style.maskPosition = "center"; el.style.webkitMaskPosition = "center";
+      break;
   }
 }
 
@@ -3048,7 +3058,7 @@ function equipmentHalfHeightPx(t) {
   // small items like cones, but put the handle right on top of (or even
   // inside) anything tall, like the goals
   const s = (t.size || equipmentDefaults.size) * fieldScaleFactor();
-  const ratios = { cone: 1, flatcone: 0.42, minigoal: 1.15, largegoal: 1.7, dummy: 0.57, ladder: 0.45 };
+  const ratios = { cone: 1, flatcone: 0.42, minigoal: 1.15, largegoal: 1.7, dummy: 0.57, ladder: 0.45, pole: 1 };
   return (s * (ratios[t.kind] || 1)) / 2;
 }
 function buildRotationHandle(t, pos) {
@@ -4902,6 +4912,15 @@ function phaseThumbHTML(ph, opts) {
       } else if (t.kind === "ladder") {
         const w = toVB(s * 1.8), h = toVB(s * 0.45);
         shapeSvg = `<rect x="${(p.x-w/2).toFixed(1)}" y="${(p.y-h/2).toFixed(1)}" width="${w}" height="${h}" fill="none" stroke="${c}" stroke-width="${toVB(2)}"/>`;
+      } else if (t.kind === "pole") {
+        const w = toVB(s * 0.2), h = toVB(s);
+        const dpath = "M 148.3,2.4 C 139.5,6.8 133.3,15.8 129.5,29.4 C 128.0,34.9 127.5,90.5 123.6,709.2 C 120.9,1155.3 119.1,1383.2 118.4,1383.7 C 96.1,1399.1 84.5,1405.8 55.5,1420.2 C 29.8,1433.0 19.2,1439.6 12.9,1446.7 C 5.2,1455.5 0.1,1470.0 0,1483.2 L 0,1488.9 L 148.8,1488.7 L 297.5,1488.4 L 297.3,1481.9 C 296.5,1461.8 288.5,1447.3 272.2,1436.6 C 268.5,1434.1 252.9,1425.8 237.5,1418.1 C 212.0,1405.2 181.8,1387.3 178.4,1382.8 C 177.7,1381.8 178.5,1188.1 181.5,706.0 C 184.1,285.4 185.3,28.7 184.8,25.6 C 183.0,15.7 176.1,6.1 168.1,2.3 C 166.1,1.3 162.0,0.4 159.0,0.1 C 154.5,-0.2 152.5,0.3 148.3,2.4";
+        // path's own bbox is 0..297.5 x 0..1488.9 — already flush against
+        // its own origin, so no offset subtraction needed here the way
+        // dummy's off-origin bbox requires
+        const scaleX = w / 297.5, scaleY = h / 1488.9;
+        const tx = p.x - w/2, ty = p.y - h/2;
+        shapeSvg = `<g transform="translate(${tx.toFixed(1)} ${ty.toFixed(1)}) scale(${scaleX.toFixed(4)} ${scaleY.toFixed(4)})"><path d="${dpath}" fill="${c}"/></g>`;
       }
       return t.rotation ? `<g transform="rotate(${t.rotation} ${p.x} ${p.y})">${shapeSvg}</g>` : shapeSvg;
     }
@@ -6057,8 +6076,7 @@ async function playPhaseScenes(ph, onSceneDone) {
 // represents — so it's protected from being edited via Animate mode.
 // Draw mode can still edit it freely; this only blocks the Animate side.
 function isAnimatePanelActive() {
-  const btn = document.querySelector('#draw-panel-toggle button[data-panel="timeline"]');
-  return !!btn && btn.classList.contains("active");
+  return currentMode === "animate";
 }
 function isEditingSceneOne() {
   const ph = phases.find(p => p.id === activePhaseId);
@@ -6307,6 +6325,9 @@ function objectGroupDefs() {
     { key: "eq-ladder", label: "Speed Ladders",
       tok: t => t.type === "equipment" && t.kind === "ladder",
       icon: icon(`<svg width="16" height="14" viewBox="0 0 16 14"><rect x="1" y="3" width="14" height="8" rx="1" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="4" y1="3" x2="4" y2="11" stroke="currentColor" stroke-width="1.1"/><line x1="7.3" y1="3" x2="7.3" y2="11" stroke="currentColor" stroke-width="1.1"/><line x1="10.6" y1="3" x2="10.6" y2="11" stroke="currentColor" stroke-width="1.1"/></svg>`) },
+    { key: "eq-pole", label: "Training Poles",
+      tok: t => t.type === "equipment" && t.kind === "pole",
+      icon: icon(`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M8 1.3v9.4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M4.3 12.7c0-1.6 1.7-2.7 3.7-2.7s3.7 1.1 3.7 2.7" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>`) },
     { key: "text", label: "Text Labels",
       tok: t => t.type === "text",
       icon: icon(`<svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M4 4.5h10M9 4.5v9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`) },
@@ -6403,7 +6424,8 @@ function renderModeContent(mode) {
     document.getElementById("output-title").textContent = document.getElementById("title-input").value;
   }
   if (mode === "notes") { renderPhaseNotes(); renderDrillDescriptionBlocks(); }
-  if (mode === "draw") { renderPhaseList(); renderObjectsList(); refreshAnimatePanel(); }
+  if (mode === "draw") { renderPhaseList(); renderObjectsList(); }
+  if (mode === "animate") { renderPhaseList(); renderObjectsList(); refreshAnimatePanel(); }
 }
 function switchMode(mode) {
   currentMode = mode;
@@ -6413,13 +6435,32 @@ function switchMode(mode) {
   // that would otherwise leak into the next *practice plan* session
   if (!isStandaloneDrillMode) sessionStorage.setItem("lastMode", mode);
   document.querySelectorAll(".mode-tab").forEach(t => t.classList.toggle("active", t.dataset.mode === mode));
-  const modeLabels = { draw: "Create", notes: "Details", output: "Output" };
+  const modeLabels = { draw: "Create", notes: "Details", animate: "Animate", output: "Output" };
   const mobileLabel = document.getElementById("mobile-mode-label");
   if (mobileLabel) mobileLabel.textContent = modeLabels[mode] || mode;
-  ["draw","notes","output"].forEach(m => {
+  // Create and Animate are two different modes now, each its own top-level
+  // tab, but they still share the same canvas, left panel (phase list),
+  // and toolkit container underneath — so view-draw stays the visible
+  // view for both, and only the toolkit's own content swaps between them
+  ["draw", "notes", "output"].forEach(m => {
     const el = document.getElementById("view-" + m);
-    if (el) el.style.display = (m === mode) ? "flex" : "none";
+    if (el) el.style.display = (m === mode || (m === "draw" && mode === "animate")) ? "flex" : "none";
   });
+  const isAnimate = mode === "animate";
+  document.getElementById("draw-tools-content").style.display = isAnimate ? "none" : "block";
+  document.getElementById("animate-timeline-panel").style.display = isAnimate ? "flex" : "none";
+  // phase management (Next/Clone/Mirror/Import) stays a Create-only set of
+  // tools — Animate's left panel is just for browsing/selecting phases
+  document.querySelector(".phase-actions").classList.toggle("phase-actions-hidden", isAnimate);
+  // Animate is for moving existing objects, not adding new ones — if a
+  // placement tool (arrow, player, etc.) was left armed from Create,
+  // switching to Animate would otherwise keep drawing/placing with it
+  if (isAnimate) setTool("select");
+  // on mobile the toolkit is a slide-up sheet, hidden until opened — since
+  // Animate is now a full mode rather than a Create sub-panel, it should
+  // just be the visible content, not something you separately open
+  document.getElementById("toolkit").classList.toggle("mobile-sheet-open", isAnimate);
+  updatePlaybackUIVisibility();
   renderModeContent(mode);
 }
 document.querySelectorAll(".mode-tab").forEach(tab => {
@@ -6438,18 +6479,17 @@ document.querySelectorAll("#mobile-mode-menu .dropdown-item").forEach(item => {
    "Select" just arms the tool directly, same as its desktop button
 ───────────────────────────────────────────────────────── */
 function openMobileSheet(panel) {
-  // "tools" opens the Draw Tools content in full; "animate" switches the
-  // sheet to the Animate/Timeline content instead — both reuse the same
-  // real desktop toggle
-  const wantPanel = panel === "animate" ? "timeline" : "tools";
-  const toggleBtn = document.querySelector(`#draw-panel-toggle button[data-panel="${wantPanel}"]`);
-  if (toggleBtn && !toggleBtn.classList.contains("active")) toggleBtn.click();
+  // Tools is the only bottom-bar entry that opens the sheet now — Animate
+  // moved out to its own top-level mode, reached via the mode dropdown
   document.getElementById("toolkit").classList.add("mobile-sheet-open");
   document.getElementById("mobile-sheet-overlay").classList.add("open");
 }
 function closeMobileSheet() {
   const selectBtn = document.querySelector('.mobile-tool-btn[data-mobiletool="select"]');
   if (selectBtn) selectBtn.style.display = "";
+  // don't close Animate's own sheet-as-content out from under it — only
+  // Create's Tools sheet is meant to be dismissed this way
+  if (currentMode === "animate") return;
   document.getElementById("toolkit").classList.remove("mobile-sheet-open");
   document.getElementById("mobile-sheet-overlay").classList.remove("open");
 }
@@ -6467,38 +6507,17 @@ document.querySelectorAll(".mobile-tool-btn").forEach(btn => {
 });
 document.getElementById("mobile-sheet-overlay").addEventListener("click", closeMobileSheet);
 
-// Draw's right panel toggles between the add/edit toolkit and the
-// animation Timeline — both live permanently in Draw now rather than
-// Animate being a separate tab, since they already shared the same
-// canvas, toolkit, and left panel underneath
-document.getElementById("draw-panel-toggle").addEventListener("click", e => {
-  const btn = e.target.closest("button[data-panel]");
-  if (!btn) return;
-  document.querySelectorAll("#draw-panel-toggle button").forEach(b => b.classList.toggle("active", b === btn));
-  const showTimeline = btn.dataset.panel === "timeline";
-  document.getElementById("draw-tools-content").style.display = showTimeline ? "none" : "block";
-  document.getElementById("animate-timeline-panel").style.display = showTimeline ? "flex" : "none";
-  // keep phase management (Next/Clone/Mirror/More) as a Draw-only set of
-  // tools — Animate's left panel is just for browsing/selecting phases
-  document.querySelector(".phase-actions").classList.toggle("phase-actions-hidden", showTimeline);
-  // Animate is for moving existing objects, not adding new ones — if a
-  // placement tool (arrow, player, etc.) was left armed from Draw Tools,
-  // switching to Animate would otherwise keep drawing/placing with it
-  if (showTimeline) setTool("select");
-  updatePlaybackUIVisibility();
-  if (showTimeline) refreshAnimatePanel();
-});
-// the progress bar is playback UI — only relevant while the Timeline
-// panel is open, or while something is actually playing (so switching
-// back to Tools mid-playback doesn't hide the progress of a still-running
+// the progress bar is playback UI — only relevant while Animate mode is
+// active, or while something is actually playing (so switching back to
+// Create mid-playback doesn't hide the progress of a still-running
 // animation)
 function updatePlaybackUIVisibility() {
-  const timelineActive = document.querySelector('#draw-panel-toggle button[data-panel="timeline"]').classList.contains("active");
+  const timelineActive = currentMode === "animate";
   const show = timelineActive || isPlaying;
   document.getElementById("animate-scrub-row").style.display = show ? "flex" : "none";
   // the border + badge signal "you're in Animate mode" specifically —
-  // tied to the toggle itself, not to isPlaying, so it reflects which
-  // panel you're working in rather than whether something is animating
+  // tied to the mode itself, not to isPlaying, so it reflects which mode
+  // you're working in rather than whether something is animating
   document.getElementById("canvas-area").classList.toggle("animate-mode-active", timelineActive);
   document.getElementById("animate-mode-badge").style.display = timelineActive ? "block" : "none";
 }
