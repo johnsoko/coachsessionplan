@@ -5206,7 +5206,7 @@ function renderOutputContent() {
       const n = document.createElement("div");
       n.className = "output-phase-notes";
       n.innerHTML = blocks.length
-        ? blocks.map(b => `<div class="output-info-block">${b.title ? `<div class="output-info-block-title">${escapeHtml(b.title)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
+        ? blocks.map(b => `<div class="output-info-block">${(b.title || b.placeholder) ? `<div class="output-info-block-title">${escapeHtml(b.title || b.placeholder)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
         : `<p class="output-empty">No notes for this phase.</p>`;
       return n;
     })() : null;
@@ -7300,7 +7300,7 @@ function migrateLegacyNoteBlocks(ph) {
 function phaseInfoBlocksText(ph) {
   return (ph.infoBlocks || [])
     .filter(b => b.enabled !== false && ((b.title || "").trim() || (b.text || "").trim()))
-    .map(b => (b.title ? b.title + ": " : "") + (b.text || ""))
+    .map(b => { const label = b.title || b.placeholder; return (label ? label + ": " : "") + (b.text || ""); })
     .join(" ")
     .trim();
 }
@@ -8384,7 +8384,7 @@ async function openLibraryDrillDetail(id) {
       notesBody.className = "lib-detail-desc";
       const notesBlocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (b.text || "").trim());
       notesBody.innerHTML = notesBlocks.length
-        ? notesBlocks.map(b => `<div class="output-info-block">${b.title ? `<div class="output-info-block-title">${escapeHtml(b.title)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
+        ? notesBlocks.map(b => `<div class="output-info-block">${(b.title || b.placeholder) ? `<div class="output-info-block-title">${escapeHtml(b.title || b.placeholder)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
         : `<p class="output-empty">No notes yet.</p>`;
       phasesEl.appendChild(thumbWrap);
       phasesEl.appendChild(notesLabel);
@@ -8413,7 +8413,7 @@ async function openLibraryDrillDetail(id) {
         const notesBody = document.createElement("div");
         notesBody.className = "output-phase-notes lib-detail-desc";
         notesBody.innerHTML = notesBlocks.length
-          ? notesBlocks.map(b => `<div class="output-info-block">${b.title ? `<div class="output-info-block-title">${escapeHtml(b.title)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
+          ? notesBlocks.map(b => `<div class="output-info-block">${(b.title || b.placeholder) ? `<div class="output-info-block-title">${escapeHtml(b.title || b.placeholder)}</div>` : ""}<div class="output-info-block-text">${escapeHtml(b.text)}</div></div>`).join("")
           : `<p class="output-empty">No notes yet.</p>`;
         block.appendChild(notesLabel);
         block.appendChild(notesBody);
