@@ -417,14 +417,14 @@
     border-radius: 9px; padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 14px;
   }
   .timetable-header-row {
-    display: grid; grid-template-columns: 20px 140px 220px 1fr 64px; gap: 12px; padding: 0 12px 6px;
+    display: grid; grid-template-columns: 20px 170px 220px 1fr 64px; gap: 12px; padding: 0 12px 6px;
     font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint);
   }
   .timetable-header-row.drill-mode, .phase-note-card.drill-mode {
     grid-template-columns: 20px 220px 1fr 64px;
   }
   .phase-note-card {
-    display: grid; grid-template-columns: 20px 140px 220px 1fr 64px; align-items: start;
+    display: grid; grid-template-columns: 20px 170px 220px 1fr 64px; align-items: start;
     gap: 12px;
     padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper-card);
   }
@@ -437,16 +437,17 @@
   .phase-note-time { align-self: center; display: flex; flex-direction: column; align-items: center; text-align: center; }
   .phase-note-time input.field-input { margin-bottom: 4px; text-align: center; }
   .phase-note-time-range { font-size: 10.5px; color: var(--ink-faint); }
-  .pn-mini-group { margin-bottom: 10px; width: 100%; }
+  .phase-note-time { padding: 6px 0; }
+  .pn-mini-group { margin-bottom: 16px; width: 100%; }
   .pn-mini-group:last-child { margin-bottom: 0; }
-  .pn-mini-row { display: flex; gap: 4px; width: 100%; }
+  .pn-mini-row { display: flex; gap: 8px; width: 100%; }
   .pn-mini-col { flex: 1; min-width: 0; }
-  .pn-mini-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-faint); display: block; margin-bottom: 3px; }
-  .pn-mini-input { width: 0; flex: 1; min-width: 0; padding: 6px 4px !important; font-size: 12px !important; text-align: center; }
-  .phase-note-duration-readout { font-size: 11px; font-weight: 700; color: var(--ink-soft); margin-bottom: 2px; }
-  .pn-load-row { display: flex; gap: 4px; align-items: center; width: 100%; }
+  .pn-mini-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-faint); display: block; margin-bottom: 4px; }
+  .pn-mini-input { width: 100%; padding: 9px 8px !important; font-size: 13px !important; text-align: center; }
+  .phase-note-duration-readout { font-size: 11px; font-weight: 700; color: var(--ink-soft); margin: 8px 0 2px; }
+  .pn-load-row { display: flex; gap: 6px; align-items: center; width: 100%; }
   .pn-load-row .pn-mini-input { text-align: left; }
-  .pn-load-swatch { width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid var(--line-md); flex-shrink: 0; padding: 0; }
+  .pn-load-swatch { width: 30px; height: 30px; border-radius: 6px; border: 1.5px solid var(--line-md); flex-shrink: 0; padding: 0; }
   .phase-note-exercise { display: flex; flex-direction: column; gap: 6px; }
   .phase-note-card .phase-note-drill-title { font-weight: 600; font-size: 13px; text-align: center; }
   .phase-note-notes-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
