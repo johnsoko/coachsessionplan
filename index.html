@@ -437,6 +437,9 @@
   .phase-note-time { align-self: center; display: flex; flex-direction: column; align-items: center; text-align: center; }
   .phase-note-time input.field-input { margin-bottom: 4px; text-align: center; }
   .phase-note-time-range { font-size: 10.5px; color: var(--ink-faint); }
+  .pn-mini-row { display: flex; gap: 4px; margin-bottom: 4px; width: 100%; }
+  .pn-mini-input { width: 0; flex: 1; min-width: 0; padding: 6px 4px !important; font-size: 12px !important; text-align: center; }
+  .phase-note-duration-readout { font-size: 11px; font-weight: 700; color: var(--ink-soft); margin-bottom: 2px; }
   .phase-note-exercise { display: flex; flex-direction: column; gap: 6px; }
   .phase-note-card .phase-note-drill-title { font-weight: 600; font-size: 13px; text-align: center; }
   .phase-note-notes-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -5885,6 +5888,7 @@ function renderPhaseNotes() {
   document.getElementById("timetable-total-duration").textContent = "Total Practice Duration: " + timetableTotalDuration() + " min";
   phases.forEach((ph, phIdx) => {
     if (!ph.noteBlocks || !ph.noteBlocks.length) ph.noteBlocks = [""];
+    ensurePhaseDetailFields(ph);
     const dur = parseInt(ph.duration, 10) || 0;
     const startEnd = dur ? `${formatClockTime(cursor)} - ${formatClockTime(cursor + dur)}` : "";
     cursor += dur;
@@ -5898,33 +5902,55 @@ function renderPhaseNotes() {
     handle.className = "phase-note-drag-handle";
     handle.innerHTML = `<svg width="12" height="18" viewBox="0 0 12 18" fill="none"><circle cx="3" cy="3" r="1.4" fill="currentColor"/><circle cx="9" cy="3" r="1.4" fill="currentColor"/><circle cx="3" cy="9" r="1.4" fill="currentColor"/><circle cx="9" cy="9" r="1.4" fill="currentColor"/><circle cx="3" cy="15" r="1.4" fill="currentColor"/><circle cx="9" cy="15" r="1.4" fill="currentColor"/></svg>`;
 
+    // Sets/Minutes/Length/Width here are the exact same ph.activeSets /
+    // ph.activeMinutes / ph.playingAreaLength / ph.playingAreaWidth the
+    // Panel's own Playing Area / Active Time fields read and write — same
+    // object, so a change made in either place is already "synced" the
+    // moment either view re-renders, with nothing extra to keep in step.
     const timeWrap = document.createElement("div");
     timeWrap.className = "phase-note-time";
-    timeWrap.innerHTML = `<input type="number" class="field-input" min="0" step="5" placeholder="min" value="${ph.duration || ""}"><div class="phase-note-time-range">${startEnd}</div>`;
-    const durInput = timeWrap.querySelector("input");
-    durInput.addEventListener("input", () => { ph.duration = durInput.value; updateTimetableTimeRanges(); });
+    timeWrap.innerHTML = `
+      <div class="pn-mini-row">
+        <input type="number" class="field-input pn-mini-input" min="0" step="1" placeholder="Sets" value="${ph.activeSets || ""}" title="Sets">
+        <input type="number" class="field-input pn-mini-input" min="0" step="1" placeholder="Min" value="${ph.activeMinutes || ""}" title="Minutes per set">
+      </div>
+      <div class="phase-note-duration-readout">${ph.duration ? ph.duration + " min" : ""}</div>
+      <div class="phase-note-time-range">${startEnd}</div>
+    `;
+    const setsInput = timeWrap.querySelectorAll(".pn-mini-input")[0];
+    const minutesInput = timeWrap.querySelectorAll(".pn-mini-input")[1];
+    function onTimeInputChanged() {
+      ph.activeSets = setsInput.value;
+      ph.activeMinutes = minutesInput.value;
+      recomputeActiveDuration(ph); // also refreshes the Panel's own readout if present
+      timeWrap.querySelector(".phase-note-duration-readout").textContent = ph.duration ? ph.duration + " min" : "";
+      updateTimetableTimeRanges();
+    }
+    setsInput.addEventListener("input", onTimeInputChanged);
+    minutesInput.addEventListener("input", onTimeInputChanged);
 
     const exerciseWrap = document.createElement("div");
     exerciseWrap.className = "phase-note-exercise";
     const thumb = createAnimatedThumb(ph, "phase-note-thumb");
-    // This field used to be linked to the drill's title (ph.title) here,
-    // shared with the Create tab's phase-thumb label — editing either one
-    // changed the same value. Deliberately unlinked now: this is always
-    // Dimensions (ph.dimensions), in both the drill creator and practice
-    // plans. The title still shows, just as a hover overlay on the
-    // preview instead of a separate editable field — it's still set from
-    // the Create tab thumbnail (and the topbar, in the drill creator).
-    const dimensionsInput = document.createElement("input");
-    dimensionsInput.type = "text";
-    dimensionsInput.className = "field-input phase-note-drill-title";
-    dimensionsInput.placeholder = "Dimensions";
-    dimensionsInput.value = ph.dimensions || "";
-    dimensionsInput.addEventListener("input", () => { ph.dimensions = dimensionsInput.value; });
+    // Length/Width replace the old single freeform Dimensions field —
+    // same ph.playingAreaLength / ph.playingAreaWidth the Panel's Playing
+    // Area section already uses. The title still shows only as a hover
+    // overlay on the preview, same as before this change.
+    const areaRow = document.createElement("div");
+    areaRow.className = "pn-mini-row";
+    areaRow.innerHTML = `
+      <input type="number" class="field-input pn-mini-input" min="0" step="1" placeholder="L (m)" value="${ph.playingAreaLength || ""}" title="Length (m)">
+      <input type="number" class="field-input pn-mini-input" min="0" step="1" placeholder="W (m)" value="${ph.playingAreaWidth || ""}" title="Width (m)">
+    `;
+    const lengthInput = areaRow.querySelectorAll(".pn-mini-input")[0];
+    const widthInput = areaRow.querySelectorAll(".pn-mini-input")[1];
+    lengthInput.addEventListener("input", () => { ph.playingAreaLength = lengthInput.value; });
+    widthInput.addEventListener("input", () => { ph.playingAreaWidth = widthInput.value; });
     const titleOverlay = document.createElement("div");
     titleOverlay.className = "phase-note-thumb-title-overlay";
     titleOverlay.textContent = ph.title || (phaseNoun() + " " + (phIdx + 1));
     thumb.appendChild(titleOverlay);
-    exerciseWrap.appendChild(dimensionsInput);
+    exerciseWrap.appendChild(areaRow);
     exerciseWrap.appendChild(thumb);
 
     // Panel's Block Information (Organisation, Coaching Points, etc.) is
