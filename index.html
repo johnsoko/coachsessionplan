@@ -554,6 +554,9 @@
   .pd-setup-box { border: 1px solid var(--line-md); border-radius: 10px; padding: 14px; margin-bottom: 22px; }
   .pd-setup-row { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
   .pd-setup-row > div { flex: 1; min-width: 0; }
+  .pd-section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-faint); display: block; margin: 20px 0 10px; }
+  .pd-section-label:first-child { margin-top: 0; }
+  .pd-hint { font-size: 11px; color: var(--ink-faint); line-height: 1.4; margin: -4px 0 16px; }
   .pd-subtle-label { font-size: 11px; font-weight: 600; color: var(--ink-soft); display: block; margin-bottom: 6px; }
   .pd-unit-input-wrap { position: relative; }
   .pd-unit-input-wrap input { width: 100%; padding-right: 30px; }
@@ -1757,7 +1760,7 @@
               <input type="text" class="field-input" id="pd-title" placeholder="e.g. Part 1">
             </div>
             <div class="pd-setup-box">
-              <label class="tp-label" style="margin-top:0;">Playing Area</label>
+              <label class="pd-section-label">Playing Area</label>
               <div class="pd-setup-row">
                 <div>
                   <span class="pd-subtle-label">Length</span>
@@ -1774,7 +1777,7 @@
                   </div>
                 </div>
               </div>
-              <label class="tp-label">Active Time</label>
+              <label class="pd-section-label">Active Time</label>
               <div class="pd-setup-row">
                 <div>
                   <span class="pd-subtle-label">Sets</span>
@@ -1788,8 +1791,8 @@
                   </div>
                 </div>
               </div>
-              <p class="pd-hint" style="margin: -6px 0 14px;">Minutes per set, excluding rest.</p>
-              <label class="tp-label">Load</label>
+              <p class="pd-hint">Minutes per set, excluding rest.</p>
+              <label class="pd-section-label">Load</label>
               <div class="pd-load-row">
                 <input type="text" class="field-input" id="pd-load" placeholder="Optional">
                 <button class="pd-load-swatch" id="pd-load-swatch" title="Load color"></button>
