@@ -552,13 +552,18 @@
   #phase-detail-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   #phase-detail-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 18px; }
   .pd-setup-box { border: 1px solid var(--line-md); border-radius: 10px; padding: 14px; margin-bottom: 22px; }
-  .pd-setup-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
-  .pd-duration-row { display: flex; align-items: center; gap: 8px; }
-  .pd-duration-row input { width: 72px; flex-shrink: 0; }
-  .pd-unit { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
-  .pd-players-readout { text-align: right; }
-  .pd-players-value { font-family: var(--display); font-size: 19px; font-weight: 700; color: var(--ink); white-space: nowrap; }
-  .pd-players-label { font-size: 11px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; }
+  .pd-setup-row { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+  .pd-setup-row > div { flex: 1; min-width: 0; }
+  .pd-subtle-label { font-size: 11px; font-weight: 600; color: var(--ink-soft); display: block; margin-bottom: 6px; }
+  .pd-unit-input-wrap { position: relative; }
+  .pd-unit-input-wrap input { width: 100%; padding-right: 30px; }
+  .pd-unit-input-wrap input::-webkit-outer-spin-button,
+  .pd-unit-input-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .pd-unit-input-wrap input[type="number"] { -moz-appearance: textfield; }
+  .pd-unit-suffix {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 12.5px; font-weight: 600; color: var(--ink-faint); pointer-events: none;
+  }
   .pd-load-row { display: flex; align-items: center; gap: 8px; }
   .pd-load-row input { flex: 1; }
   .pd-load-swatch { width: 34px; height: 34px; border-radius: 8px; border: 1.5px solid var(--line-md); flex-shrink: 0; }
@@ -1748,23 +1753,42 @@
         <div id="phase-detail-panel" style="display:none;">
           <div id="phase-detail-scroll">
             <div class="notes-field" style="margin-bottom:18px;">
-              <label>Block Title</label>
+              <label>Activity Title</label>
               <input type="text" class="field-input" id="pd-title" placeholder="e.g. Part 1">
             </div>
             <div class="pd-setup-box">
+              <label class="tp-label" style="margin-top:0;">Playing Area</label>
               <div class="pd-setup-row">
                 <div>
-                  <label class="tp-label" style="margin-top:0;">Duration</label>
-                  <div class="pd-duration-row">
-                    <input type="number" class="field-input" id="pd-duration" min="0" step="5">
-                    <span class="pd-unit">min</span>
+                  <span class="pd-subtle-label">Length</span>
+                  <div class="pd-unit-input-wrap">
+                    <input type="number" class="field-input" id="pd-length" min="0" step="1">
+                    <span class="pd-unit-suffix">m</span>
                   </div>
                 </div>
-                <div class="pd-players-readout">
-                  <div class="pd-players-value" id="pd-players-value">–</div>
-                  <div class="pd-players-label">Players</div>
+                <div>
+                  <span class="pd-subtle-label">Width</span>
+                  <div class="pd-unit-input-wrap">
+                    <input type="number" class="field-input" id="pd-width" min="0" step="1">
+                    <span class="pd-unit-suffix">m</span>
+                  </div>
                 </div>
               </div>
+              <label class="tp-label">Active Time</label>
+              <div class="pd-setup-row">
+                <div>
+                  <span class="pd-subtle-label">Sets</span>
+                  <input type="number" class="field-input" id="pd-sets" min="0" step="1">
+                </div>
+                <div>
+                  <span class="pd-subtle-label">Minutes</span>
+                  <div class="pd-unit-input-wrap">
+                    <input type="number" class="field-input" id="pd-minutes" min="0" step="1">
+                    <span class="pd-unit-suffix">min</span>
+                  </div>
+                </div>
+              </div>
+              <p class="pd-hint" style="margin: -6px 0 14px;">Minutes per set, excluding rest.</p>
               <label class="tp-label">Load</label>
               <div class="pd-load-row">
                 <input type="text" class="field-input" id="pd-load" placeholder="Optional">
@@ -4680,7 +4704,11 @@ function newPhaseObj(contentSrc, surfaceSrc) {
     objective: contentSrc ? (contentSrc.objective || "") : "",
     load: contentSrc ? (contentSrc.load || "") : "",
     loadColor: contentSrc ? (contentSrc.loadColor || DEFAULT_LOAD_COLOR) : DEFAULT_LOAD_COLOR,
-    infoBlocks: contentSrc && contentSrc.infoBlocks ? contentSrc.infoBlocks.map(b => ({...b, id: nextId++})) : defaultInfoBlocks()
+    infoBlocks: contentSrc && contentSrc.infoBlocks ? contentSrc.infoBlocks.map(b => ({...b, id: nextId++})) : defaultInfoBlocks(),
+    playingAreaLength: contentSrc ? (contentSrc.playingAreaLength || "") : "",
+    playingAreaWidth: contentSrc ? (contentSrc.playingAreaWidth || "") : "",
+    activeSets: contentSrc ? (contentSrc.activeSets || "") : "",
+    activeMinutes: contentSrc ? (contentSrc.activeMinutes || "") : ""
   };
 }
 function saveActiveScene() {
@@ -6116,17 +6144,10 @@ function ensurePhaseDetailFields(ph) {
   if (ph.load == null) ph.load = "";
   if (!ph.loadColor) ph.loadColor = DEFAULT_LOAD_COLOR;
   if (!ph.infoBlocks || !ph.infoBlocks.length) ph.infoBlocks = defaultInfoBlocks();
-}
-// "4 + 2 GK" style readout — outfield player count, plus goalkeepers
-// counted separately, based on the phase's own currently active scene
-function computePlayersReadout(ph) {
-  const sc = ph.scenes.find(s => s.id === ph.activeSceneId) || ph.scenes[0];
-  if (!sc) return "–";
-  const players = sc.tokens.filter(t => t.type === "player");
-  if (!players.length) return "–";
-  const gk = players.filter(t => t.pos === "GK").length;
-  const outfield = players.length - gk;
-  return gk ? `${outfield} + ${gk} GK` : String(outfield);
+  if (ph.playingAreaLength == null) ph.playingAreaLength = "";
+  if (ph.playingAreaWidth == null) ph.playingAreaWidth = "";
+  if (ph.activeSets == null) ph.activeSets = "";
+  if (ph.activeMinutes == null) ph.activeMinutes = "";
 }
 function renderPhaseDetailPanel() {
   const panel = document.getElementById("phase-detail-panel");
@@ -6135,8 +6156,10 @@ function renderPhaseDetailPanel() {
   if (!ph) return;
   ensurePhaseDetailFields(ph);
   document.getElementById("pd-title").value = ph.title || "";
-  document.getElementById("pd-duration").value = ph.duration || "";
-  document.getElementById("pd-players-value").textContent = computePlayersReadout(ph);
+  document.getElementById("pd-length").value = ph.playingAreaLength || "";
+  document.getElementById("pd-width").value = ph.playingAreaWidth || "";
+  document.getElementById("pd-sets").value = ph.activeSets || "";
+  document.getElementById("pd-minutes").value = ph.activeMinutes || "";
   document.getElementById("pd-load").value = ph.load || "";
   document.getElementById("pd-load-swatch").style.background = ph.loadColor;
   document.getElementById("pd-load-color-input").value = ph.loadColor;
@@ -6215,10 +6238,36 @@ document.getElementById("pd-title").addEventListener("input", e => {
   ph.title = e.target.value;
   renderPhaseThumbActive();
 });
-document.getElementById("pd-duration").addEventListener("input", e => {
+document.getElementById("pd-length").addEventListener("input", e => {
   const ph = phases.find(p => p.id === activePhaseId);
   if (!ph) return;
-  ph.duration = e.target.value;
+  ph.playingAreaLength = e.target.value;
+});
+document.getElementById("pd-width").addEventListener("input", e => {
+  const ph = phases.find(p => p.id === activePhaseId);
+  if (!ph) return;
+  ph.playingAreaWidth = e.target.value;
+});
+// Sets × Minutes-per-set is how activity time is entered now, but the
+// Details timetable's start/end time math and the session total still
+// run on ph.duration — recomputing it here keeps that working unchanged
+// rather than needing its own rewrite
+function recomputeActiveDuration(ph) {
+  const sets = parseInt(ph.activeSets, 10) || 0;
+  const minutes = parseInt(ph.activeMinutes, 10) || 0;
+  ph.duration = (sets && minutes) ? String(sets * minutes) : "";
+}
+document.getElementById("pd-sets").addEventListener("input", e => {
+  const ph = phases.find(p => p.id === activePhaseId);
+  if (!ph) return;
+  ph.activeSets = e.target.value;
+  recomputeActiveDuration(ph);
+});
+document.getElementById("pd-minutes").addEventListener("input", e => {
+  const ph = phases.find(p => p.id === activePhaseId);
+  if (!ph) return;
+  ph.activeMinutes = e.target.value;
+  recomputeActiveDuration(ph);
 });
 document.getElementById("pd-load").addEventListener("input", e => {
   const ph = phases.find(p => p.id === activePhaseId);
