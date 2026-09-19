@@ -556,6 +556,8 @@
   .pd-setup-row > div { flex: 1; min-width: 0; }
   .pd-section-label { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--ink-faint); display: block; margin: 20px 0 10px; }
   .pd-section-label:first-child { margin-top: 0; }
+  .pd-section-header-row { display: flex; align-items: baseline; justify-content: space-between; margin: 20px 0 10px; }
+  .pd-duration-readout { font-size: 11px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; }
   .pd-hint { font-size: 11px; color: var(--ink-faint); line-height: 1.4; margin: -4px 0 16px; }
   .pd-subtle-label { font-size: 11px; font-weight: 600; color: var(--ink-soft); display: block; margin-bottom: 6px; }
   .pd-unit-input-wrap { position: relative; }
@@ -1777,7 +1779,10 @@
                   </div>
                 </div>
               </div>
-              <label class="pd-section-label">Active Time</label>
+              <div class="pd-section-header-row">
+                <label class="pd-section-label" style="margin-bottom:0;">Active Time</label>
+                <span class="pd-duration-readout" id="pd-duration-readout"></span>
+              </div>
               <div class="pd-setup-row">
                 <div>
                   <span class="pd-subtle-label">Sets</span>
@@ -6163,6 +6168,7 @@ function renderPhaseDetailPanel() {
   document.getElementById("pd-width").value = ph.playingAreaWidth || "";
   document.getElementById("pd-sets").value = ph.activeSets || "";
   document.getElementById("pd-minutes").value = ph.activeMinutes || "";
+  updateDurationReadout(ph);
   document.getElementById("pd-load").value = ph.load || "";
   document.getElementById("pd-load-swatch").style.background = ph.loadColor;
   document.getElementById("pd-load-color-input").value = ph.loadColor;
@@ -6259,6 +6265,12 @@ function recomputeActiveDuration(ph) {
   const sets = parseInt(ph.activeSets, 10) || 0;
   const minutes = parseInt(ph.activeMinutes, 10) || 0;
   ph.duration = (sets && minutes) ? String(sets * minutes) : "";
+  updateDurationReadout(ph);
+}
+function updateDurationReadout(ph) {
+  const el = document.getElementById("pd-duration-readout");
+  if (!el) return;
+  el.textContent = ph.duration ? `Duration ${ph.duration} min` : "";
 }
 document.getElementById("pd-sets").addEventListener("input", e => {
   const ph = phases.find(p => p.id === activePhaseId);
