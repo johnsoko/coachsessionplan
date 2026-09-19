@@ -658,6 +658,19 @@
   }
   .scene-add-btn:hover { background: var(--pitch); color: #F7F8F3; }
 
+  @media print {
+    /* only the Output card's own content should ever print — everything
+       else (app nav, sidebars, toolbars, icon row, the browser's own
+       print/PDF settings) is app chrome that means nothing on paper */
+    body * { visibility: hidden; }
+    #output-card, #output-card * { visibility: visible; }
+    #output-card {
+      position: absolute; left: 0; top: 0; width: 100%; max-width: none;
+      border: none; box-shadow: none; padding: 0; margin: 0;
+    }
+    .output-card-head, #output-play-full-btn { display: none !important; }
+  }
+
   .output-card {
     width: 100%; max-width: 920px; background: var(--paper-card); border: 1px solid var(--line); border-radius: 12px; padding: 26px;
   }
@@ -1096,6 +1109,35 @@
   .lib-detail-label { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
   .lib-detail-phases-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px 24px; }
   .lib-detail-phases-grid .output-phase-block { margin-top: 0; }
+
+  /* PRINT / DOWNLOAD-AS-PDF — Print and Download both use the browser's
+     own print pipeline (window.print(); "Save as PDF" is a standard
+     destination in every modern browser's print dialog, so this needs no
+     PDF library). This isolates the Output card itself: everything else
+     (top bar, side panels, toolbar, the icon row you'd be clicking from)
+     is hidden, and the height/overflow lock the app normally runs under
+     is lifted so the full, possibly-multi-page content can actually print
+     rather than being clipped to one screen's height. */
+  @media print {
+    body { height: auto !important; overflow: visible !important; }
+    #app-shell { display: block !important; }
+    #topbar, #left-panel, #draw-main-row, .output-toolbar-row, .output-icon-row,
+    #view-draw, #view-notes, .mobile-mode-btn, #mobile-sheet-overlay { display: none !important; }
+    #view-output { display: block !important; position: static !important; height: auto !important; overflow: visible !important; }
+    .stub-main { width: 100% !important; height: auto !important; overflow: visible !important; padding: 0 !important; }
+    .output-card { box-shadow: none !important; border: none !important; max-width: 100% !important; }
+  }
+  /* PUBLIC VIEW — a shared link (?id=...) opened by someone not signed
+     in. The plan's data loads the same way it always does (the backend's
+     GET already requires no auth); what's hidden here is purely editing
+     chrome that would be meaningless (Save would just fail with no
+     account) or risky-looking (implying they could change someone else's
+     plan) for a read-only visitor. */
+  body.public-view-mode .mode-tabs,
+  body.public-view-mode #save-menu-wrap,
+  body.public-view-mode .topbar-right,
+  body.public-view-mode #close-btn,
+  body.public-view-mode .output-settings-btn { display: none !important; }
 </style>
 </head>
 <body>
@@ -1855,7 +1897,7 @@
           </div>
         </div>
 
-        <div class="output-card">
+        <div class="output-card" id="output-card">
           <div class="output-card-head">
             <div class="output-author">
               <div class="output-avatar" id="output-avatar">C</div>
@@ -1865,11 +1907,9 @@
               </div>
             </div>
             <div class="output-icon-row">
-              <button class="icon-btn" data-toast="Opening viewer…" title="Open"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.2" stroke="currentColor" stroke-width="1.3"/></svg></button>
-              <button class="icon-btn" data-toast="Sign in to download" title="Download"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2.5v7M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3"/></svg></button>
-              <button class="icon-btn" data-toast="Preparing print view…" title="Print"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3.5" y="6" width="9" height="5" stroke="currentColor" stroke-width="1.3"/><path d="M5 6V3h6v3M5 11v2h6v-2" stroke="currentColor" stroke-width="1.3"/></svg></button>
-              <button class="icon-btn" data-toast="Sign in to share a link" title="Share"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="4" cy="8" r="1.6" stroke="currentColor" stroke-width="1.2"/><circle cx="11" cy="4" r="1.6" stroke="currentColor" stroke-width="1.2"/><circle cx="11" cy="12" r="1.6" stroke="currentColor" stroke-width="1.2"/><path d="M5.3 7.2l4.4-2.4M5.3 8.8l4.4 2.4" stroke="currentColor" stroke-width="1.2"/></svg></button>
-              <button class="icon-btn" data-toast="Sign in to save a copy" title="Duplicate"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4.5" width="8" height="9" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M6 4.5V3a1 1 0 0 1 1-1h5.5a1 1 0 0 1 1 1V10a1 1 0 0 1-1 1H12" stroke="currentColor" stroke-width="1.2"/></svg></button>
+              <button class="icon-btn" id="output-download-btn" title="Download PDF"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2.5v7M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" fill="none"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.3"/></svg></button>
+              <button class="icon-btn" id="output-print-btn" title="Print"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3.5" y="6" width="9" height="5" stroke="currentColor" stroke-width="1.3"/><path d="M5 6V3h6v3M5 11v2h6v-2" stroke="currentColor" stroke-width="1.3"/></svg></button>
+              <button class="icon-btn" id="output-share-btn" title="Share"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="4" cy="8" r="1.6" stroke="currentColor" stroke-width="1.2"/><circle cx="11" cy="4" r="1.6" stroke="currentColor" stroke-width="1.2"/><circle cx="11" cy="12" r="1.6" stroke="currentColor" stroke-width="1.2"/><path d="M5.3 7.2l4.4-2.4M5.3 8.8l4.4 2.4" stroke="currentColor" stroke-width="1.2"/></svg></button>
             </div>
           </div>
           <div class="output-title" id="output-title">Overload to finish</div>
@@ -7250,6 +7290,40 @@ document.getElementById("opt-show-desc").addEventListener("change", e => { outpu
 document.getElementById("opt-show-anim").addEventListener("change", e => { outputSettings.showAnimationButton = e.target.checked; renderOutputContent(); });
 document.getElementById("opt-show-titles").addEventListener("change", e => { outputSettings.showPhaseTitles = e.target.checked; renderOutputContent(); });
 document.getElementById("opt-show-phase-notes").addEventListener("change", e => { outputSettings.showPhaseNotes = e.target.checked; renderOutputContent(); });
+// Print and "Download PDF" both hand off to the browser's own print
+// pipeline — every modern browser's print dialog offers "Save as PDF" as
+// a destination, which is a reliable, dependency-free way to produce a
+// PDF without a client-side PDF library (and one that renders the field
+// diagrams as actual vector graphics, not a rasterized screenshot the
+// way a library like html2canvas would). The @media print rules do the
+// real work of hiding everything but the Output card itself.
+document.getElementById("output-print-btn").addEventListener("click", () => window.print());
+document.getElementById("output-download-btn").addEventListener("click", () => {
+  toast("Choose \"Save as PDF\" in the print dialog to download");
+  window.print();
+});
+document.getElementById("output-share-btn").addEventListener("click", async () => {
+  if (!currentDrillId) {
+    toast("Save this plan first to get a shareable link");
+    return;
+  }
+  const shareUrl = `${location.origin}${location.pathname}?id=${currentDrillId}`;
+  const title = document.getElementById("title-input").value || "Practice Plan";
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, url: shareUrl });
+    } catch (e) {
+      // user backed out of the native share sheet — not an error
+    }
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(shareUrl);
+    toast("Link copied to clipboard");
+  } catch (e) {
+    toast("Could not copy link — copy it from the address bar instead");
+  }
+});
 document.getElementById("opt-show-videos").addEventListener("change", e => { outputSettings.showVideos = e.target.checked; });
 document.getElementById("output-color-row").addEventListener("click", e => {
   const btn = e.target.closest("button[data-color]");
@@ -7270,6 +7344,19 @@ document.getElementById("opt-scale").addEventListener("input", e => {
    id in it; opening that link loads the drill back.
 ═════════════════════════════════════════════════════════════════════ */
 let currentDrillId = new URLSearchParams(location.search).get("id") || null;
+// true when a shared link (?id=...) is opened by someone who isn't
+// signed in — the plan's data loads exactly the same way either way
+// (the backend's read endpoint already requires no auth); this only
+// controls presentation, dropping the visitor straight into a read-only
+// Output view instead of the normal sign-in/marketing landing page
+let isPublicViewMode = false;
+function enterPublicViewMode() {
+  isPublicViewMode = true;
+  document.body.classList.add("public-view-mode");
+  showScreen("app");
+  switchMode("output");
+  requestAnimationFrame(() => resizeCanvas());
+}
 // standalone "Drills" page mode: editing a single drill directly (saved
 // to drill_library) rather than a multi-phase practice plan (saved to
 // drills). Hides scheduling fields/timetable extras that only make sense
@@ -7665,6 +7752,15 @@ function refreshAuthUI() {
   } else {
     signInBtn.style.display = "inline-flex";
     accountWrap.style.display = "none";
+    // a shared link should be viewable without an account — the backend's
+    // GET /api/drills/:id already allows this read with no auth; this is
+    // what actually lets a signed-out visitor see it, instead of always
+    // bouncing to the sign-in/landing screen the way every other route
+    // does for someone who isn't signed in
+    if (!isPublicViewMode && new URLSearchParams(location.search).get("id")) {
+      enterPublicViewMode();
+      return;
+    }
     // after an explicit sign-out, show the "you've been signed out" prompt
     // instead of the marketing landing page — but don't bounce off that
     // screen (or the marketing landing page) mid-sign-in-flow just because
@@ -7835,6 +7931,10 @@ async function loadDrillFromUrl() {
     loadAppState(data);
     markSavedSnapshot(); // baseline is the server's last-saved version, BEFORE any draft gets overlaid
     tryRestoreDraft("plan:" + id); // any unsaved edits from before a refresh take precedence over the last-saved version
+    // refreshAuthUI() may have already switched to Output before this
+    // fetch resolved, rendering it against still-empty data — this
+    // re-renders it now that the real plan is actually loaded
+    if (isPublicViewMode) switchMode("output");
     return true;
   } catch {
     toast("Could not load that drill — check your connection");
