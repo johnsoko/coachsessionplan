@@ -417,14 +417,14 @@
     border-radius: 9px; padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 14px;
   }
   .timetable-header-row {
-    display: grid; grid-template-columns: 20px 96px 220px 1fr 64px; gap: 12px; padding: 0 12px 6px;
+    display: grid; grid-template-columns: 20px 140px 220px 1fr 64px; gap: 12px; padding: 0 12px 6px;
     font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint);
   }
   .timetable-header-row.drill-mode, .phase-note-card.drill-mode {
     grid-template-columns: 20px 220px 1fr 64px;
   }
   .phase-note-card {
-    display: grid; grid-template-columns: 20px 96px 220px 1fr 64px; align-items: start;
+    display: grid; grid-template-columns: 20px 140px 220px 1fr 64px; align-items: start;
     gap: 12px;
     padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper-card);
   }
@@ -437,9 +437,16 @@
   .phase-note-time { align-self: center; display: flex; flex-direction: column; align-items: center; text-align: center; }
   .phase-note-time input.field-input { margin-bottom: 4px; text-align: center; }
   .phase-note-time-range { font-size: 10.5px; color: var(--ink-faint); }
-  .pn-mini-row { display: flex; gap: 4px; margin-bottom: 4px; width: 100%; }
+  .pn-mini-group { margin-bottom: 10px; width: 100%; }
+  .pn-mini-group:last-child { margin-bottom: 0; }
+  .pn-mini-row { display: flex; gap: 4px; width: 100%; }
+  .pn-mini-col { flex: 1; min-width: 0; }
+  .pn-mini-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-faint); display: block; margin-bottom: 3px; }
   .pn-mini-input { width: 0; flex: 1; min-width: 0; padding: 6px 4px !important; font-size: 12px !important; text-align: center; }
   .phase-note-duration-readout { font-size: 11px; font-weight: 700; color: var(--ink-soft); margin-bottom: 2px; }
+  .pn-load-row { display: flex; gap: 4px; align-items: center; width: 100%; }
+  .pn-load-row .pn-mini-input { text-align: left; }
+  .pn-load-swatch { width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid var(--line-md); flex-shrink: 0; padding: 0; }
   .phase-note-exercise { display: flex; flex-direction: column; gap: 6px; }
   .phase-note-card .phase-note-drill-title { font-weight: 600; font-size: 13px; text-align: center; }
   .phase-note-notes-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -5902,20 +5909,35 @@ function renderPhaseNotes() {
     handle.className = "phase-note-drag-handle";
     handle.innerHTML = `<svg width="12" height="18" viewBox="0 0 12 18" fill="none"><circle cx="3" cy="3" r="1.4" fill="currentColor"/><circle cx="9" cy="3" r="1.4" fill="currentColor"/><circle cx="3" cy="9" r="1.4" fill="currentColor"/><circle cx="9" cy="9" r="1.4" fill="currentColor"/><circle cx="3" cy="15" r="1.4" fill="currentColor"/><circle cx="9" cy="15" r="1.4" fill="currentColor"/></svg>`;
 
-    // Sets/Minutes/Length/Width here are the exact same ph.activeSets /
-    // ph.activeMinutes / ph.playingAreaLength / ph.playingAreaWidth the
-    // Panel's own Playing Area / Active Time fields read and write — same
-    // object, so a change made in either place is already "synced" the
-    // moment either view re-renders, with nothing extra to keep in step.
+    // Sets/Minutes/Length/Width/Load here are the exact same ph fields
+    // the Panel's own Playing Area / Active Time / Load fields read and
+    // write — same object, so a change made in either place is already
+    // "synced" the moment either view re-renders, with nothing extra to
+    // keep in step.
     const timeWrap = document.createElement("div");
     timeWrap.className = "phase-note-time";
     timeWrap.innerHTML = `
-      <div class="pn-mini-row">
-        <input type="number" class="field-input pn-mini-input" min="0" step="1" placeholder="Sets" value="${ph.activeSets || ""}" title="Sets">
-        <input type="number" class="field-input pn-mini-input" min="0" step="1" placeholder="Min" value="${ph.activeMinutes || ""}" title="Minutes per set">
+      <div class="pn-mini-group">
+        <div class="pn-mini-row">
+          <div class="pn-mini-col">
+            <span class="pn-mini-label">Sets</span>
+            <input type="number" class="field-input pn-mini-input" min="0" step="1" value="${ph.activeSets || ""}" title="Sets">
+          </div>
+          <div class="pn-mini-col">
+            <span class="pn-mini-label">Min</span>
+            <input type="number" class="field-input pn-mini-input" min="0" step="1" value="${ph.activeMinutes || ""}" title="Minutes per set">
+          </div>
+        </div>
+        <div class="phase-note-duration-readout">${ph.duration ? ph.duration + " min" : ""}</div>
+        <div class="phase-note-time-range">${startEnd}</div>
       </div>
-      <div class="phase-note-duration-readout">${ph.duration ? ph.duration + " min" : ""}</div>
-      <div class="phase-note-time-range">${startEnd}</div>
+      <div class="pn-mini-group">
+        <span class="pn-mini-label">Load</span>
+        <div class="pn-load-row">
+          <input type="text" class="field-input pn-mini-input" placeholder="Optional" value="${escapeHtml(ph.load || "")}" title="Load">
+          <button class="pn-load-swatch" title="Load color" style="background:${ph.loadColor || DEFAULT_LOAD_COLOR};"></button>
+        </div>
+      </div>
     `;
     const setsInput = timeWrap.querySelectorAll(".pn-mini-input")[0];
     const minutesInput = timeWrap.querySelectorAll(".pn-mini-input")[1];
@@ -5928,6 +5950,17 @@ function renderPhaseNotes() {
     }
     setsInput.addEventListener("input", onTimeInputChanged);
     minutesInput.addEventListener("input", onTimeInputChanged);
+    const loadInput = timeWrap.querySelector(".pn-load-row .pn-mini-input");
+    const loadSwatch = timeWrap.querySelector(".pn-load-swatch");
+    loadInput.addEventListener("input", () => { ph.load = loadInput.value; });
+    loadSwatch.addEventListener("click", () => {
+      // reuse the same single hidden native color input the Panel uses,
+      // rather than one per timetable card
+      const colorInput = document.getElementById("pd-load-color-input");
+      colorInput.value = ph.loadColor || DEFAULT_LOAD_COLOR;
+      colorInput.dataset.forPhaseId = ph.id;
+      colorInput.click();
+    });
 
     const exerciseWrap = document.createElement("div");
     exerciseWrap.className = "phase-note-exercise";
@@ -5939,8 +5972,14 @@ function renderPhaseNotes() {
     const areaRow = document.createElement("div");
     areaRow.className = "pn-mini-row";
     areaRow.innerHTML = `
-      <input type="number" class="field-input pn-mini-input" min="0" step="1" placeholder="L (m)" value="${ph.playingAreaLength || ""}" title="Length (m)">
-      <input type="number" class="field-input pn-mini-input" min="0" step="1" placeholder="W (m)" value="${ph.playingAreaWidth || ""}" title="Width (m)">
+      <div class="pn-mini-col">
+        <span class="pn-mini-label">Length (m)</span>
+        <input type="number" class="field-input pn-mini-input" min="0" step="1" value="${ph.playingAreaLength || ""}" title="Length (m)">
+      </div>
+      <div class="pn-mini-col">
+        <span class="pn-mini-label">Width (m)</span>
+        <input type="number" class="field-input pn-mini-input" min="0" step="1" value="${ph.playingAreaWidth || ""}" title="Width (m)">
+      </div>
     `;
     const lengthInput = areaRow.querySelectorAll(".pn-mini-input")[0];
     const widthInput = areaRow.querySelectorAll(".pn-mini-input")[1];
@@ -6316,13 +6355,24 @@ document.getElementById("pd-load").addEventListener("input", e => {
   ph.load = e.target.value;
 });
 document.getElementById("pd-load-swatch").addEventListener("click", () => {
-  document.getElementById("pd-load-color-input").click();
-});
-document.getElementById("pd-load-color-input").addEventListener("input", e => {
+  const colorInput = document.getElementById("pd-load-color-input");
   const ph = phases.find(p => p.id === activePhaseId);
+  colorInput.value = (ph && ph.loadColor) || DEFAULT_LOAD_COLOR;
+  colorInput.dataset.forPhaseId = activePhaseId;
+  colorInput.click();
+});
+// shared by both the Panel's own Load swatch and the Details/timetable
+// row's Load swatch — dataset.forPhaseId says which phase this click was
+// actually for, since the timetable can show any phase, not just
+// whichever one the Panel currently has open
+document.getElementById("pd-load-color-input").addEventListener("input", e => {
+  const targetId = parseInt(document.getElementById("pd-load-color-input").dataset.forPhaseId, 10);
+  const ph = phases.find(p => p.id === targetId);
   if (!ph) return;
   ph.loadColor = e.target.value;
-  document.getElementById("pd-load-swatch").style.background = e.target.value;
+  if (targetId === activePhaseId) document.getElementById("pd-load-swatch").style.background = e.target.value;
+  const timetableSwatch = document.querySelector(`.phase-note-card[data-phase-id="${targetId}"] .pn-load-swatch`);
+  if (timetableSwatch) timetableSwatch.style.background = e.target.value;
 });
 document.getElementById("pd-objective").addEventListener("input", e => {
   const ph = phases.find(p => p.id === activePhaseId);
