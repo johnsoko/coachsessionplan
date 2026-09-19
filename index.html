@@ -5919,29 +5919,29 @@ function renderPhaseNotes() {
     timeWrap.className = "phase-note-time";
     timeWrap.innerHTML = `
       <div class="pn-mini-group">
+        <span class="pn-mini-label">Load</span>
+        <div class="pn-load-row">
+          <input type="text" class="field-input pn-mini-input" data-field="load" placeholder="Optional" value="${escapeHtml(ph.load || "")}" title="Load">
+          <button class="pn-load-swatch" title="Load color" style="background:${ph.loadColor || DEFAULT_LOAD_COLOR};"></button>
+        </div>
+      </div>
+      <div class="pn-mini-group">
         <div class="pn-mini-row">
           <div class="pn-mini-col">
             <span class="pn-mini-label">Sets</span>
-            <input type="number" class="field-input pn-mini-input" min="0" step="1" value="${ph.activeSets || ""}" title="Sets">
+            <input type="number" class="field-input pn-mini-input" data-field="sets" min="0" step="1" value="${ph.activeSets || ""}" title="Sets">
           </div>
           <div class="pn-mini-col">
             <span class="pn-mini-label">Min</span>
-            <input type="number" class="field-input pn-mini-input" min="0" step="1" value="${ph.activeMinutes || ""}" title="Minutes per set">
+            <input type="number" class="field-input pn-mini-input" data-field="minutes" min="0" step="1" value="${ph.activeMinutes || ""}" title="Minutes per set">
           </div>
         </div>
         <div class="phase-note-duration-readout">${ph.duration ? ph.duration + " min" : ""}</div>
         <div class="phase-note-time-range">${startEnd}</div>
       </div>
-      <div class="pn-mini-group">
-        <span class="pn-mini-label">Load</span>
-        <div class="pn-load-row">
-          <input type="text" class="field-input pn-mini-input" placeholder="Optional" value="${escapeHtml(ph.load || "")}" title="Load">
-          <button class="pn-load-swatch" title="Load color" style="background:${ph.loadColor || DEFAULT_LOAD_COLOR};"></button>
-        </div>
-      </div>
     `;
-    const setsInput = timeWrap.querySelectorAll(".pn-mini-input")[0];
-    const minutesInput = timeWrap.querySelectorAll(".pn-mini-input")[1];
+    const setsInput = timeWrap.querySelector('[data-field="sets"]');
+    const minutesInput = timeWrap.querySelector('[data-field="minutes"]');
     function onTimeInputChanged() {
       ph.activeSets = setsInput.value;
       ph.activeMinutes = minutesInput.value;
@@ -5951,7 +5951,7 @@ function renderPhaseNotes() {
     }
     setsInput.addEventListener("input", onTimeInputChanged);
     minutesInput.addEventListener("input", onTimeInputChanged);
-    const loadInput = timeWrap.querySelector(".pn-load-row .pn-mini-input");
+    const loadInput = timeWrap.querySelector('[data-field="load"]');
     const loadSwatch = timeWrap.querySelector(".pn-load-swatch");
     loadInput.addEventListener("input", () => { ph.load = loadInput.value; });
     loadSwatch.addEventListener("click", () => {
