@@ -3554,16 +3554,16 @@ function setEquipmentSize(size) {
 }
 
 function syncArrowPopover() {
-  const matched = activeShapesOfKind(ARROW_KINDS);
-  const s = matched[0];
-  const color = s ? (s.color || drawDefaults.color) : drawDefaults.color;
+  // width and kind now apply immediately to whatever's selected, just
+  // like curved (see setArrowCurved's comment) — so their display reads
+  // from that same ungated source, unlike color below, which still only
+  // sets the default for the next new line
+  const gated = activeShapesOfKind(ARROW_KINDS)[0];
+  const s = selectedShapesOfKindAnyTool(ARROW_KINDS)[0];
+  const color = gated ? (gated.color || drawDefaults.color) : drawDefaults.color;
   const width = s ? (s.width || drawDefaults.width) : drawDefaults.width;
   const kind  = s ? s.style : arrowStyle;
-  // curved reads from whatever's actually selected right now (even the
-  // arrow just finished drawing, with the tool still armed), unlike
-  // color/width/kind above — see setArrowCurved's comment for why
-  const curvedShape = selectedShapesOfKindAnyTool(["run", "pass"])[0];
-  const curved = curvedShape ? !!curvedShape.curved : drawDefaults.curved;
+  const curved = (s && (s.style === "run" || s.style === "pass")) ? !!s.curved : drawDefaults.curved;
   document.querySelectorAll("#arrow-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
   // older saved arrows may have an arbitrary width from before this was
   // simplified to three presets — match to the closest preset for
@@ -3595,7 +3595,7 @@ function setArrowColor(color) {
   syncArrowPopover();
 }
 function setArrowWidth(width) {
-  const matched = activeShapesOfKind(ARROW_KINDS);
+  const matched = selectedShapesOfKindAnyTool(ARROW_KINDS);
   if (matched.length) { matched.forEach(s => s.width = width); renderShapes(); }
   drawDefaults.width = width;
   syncArrowPopover();
@@ -3815,7 +3815,7 @@ function initArrowPopover() {
     opt.addEventListener("click", e => {
       e.stopPropagation();
       const newStyle = opt.dataset.style;
-      const matched = activeShapesOfKind(ARROW_KINDS);
+      const matched = selectedShapesOfKindAnyTool(ARROW_KINDS);
       document.querySelectorAll("#arrow-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o === opt));
       // always keep the default in sync with whatever's now highlighted,
       // regardless of whether a shape was also selected — otherwise the
