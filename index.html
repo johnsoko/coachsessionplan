@@ -4675,11 +4675,19 @@ function onStageUp(e) {
   let shape;
   if (currentTool === "shape") {
     const dist = Math.hypot(p.x-drawStart.x, p.y-drawStart.y);
-    if (dist < 2) { noShapeCreated(); return; }
+    // this only needs to catch a genuine no-drag click (to deselect) —
+    // a real, deliberate short drag, like a small arrow started right
+    // next to a player, must still count as drawing. The old 2%-of-field
+    // threshold (~12-14px on a typical field) was easily bigger than the
+    // gap between a player token and a short arrow's own start/end point,
+    // so a short-but-real drag there got silently discarded as "just a
+    // click" and auto-switched back to Select — right where the next
+    // click would then land on the player instead of drawing.
+    if (dist < 0.5) { noShapeCreated(); return; }
     shape = { id: nextId++, style: shapeKind, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: shapeDefaults.color, width: shapeSizeMemory[shapeKind], fill: shapeDefaults.fill };
   } else {
     const dist = Math.hypot(p.x-drawStart.x, p.y-drawStart.y);
-    if (dist < 2) { noShapeCreated(); return; }
+    if (dist < 0.5) { noShapeCreated(); return; }
     // dribble now works exactly like run/pass — a simple two-point drag,
     // draggable/curvable the same way — the zigzag is purely a rendering
     // style, not a different underlying shape
