@@ -3412,6 +3412,17 @@ function activeShapesOfKind(kinds) {
   const ids = selectedIds().s;
   return shapes.filter(s => ids.includes(s.id) && kinds.includes(s.style));
 }
+// Straight/Curved is different from style/color/width: those set what a
+// brand-new line should look like, and shouldn't retroactively change
+// the one just drawn — but curved is a property of the line itself, the
+// same kind of adjustment as dragging its curve handle, so it should
+// always act on whatever's currently selected, including the arrow just
+// finished drawing (that's still "selected" for exactly this reason —
+// see the comment on activeShapesOfKind above)
+function selectedShapesOfKindAnyTool(kinds) {
+  const ids = selectedIds().s;
+  return shapes.filter(s => ids.includes(s.id) && kinds.includes(s.style));
+}
 
 function syncTeamPopover(team) {
   const matched = activeTokensOfType("player");
@@ -3548,7 +3559,11 @@ function syncArrowPopover() {
   const color = s ? (s.color || drawDefaults.color) : drawDefaults.color;
   const width = s ? (s.width || drawDefaults.width) : drawDefaults.width;
   const kind  = s ? s.style : arrowStyle;
-  const curved = (s && (s.style === "run" || s.style === "pass")) ? !!s.curved : drawDefaults.curved;
+  // curved reads from whatever's actually selected right now (even the
+  // arrow just finished drawing, with the tool still armed), unlike
+  // color/width/kind above — see setArrowCurved's comment for why
+  const curvedShape = selectedShapesOfKindAnyTool(["run", "pass"])[0];
+  const curved = curvedShape ? !!curvedShape.curved : drawDefaults.curved;
   document.querySelectorAll("#arrow-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
   // older saved arrows may have an arbitrary width from before this was
   // simplified to three presets — match to the closest preset for
@@ -3561,7 +3576,7 @@ function syncArrowPopover() {
 }
 function setArrowCurved(curved) {
   pushHistory();
-  const matched = activeShapesOfKind(["run", "pass"]);
+  const matched = selectedShapesOfKindAnyTool(["run", "pass"]);
   if (matched.length) {
     matched.forEach(s => {
       s.curved = curved;
