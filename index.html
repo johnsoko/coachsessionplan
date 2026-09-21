@@ -967,7 +967,7 @@
   #dashboard-screen { display: flex; height: 100vh; }
   .dash-sidebar {
     width: 220px; flex-shrink: 0; background: var(--paper-card); border-right: 1px solid var(--line);
-    padding: 20px 14px; display: flex; flex-direction: column;
+    padding: 20px 14px; display: flex; flex-direction: column; overflow-y: auto;
   }
   .dash-logo {
     font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: 0.04em;
@@ -1017,6 +1017,11 @@
     padding: 6px 10px; background: var(--paper-raised); color: var(--ink-soft);
   }
   .dash-filter-tag-chip.selected { background: var(--pitch); border-color: var(--pitch); color: #F7F8F3; }
+  .dash-filter-tag-viewall {
+    font-size: 12px; font-weight: 600; color: var(--pitch-deep); background: none; border: none;
+    padding: 6px 4px; width: 100%; text-align: left;
+  }
+  .dash-filter-tag-viewall:hover { text-decoration: underline; }
   .dash-empty { color: var(--ink-faint); font-size: 14px; padding: 20px 0; }
   .dash-plans-header, .dash-plan-row {
     display: grid; grid-template-columns: 28px 2fr 1fr 1fr 1fr 32px; align-items: center; gap: 12px;
@@ -8652,16 +8657,44 @@ async function deleteLibraryDrill(id, title, onDone) {
   }
 }
 
+const TAG_LIST_LIMIT = 10;
+let libraryTagListExpanded = false;
 function renderLibraryTagList() {
   const tagSearch = (document.getElementById("lib-tag-search-input").value || "").trim().toLowerCase();
   const counts = new Map();
   allLibraryDrills.forEach(d => d.tags.forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
   const listEl = document.getElementById("lib-tag-list");
-  const tags = Array.from(counts.keys()).filter(t => t.toLowerCase().includes(tagSearch)).sort();
+  const tags = Array.from(counts.keys()).filter(t => t.toLowerCase().includes(tagSearch));
+  // most-used first, so limiting to the top N surfaces the tags actually
+  // worth seeing at a glance rather than an arbitrary alphabetical slice
+  tags.sort((a, b) => (counts.get(b) - counts.get(a)) || a.localeCompare(b));
   if (!tags.length) { listEl.innerHTML = '<p class="dash-empty" style="padding:4px 0;">No tags yet.</p>'; return; }
-  listEl.innerHTML = tags.map(t =>
+
+  const searching = !!tagSearch;
+  let visibleTags = tags;
+  let viewAllLabel = null;
+  if (!searching && tags.length > TAG_LIST_LIMIT) {
+    if (libraryTagListExpanded) {
+      viewAllLabel = "Show less";
+    } else {
+      const top = tags.slice(0, TAG_LIST_LIMIT);
+      // a tag the coach has already filtered by should never disappear
+      // from view just because it didn't make the "most used" cut —
+      // otherwise there'd be no way to see (or clear) an active filter
+      // without expanding the list first
+      const topSet = new Set(top);
+      const keptSelected = tags.filter(t => selectedLibraryTags.has(t) && !topSet.has(t));
+      visibleTags = top.concat(keptSelected);
+      viewAllLabel = `View all (${tags.length})`;
+    }
+  }
+
+  listEl.innerHTML = visibleTags.map(t =>
     `<button class="dash-filter-tag-chip${selectedLibraryTags.has(t) ? " selected" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)} (${counts.get(t)})</button>`
   ).join("");
+  if (viewAllLabel) {
+    listEl.innerHTML += `<button class="dash-filter-tag-viewall" id="lib-tag-viewall-btn">${viewAllLabel}</button>`;
+  }
   listEl.querySelectorAll(".dash-filter-tag-chip").forEach(chip => {
     chip.addEventListener("click", () => {
       const tag = chip.dataset.tag;
@@ -8671,6 +8704,13 @@ function renderLibraryTagList() {
       applyLibraryFilters();
     });
   });
+  const viewAllBtn = document.getElementById("lib-tag-viewall-btn");
+  if (viewAllBtn) {
+    viewAllBtn.addEventListener("click", () => {
+      libraryTagListExpanded = !libraryTagListExpanded;
+      renderLibraryTagList();
+    });
+  }
 }
 
 async function openLibraryDrillDetail(id) {
