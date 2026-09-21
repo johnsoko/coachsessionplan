@@ -406,6 +406,16 @@
     font-size: 12.5px; font-weight: 500; color: var(--ink); background: var(--paper-card); border: 1.5px solid var(--pitch);
     border-radius: 5px; padding: 5px 9px; outline: none; width: 110px;
   }
+  .tag-suggest-wrap { position: relative; display: inline-block; }
+  .tag-suggest-menu {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 70;
+    background: var(--paper-card); border: 1px solid var(--line-md); border-radius: 8px;
+    box-shadow: 0 12px 28px -14px rgba(27,33,28,0.35); padding: 4px; min-width: 140px;
+    max-height: 180px; overflow-y: auto; display: none;
+  }
+  .tag-suggest-menu.open { display: block; }
+  .tag-suggest-item { padding: 7px 10px; border-radius: 6px; font-size: 12.5px; color: var(--ink); cursor: pointer; white-space: nowrap; }
+  .tag-suggest-item:hover, .tag-suggest-item.active { background: var(--paper-raised); }
   select, .field-input { width: 100%; border: 1px solid var(--line-md); background: var(--paper-card); border-radius: 7px; padding: 10px 12px; font-size: 13.5px; color: var(--ink); }
   .notes-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   textarea { width: 100%; border: 1px solid var(--line-md); background: var(--paper-card); border-radius: 7px; padding: 10px 12px; font-size: 13.5px; color: var(--ink); resize: vertical; min-height: 90px; font-family: var(--body); }
@@ -7085,31 +7095,83 @@ document.querySelectorAll("#tag-field .chip button").forEach(btn => {
   btn.addEventListener("click", () => { btn.closest(".chip").remove(); updateAddTagVisibility(); });
 });
 updateAddTagVisibility();
+// tags already used on any of this coach's other saved drills — the
+// suggestion list below is drawn from this, so typing "Fin" can surface
+// "Finishing" already used elsewhere instead of risking a near-duplicate
+// tag (e.g. "finishing") that wouldn't group with it in the library filter
+let knownTagsLoaded = false;
+async function ensureKnownTagsLoaded() {
+  if (knownTagsLoaded && allLibraryDrills.length) return;
+  try {
+    const token = await getAuthToken();
+    const headers = token ? { authorization: "Bearer " + token } : {};
+    const res = await fetch("/api/drill-library", { headers, cache: "no-store" });
+    if (!res.ok) return;
+    const { drills } = await res.json();
+    allLibraryDrills = drills.map(d => {
+      let tags = [];
+      try { tags = JSON.parse(d.tags || "[]"); } catch {}
+      let scenes = [];
+      try { scenes = JSON.parse(d.scenes || "[]"); } catch {}
+      return { ...d, tags: Array.isArray(tags) ? tags : [], scenes: Array.isArray(scenes) ? scenes : [] };
+    });
+    knownTagsLoaded = true;
+  } catch {}
+}
+function getKnownTags() {
+  const set = new Set();
+  allLibraryDrills.forEach(d => d.tags.forEach(t => set.add(t)));
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
 document.getElementById("add-tag-btn").addEventListener("click", () => {
   if (tagCount() >= MAX_TAGS) { toast("Up to " + MAX_TAGS + " tags per drill"); return; }
   const field = document.getElementById("tag-field");
   const addBtn = document.getElementById("add-tag-btn");
   if (field.querySelector(".chip-input")) return; // already editing one
+
+  const wrap = document.createElement("div");
+  wrap.className = "tag-suggest-wrap";
   const input = document.createElement("input");
   input.type = "text";
   input.className = "chip-input";
   input.placeholder = "Tag name";
-  field.insertBefore(input, addBtn);
+  const menu = document.createElement("div");
+  menu.className = "tag-suggest-menu";
+  wrap.appendChild(input);
+  wrap.appendChild(menu);
+  field.insertBefore(wrap, addBtn);
   input.focus();
+
   let done = false;
-  function commit() {
+  function commit(val) {
     if (done) return;
     done = true;
-    const val = input.value.trim();
-    input.remove();
+    val = (val != null ? val : input.value).trim();
+    wrap.remove();
     if (val) addTagChip(val);
   }
+  function renderSuggestions() {
+    const q = input.value.trim().toLowerCase();
+    const already = new Set(getTags().map(t => t.toLowerCase()));
+    const matches = getKnownTags().filter(t => !already.has(t.toLowerCase()) && (!q || t.toLowerCase().includes(q))).slice(0, 8);
+    if (!matches.length) { menu.classList.remove("open"); menu.innerHTML = ""; return; }
+    menu.innerHTML = matches.map(t => `<div class="tag-suggest-item">${escapeHtml(t)}</div>`).join("");
+    menu.classList.add("open");
+    menu.querySelectorAll(".tag-suggest-item").forEach((item, i) => {
+      // mousedown (not click) fires before the input's blur, so selecting
+      // a suggestion commits it directly instead of the blur handler
+      // racing it and closing the menu on an empty/half-typed value first
+      item.addEventListener("mousedown", e => { e.preventDefault(); commit(matches[i]); });
+    });
+  }
+  ensureKnownTagsLoaded().then(() => { if (!done) renderSuggestions(); });
+  input.addEventListener("input", renderSuggestions);
   input.addEventListener("keydown", e => {
     e.stopPropagation();
     if (e.key === "Enter") { e.preventDefault(); commit(); }
-    if (e.key === "Escape") { e.preventDefault(); done = true; input.remove(); }
+    if (e.key === "Escape") { e.preventDefault(); done = true; wrap.remove(); }
   });
-  input.addEventListener("blur", commit);
+  input.addEventListener("blur", () => commit());
 });
 
 /* ─────────────────────────────────────────────────────────
