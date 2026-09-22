@@ -2632,7 +2632,7 @@ function updateDrawHint(tool) {
 function setTool(tool, keepPanelOpen) {
   currentTool = tool;
   if (!keepPanelOpen) closeAllPopovers();
-  document.querySelectorAll(".tk-btn[data-tool]").forEach(b => b.classList.toggle("active", b.dataset.tool === tool));
+  refreshToolButtonStates();
   selectedTokenId = null; selectedShapeId = null;
   multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
   hideToolbars();
@@ -2661,6 +2661,19 @@ function focusOpenPanel(id) {
   setTimeout(run, 320);
 }
 const TOOL_POPOVER_IDS = { arrow: "arrow-popover", player: "player-popover", equipment: "equipment-popover", shape: "shape-popover", text: "text-popover", ball: "ball-popover" };
+// a toolkit button should look "on" whenever its own panel is the one
+// currently showing — whether that's because this tool is actually armed
+// (currentTool) or because an existing selection opened it for editing
+// under Select — not just the former, which is what left a button
+// looking off next to its own open, populated panel
+function refreshToolButtonStates() {
+  document.querySelectorAll(".tk-btn[data-tool]").forEach(b => {
+    const tool = b.dataset.tool;
+    const popoverId = TOOL_POPOVER_IDS[tool];
+    const popoverOpen = popoverId && document.getElementById(popoverId).classList.contains("open");
+    b.classList.toggle("active", currentTool === tool || !!popoverOpen);
+  });
+}
 document.querySelectorAll(".tk-btn[data-tool]").forEach(btn => {
   btn.addEventListener("click", e => {
     const tool = btn.dataset.tool;
@@ -2689,6 +2702,7 @@ document.querySelectorAll(".tk-btn[data-tool]").forEach(btn => {
     // for a placement tool the next click on the field would then use.
     if (popoverId && document.getElementById(popoverId).classList.contains("open")) {
       document.getElementById(popoverId).classList.remove("open");
+      refreshToolButtonStates();
       return;
     }
     setTool(tool);
@@ -3405,6 +3419,7 @@ function closeAllPopovers() {
   });
   const formationsBtn = document.getElementById("formations-tool");
   if (formationsBtn) formationsBtn.classList.remove("active");
+  refreshToolButtonStates();
 }
 
 // these now return every matching token/shape currently selected — a
@@ -3946,6 +3961,7 @@ function showPopoverForToken(t) {
     syncBallPopover();
     focusOpenPanel("ball-popover");
   }
+  refreshToolButtonStates();
 }
 function showArrowPopoverForSelection() {
   closeAllPopovers();
@@ -3953,6 +3969,7 @@ function showArrowPopoverForSelection() {
   const s = shapes.find(sh => sh.id === selectedShapeId);
   if (s && SHAPE_KINDS.includes(s.style)) { document.getElementById("shape-popover").classList.add("open"); syncShapePopover(); focusOpenPanel("shape-popover"); }
   else { document.getElementById("arrow-popover").classList.add("open"); syncArrowPopover(); focusOpenPanel("arrow-popover"); }
+  refreshToolButtonStates();
 }
 // for a MULTI-selection (marquee, or a whole group picked from the
 // Objects tab): opens the matching properties panel when every selected
@@ -3997,6 +4014,7 @@ function showPopoverForSelection() {
       focusOpenPanel("shape-popover");
     }
   }
+  refreshToolButtonStates();
 }
 
 /* ─────────────────────────────────────────────────────────
