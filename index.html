@@ -2606,6 +2606,29 @@ document.getElementById("redo-btn").addEventListener("click", redo);
 /* ─────────────────────────────────────────────────────────
    TOOLKIT — tool selection
 ───────────────────────────────────────────────────────── */
+const TOOL_HINTS = {
+  select: null,
+  player: "Set a quantity and press Insert Players",
+  equipment: "Click to place equipment",
+  ball: "Click to place a ball",
+  arrow: "Click and drag to draw",
+  shape: "Click and drag to draw a shape",
+  text: "Click on the pitch to add a text label"
+};
+// the "click and drag to draw" hints are onboarding for an empty field —
+// once the coach has actually drawn something there, they already know
+// how the tool works, so re-arming it (or a new drawing tool) shouldn't
+// keep re-showing it. It's still relevant on a field with nothing on it
+// yet, including a freshly cleared one. Called both when a tool is armed
+// and right after a shape is actually drawn, since the arrow/shape tool
+// stays armed for the next one rather than re-triggering setTool().
+function updateDrawHint(tool) {
+  const hint = document.getElementById("hint-pill");
+  const isDrawHint = (tool === "arrow" || tool === "shape");
+  const fieldHasObjects = tokens.length > 0 || shapes.length > 0;
+  if (TOOL_HINTS[tool] && !(isDrawHint && fieldHasObjects)) { hint.textContent = TOOL_HINTS[tool]; hint.style.display = "block"; }
+  else hint.style.display = "none";
+}
 function setTool(tool, keepPanelOpen) {
   currentTool = tool;
   if (!keepPanelOpen) closeAllPopovers();
@@ -2614,18 +2637,7 @@ function setTool(tool, keepPanelOpen) {
   multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
   hideToolbars();
   renderTokens(); renderShapes();
-  const hint = document.getElementById("hint-pill");
-  const hints = {
-    select: null,
-    player: "Set a quantity and press Insert Players",
-    equipment: "Click to place equipment",
-    ball: "Click to place a ball",
-    arrow: "Click and drag to draw",
-    shape: "Click and drag to draw a shape",
-    text: "Click on the pitch to add a text label"
-  };
-  if (hints[tool]) { hint.textContent = hints[tool]; hint.style.display = "block"; }
-  else hint.style.display = "none";
+  updateDrawHint(tool);
 }
 // scrolls the toolkit panel so a newly-opened accordion panel is fully
 // visible, since opening one can push it further down the list
@@ -2813,6 +2825,7 @@ function deleteToken(id) {
   tokens = tokens.filter(t => t.id !== id);
   selectedTokenId = null; hideToolbars(); closeAllPopovers();
   renderTokens(); renderPhaseThumbActive();
+  updateDrawHint(currentTool); // the field may be empty again — let the hint reappear
 }
 function duplicateToken(id) {
   const t = tokens.find(tk => tk.id === id);
@@ -4380,6 +4393,7 @@ function deleteMultiSelection() {
   multiTokenIds = []; multiShapeIds = [];
   hideGroupToolbar();
   renderTokens(); renderShapes(); renderPhaseThumbActive();
+  updateDrawHint(currentTool); // the field may be empty again — let the hint reappear
 }
 function startMarqueeSelect(startP) {
   let moved = false;
@@ -4475,6 +4489,7 @@ function deleteShape(id) {
   shapes = shapes.filter(s => s.id !== id);
   selectedShapeId = null; hideShapeToolbar();
   renderShapes(); renderPhaseThumbActive();
+  updateDrawHint(currentTool); // the field may be empty again — let the hint reappear
 }
 function shapeMidpoint(s) {
   return px((s.x1+s.x2)/2, (s.y1+s.y2)/2);
@@ -4713,6 +4728,7 @@ function onStageUp(e) {
   selectedShapeId = shape.id;
   renderShapes();
   renderPhaseThumbActive();
+  updateDrawHint(currentTool); // this may be the field's first object — hide the hint now, not just next time a tool is armed
 }
 
 /* ═════════════════════════════════════════════════════════════════════
@@ -4831,6 +4847,7 @@ function loadScene(sceneId) {
   renderTokens(); renderShapes();
   renderSceneTimeline();
   renderPhaseThumbActive();
+  updateDrawHint(currentTool); // a different scene may have no objects yet, or may already have some
 }
 // manual navigation between scenes (clicking a Timeline row) uses the
 // same tween-then-wipe transition as actual playback, rather than
