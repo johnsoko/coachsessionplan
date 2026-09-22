@@ -3644,12 +3644,16 @@ function setArrowWidth(width) {
 }
 
 function syncShapePopover() {
-  const matched = activeShapesOfKind(SHAPE_KINDS);
-  const s = matched[0];
-  const kind  = s ? s.style : shapeKind;
-  const color = s ? (s.color || shapeDefaults.color) : shapeDefaults.color;
+  // width and dashed now apply immediately to whatever's selected, just
+  // like arrows' width/style (see setArrowWidth's comment) — so their
+  // display reads from that same ungated source, unlike color/fill/kind
+  // below, which still only set the default for the next new shape
+  const gated = activeShapesOfKind(SHAPE_KINDS)[0];
+  const s = selectedShapesOfKindAnyTool(SHAPE_KINDS)[0];
+  const kind  = gated ? gated.style : shapeKind;
+  const color = gated ? (gated.color || shapeDefaults.color) : shapeDefaults.color;
+  const fill  = gated ? !!gated.fill : shapeDefaults.fill;
   const width = s ? (s.width || shapeDefaults.width) : shapeSizeMemory[kind];
-  const fill  = s ? !!s.fill : shapeDefaults.fill;
   const dashed = s ? !!s.dashed : shapeDefaults.dashed;
   document.querySelectorAll("#shape-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
   // older saved shapes may have an arbitrary width from before this was
@@ -3670,7 +3674,7 @@ function setShapeColor(color) {
   syncShapePopover();
 }
 function setShapeWidth(width) {
-  const matched = activeShapesOfKind(SHAPE_KINDS);
+  const matched = selectedShapesOfKindAnyTool(SHAPE_KINDS);
   const kind = matched.length ? matched[0].style : shapeKind;
   if (matched.length) { matched.forEach(s => s.width = width); renderShapes(); }
   shapeSizeMemory[kind] = width;
@@ -3685,7 +3689,7 @@ function setShapeFill(fill) {
 }
 function setShapeDash(dashed) {
   pushHistory();
-  const matched = activeShapesOfKind(SHAPE_KINDS);
+  const matched = selectedShapesOfKindAnyTool(SHAPE_KINDS);
   if (matched.length) { matched.forEach(s => s.dashed = dashed); renderShapes(); }
   shapeDefaults.dashed = dashed;
   syncShapePopover();
