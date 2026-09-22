@@ -4426,6 +4426,11 @@ function deleteMultiSelection() {
   hideGroupToolbar();
   renderTokens(); renderShapes(); renderPhaseThumbActive();
   updateDrawHint(currentTool); // the field may be empty again — let the hint reappear
+  // same reasoning as onStageDown's deselect branch and deleteShape:
+  // don't leave an open popover showing the deleted selection's own
+  // style/width/curved once nothing is selected
+  if (document.getElementById("arrow-popover").classList.contains("open")) syncArrowPopover();
+  if (document.getElementById("shape-popover").classList.contains("open")) syncShapePopover();
 }
 function startMarqueeSelect(startP) {
   let moved = false;
@@ -4543,6 +4548,12 @@ function deleteShape(id) {
   selectedShapeId = null; hideShapeToolbar();
   renderShapes(); renderPhaseThumbActive();
   updateDrawHint(currentTool); // the field may be empty again — let the hint reappear
+  // same reasoning as onStageDown's deselect branch: the now-deleted
+  // shape's style/width/curved may still be showing highlighted in an
+  // open popover — re-sync it to the actual defaults now that nothing's
+  // selected, so it doesn't silently mislead the next shape drawn
+  if (document.getElementById("arrow-popover").classList.contains("open")) syncArrowPopover();
+  if (document.getElementById("shape-popover").classList.contains("open")) syncShapePopover();
 }
 function shapeMidpoint(s) {
   return px((s.x1+s.x2)/2, (s.y1+s.y2)/2);
@@ -4678,6 +4689,16 @@ function onStageDown(e) {
       // popover before every single line, defeating the point of being
       // able to just click a different style and keep drawing
       renderShapes(); renderTokens();
+      // the popover was very possibly showing a previously-selected
+      // shape's own style/width/curved (e.g. Pass highlighted because a
+      // dashed line was selected) rather than the actual arrowStyle/
+      // shapeDefaults that a brand-new shape will use — with nothing
+      // selected now, re-sync so it reflects that instead. Without this,
+      // the panel can keep showing "Pass" highlighted from a moment ago
+      // while every new line drawn actually comes out as arrowStyle's
+      // real value (e.g. "run", solid) — a real mismatch, not just a
+      // stale-looking label.
+      if (currentTool === "shape") syncShapePopover(); else syncArrowPopover();
     }
     pushHistory();
     isDrawing = true; drawStart = p; freehand = [p];
