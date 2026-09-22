@@ -276,6 +276,14 @@
   .token.text[contenteditable="true"] { outline: 1.5px dashed var(--bib); outline-offset: 3px; cursor: text; min-width: 26px; min-height: 1.2em; }
   .token.text[contenteditable="true"]:empty::before { content: "Type…"; opacity: 0.5; }
   .token.selected { outline: 2px solid var(--bib); outline-offset: 3px; }
+  /* equipment icons (cones, poles, goals…) are small and thin compared to
+     a player token — the same 2px outline that reads clearly around a
+     large circular player is easy to miss around, say, a skinny pole or
+     a small cone, especially with several selected at once. A soft glow
+     behind the icon is far more noticeable at that scale without
+     needing a thicker or brighter outline that would look heavy-handed
+     on a player token. */
+  .token[class*="eq-"].selected { filter: drop-shadow(0 0 5px rgba(226,137,43,0.95)); }
 
   #marquee-box {
     position: absolute; border: 1.5px dashed var(--bib); background: rgba(226,137,43,0.12);
