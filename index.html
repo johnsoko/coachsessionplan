@@ -2678,9 +2678,16 @@ document.querySelectorAll(".tk-btn[data-tool]").forEach(btn => {
       return;
     }
     const popoverId = TOOL_POPOVER_IDS[tool];
-    // re-clicking the tool whose panel is already open just collapses it,
-    // without resetting the tool or current selection
-    if (popoverId && currentTool === tool && document.getElementById(popoverId).classList.contains("open")) {
+    // re-clicking the toolkit button whose panel is already open just
+    // collapses it, without resetting the tool or current selection —
+    // this must NOT require currentTool === tool: the panel is just as
+    // often open because an existing multi-selection is being edited
+    // (still under the Select tool) as because this tool is armed for
+    // placing something new. Requiring a tool match here meant clicking
+    // the button while editing a selection fell through to setTool()
+    // instead, which cleared that selection and silently swapped Select
+    // for a placement tool the next click on the field would then use.
+    if (popoverId && document.getElementById(popoverId).classList.contains("open")) {
       document.getElementById(popoverId).classList.remove("open");
       return;
     }
