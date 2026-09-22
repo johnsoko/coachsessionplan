@@ -4429,6 +4429,8 @@ function deleteMultiSelection() {
 }
 function startMarqueeSelect(startP) {
   let moved = false;
+  let lastP = startP; // last known position, clamped to the field — used if the
+                       // cursor leaves the page entirely and mouseup never fires
   const box = document.createElement("div");
   box.id = "marquee-box";
   document.getElementById("pitch-stage").appendChild(box);
@@ -4441,25 +4443,44 @@ function startMarqueeSelect(startP) {
   function onMove(ev) {
     ev.preventDefault();
     const p = pctFromEvent(ev);
+    lastP = p;
     if (!moved && Math.hypot(p.x - startP.x, p.y - startP.y) > 0.6) moved = true;
     if (moved) updateBoxVisual(p);
   }
-  function onUp(ev) {
+  function cleanup() {
     document.removeEventListener("mousemove", onMove);
     document.removeEventListener("mouseup", onUp);
     document.removeEventListener("touchmove", onMove);
     document.removeEventListener("touchend", onUp);
+    document.documentElement.removeEventListener("mouseleave", onLeavePage);
     box.remove();
+  }
+  function finish(p) {
+    cleanup();
     if (!moved) return;
-    const p = pctFromEvent(ev.changedTouches ? { touches: ev.changedTouches } : ev);
     const x1 = Math.min(startP.x, p.x), x2 = Math.max(startP.x, p.x);
     const y1 = Math.min(startP.y, p.y), y2 = Math.max(startP.y, p.y);
     finishMarqueeSelect(x1, y1, x2, y2);
   }
+  function onUp(ev) {
+    finish(pctFromEvent(ev.changedTouches ? { touches: ev.changedTouches } : ev));
+  }
+  // if the drag's mouseup happens with the cursor outside the browser's
+  // own viewport (dragging the marquee out past the field toward — or
+  // past — the edge of the window), most browsers never deliver that
+  // mouseup to the page at all, so it would otherwise look like nothing
+  // was ever selected. mouseleave firing on <html> means the cursor has
+  // left the page while the button is presumably still down (mouseup
+  // itself always removes this listener first) — finishing right there,
+  // with the last position we actually saw (already clamped to the
+  // field's own edge by pctFromEvent), is the best available substitute
+  // for a mouseup that may never come.
+  function onLeavePage() { finish(lastP); }
   document.addEventListener("mousemove", onMove);
   document.addEventListener("mouseup", onUp);
   document.addEventListener("touchmove", onMove, { passive: false });
   document.addEventListener("touchend", onUp);
+  document.documentElement.addEventListener("mouseleave", onLeavePage);
 }
 function finishMarqueeSelect(x1, y1, x2, y2) {
   const inBox = (x, y) => x >= x1 && x <= x2 && y >= y1 && y <= y2;
