@@ -2721,7 +2721,14 @@ document.addEventListener("click", e => {
   // clicking/drawing on the pitch itself shouldn't collapse an open panel —
   // only clicking elsewhere in the app (outside the toolkit and the canvas)
   // should. Panels close via the rules in setTool/showPopoverForToken etc.
-  if (!e.target.closest(".tk-btn") && !e.target.closest(".arrow-popover") && !e.target.closest(".team-popover") && !e.target.closest("#pitch-stage") && !e.target.closest("#objects-list")) closeAllPopovers();
+  if (!e.target.closest(".tk-btn") && !e.target.closest(".arrow-popover") && !e.target.closest(".team-popover") && !e.target.closest("#pitch-stage") && !e.target.closest("#objects-list")) {
+    // this popover is closing because the click landed somewhere that
+    // isn't the field, the toolkit, or the objects list — nothing left
+    // for a selection to be "for", so the highlighted token(s)/shape(s)
+    // that opened it should clear too, not just the panel itself
+    clearSelectionState();
+    renderTokens(); renderShapes();
+  }
   // clicking the empty space around the field (not the field itself) means
   // the user's done with whatever tool was armed — jump back to Select so
   // they don't have to go find that button
