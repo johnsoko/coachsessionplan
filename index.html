@@ -2021,9 +2021,9 @@
     <div class="modal-card">
       <h4>Edit Player</h4>
       <span class="tp-label" style="margin-top:0;">Number</span>
-      <input type="number" id="name-modal-number" class="field-input" min="1" max="99">
+      <input type="text" id="name-modal-number" class="field-input" maxlength="3" inputmode="text">
       <span class="tp-label">Name</span>
-      <input type="text" id="name-modal-input" class="field-input" placeholder="e.g. Messi" maxlength="24">
+      <input type="text" id="name-modal-input" class="field-input" placeholder="e.g. Messi" maxlength="3">
       <div style="display:flex; gap:18px; margin-top:6px;">
         <div style="flex:1;">
           <span class="tp-label" style="margin-top:0;">Colour</span>
@@ -7339,13 +7339,23 @@ function toast(msg) {
    number, name, colors, badge, highlight, opacity, and layer
 ───────────────────────────────────────────────────────── */
 let nameModalTokenId = null;
+let nameModalOriginal = null; // { name, num, showName } as they were before this modal opened — restored on Cancel/Escape/click-outside
+let nameModalHistoryPushed = false; // true once a live-preview edit has snapshotted the pre-edit state — Save must not push a second, later (already-edited) snapshot on top of it
+// letters and digits only, capped at 3 characters — short enough to fit
+// under a player dot and to stay readable as a jersey number/position tag
+// (e.g. "GK", "C7") without spilling into full free text
+function sanitizeShortField(raw) {
+  return (raw || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 3);
+}
 function openNameModal(id) {
   const t = tokens.find(tk => tk.id === id);
   if (!t) return;
   nameModalTokenId = id;
+  nameModalOriginal = { name: t.name || "", num: t.num, showName: !!t.showName };
+  nameModalHistoryPushed = false;
   const input = document.getElementById("name-modal-input");
   input.value = t.name || "";
-  document.getElementById("name-modal-number").value = t.num;
+  document.getElementById("name-modal-number").value = t.num != null ? t.num : "";
   document.querySelectorAll("#name-modal-color-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === t.color));
   const textColor = t.badgeTextColor || textColorFor(t.color);
   document.querySelectorAll("#name-modal-textcolor-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === textColor));
@@ -7358,17 +7368,38 @@ function openNameModal(id) {
   document.getElementById("name-modal-overlay").classList.add("open");
   requestAnimationFrame(() => { input.focus(); input.select(); });
 }
-function closeNameModal() {
+// cancelled=true (Cancel button, Escape, clicking outside the modal) puts
+// the token back exactly how it looked before the modal opened, since
+// the Name/Number fields now preview live on the token as you type —
+// without this, backing out of the modal would leave that live preview
+// in place instead of actually discarding it the way Cancel implies
+function closeNameModal(cancelled) {
+  if (cancelled && nameModalTokenId != null && nameModalOriginal) {
+    const t = tokens.find(tk => tk.id === nameModalTokenId);
+    if (t) { t.name = nameModalOriginal.name; t.num = nameModalOriginal.num; t.showName = nameModalOriginal.showName; renderTokens(); }
+    // the live preview's first keystroke already pushed a pre-edit
+    // snapshot onto the undo stack (see the input listeners) — now that
+    // Cancel has manually put the token back to that exact state itself,
+    // that snapshot is redundant; leaving it would mean pressing Undo
+    // right after Cancel silently does nothing visible
+    if (nameModalHistoryPushed) undoStack.pop();
+  }
   document.getElementById("name-modal-overlay").classList.remove("open");
   nameModalTokenId = null;
+  nameModalOriginal = null;
+  nameModalHistoryPushed = false;
 }
 function saveNameModal() {
   if (nameModalTokenId == null) return;
   const t = tokens.find(tk => tk.id === nameModalTokenId);
   if (t) {
-    const val = document.getElementById("name-modal-input").value.trim();
-    const numRaw = parseInt(document.getElementById("name-modal-number").value, 10);
-    const num = Number.isFinite(numRaw) ? Math.max(1, Math.min(99, numRaw)) : t.num;
+    const val = sanitizeShortField(document.getElementById("name-modal-input").value);
+    const numVal = sanitizeShortField(document.getElementById("name-modal-number").value);
+    // t.num is already live-previewed by this point, so falling back to
+    // it here (rather than the true original) would just fall back to
+    // whatever the field was already showing — nameModalOriginal.num is
+    // what a cleared field should actually revert to
+    const num = numVal || nameModalOriginal.num;
     const colorSwatch = document.querySelector("#name-modal-color-row .tp-swatch.active");
     const color = colorSwatch ? colorSwatch.dataset.color : t.color;
     const textSwatch = document.querySelector("#name-modal-textcolor-row .tp-swatch.active");
@@ -7380,8 +7411,14 @@ function saveNameModal() {
     const changed = val !== (t.name || "") || num !== t.num ||
       color !== t.color || badgeTextColor !== t.badgeTextColor ||
       highlighted !== !!t.highlighted || opacity !== (t.opacity != null ? t.opacity : 100);
+    // Name/Number are already live on the token by this point (that's the
+    // whole point of the preview) — the "before" snapshot for undo was
+    // already taken on the first keystroke, if there was one; pushing
+    // another one here would wrongly snapshot the post-edit state as the
+    // undo target. Only push now if nothing was live-previewed, so a
+    // color/highlight/opacity-only edit is still undoable as before.
+    if (changed && !nameModalHistoryPushed) pushHistory();
     if (changed) {
-      pushHistory();
       t.name = val;
       t.num = num;
       t.color = color;
@@ -7415,9 +7452,9 @@ function sendTokenToBack(id) {
   renderPhaseThumbActive();
 }
 document.getElementById("name-modal-save").addEventListener("click", saveNameModal);
-document.getElementById("name-modal-cancel").addEventListener("click", closeNameModal);
+document.getElementById("name-modal-cancel").addEventListener("click", () => closeNameModal(true));
 document.getElementById("name-modal-overlay").addEventListener("click", e => {
-  if (e.target.id === "name-modal-overlay") closeNameModal();
+  if (e.target.id === "name-modal-overlay") closeNameModal(true);
 });
 document.querySelectorAll("#name-modal-highlight-toggle button").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -7465,12 +7502,41 @@ document.getElementById("name-modal-delete").addEventListener("click", () => {
 document.getElementById("name-modal-number").addEventListener("keydown", e => {
   e.stopPropagation();
   if (e.key === "Enter") { e.preventDefault(); saveNameModal(); }
-  if (e.key === "Escape") { e.preventDefault(); closeNameModal(); }
+  if (e.key === "Escape") { e.preventDefault(); closeNameModal(true); }
 });
 document.getElementById("name-modal-input").addEventListener("keydown", e => {
   e.stopPropagation();
   if (e.key === "Enter") { e.preventDefault(); saveNameModal(); }
-  if (e.key === "Escape") { e.preventDefault(); closeNameModal(); }
+  if (e.key === "Escape") { e.preventDefault(); closeNameModal(true); }
+});
+// both fields preview live on the token itself as you type, not just
+// after Save — letters/digits only, capped at 3 characters (see
+// sanitizeShortField); Cancel/Escape/click-outside puts the token back
+// to how it looked before the modal opened (see closeNameModal)
+document.getElementById("name-modal-input").addEventListener("input", e => {
+  const clean = sanitizeShortField(e.target.value);
+  if (clean !== e.target.value) e.target.value = clean;
+  if (nameModalTokenId == null) return;
+  const t = tokens.find(tk => tk.id === nameModalTokenId);
+  if (!t) return;
+  if (!nameModalHistoryPushed) { pushHistory(); nameModalHistoryPushed = true; }
+  t.name = clean;
+  // typing an actual name is a clear enough signal the coach wants it
+  // visible under this player specifically — showing it right away
+  // (rather than only after also separately enabling the team's Show
+  // Names toggle) is what makes it feel "automatic"
+  if (clean) t.showName = true;
+  renderTokens();
+});
+document.getElementById("name-modal-number").addEventListener("input", e => {
+  const clean = sanitizeShortField(e.target.value);
+  if (clean !== e.target.value) e.target.value = clean;
+  if (nameModalTokenId == null) return;
+  const t = tokens.find(tk => tk.id === nameModalTokenId);
+  if (!t) return;
+  if (!nameModalHistoryPushed) { pushHistory(); nameModalHistoryPushed = true; }
+  t.num = clean;
+  renderTokens();
 });
 
 /* ─────────────────────────────────────────────────────────
