@@ -2023,7 +2023,7 @@
       <span class="tp-label" style="margin-top:0;">Number</span>
       <input type="text" id="name-modal-number" class="field-input" maxlength="3" inputmode="text">
       <span class="tp-label">Name</span>
-      <input type="text" id="name-modal-input" class="field-input" placeholder="e.g. Messi" maxlength="3">
+      <input type="text" id="name-modal-input" class="field-input" placeholder="e.g. Messi" maxlength="15">
       <div style="display:flex; gap:18px; margin-top:6px;">
         <div style="flex:1;">
           <span class="tp-label" style="margin-top:0;">Colour</span>
@@ -7341,17 +7341,21 @@ function toast(msg) {
 let nameModalTokenId = null;
 let nameModalOriginal = null; // { name, num, showName } as they were before this modal opened — restored on Cancel/Escape/click-outside
 let nameModalHistoryPushed = false; // true once a live-preview edit has snapshotted the pre-edit state — Save must not push a second, later (already-edited) snapshot on top of it
-// letters and digits only, capped at 3 characters — short enough to fit
-// under a player dot and to stay readable as a jersey number/position tag
-// (e.g. "GK", "C7") without spilling into full free text
+// letters and digits only — short enough to stay readable as a jersey
+// number/position tag (e.g. "GK", "C7") without spilling into full free
+// text; the Name field uses the same character rule but a longer cap
+// (see sanitizeNameField), matching common jersey name-printing limits
 function sanitizeShortField(raw) {
   return (raw || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 3);
+}
+function sanitizeNameField(raw) {
+  return (raw || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 15);
 }
 function openNameModal(id) {
   const t = tokens.find(tk => tk.id === id);
   if (!t) return;
   nameModalTokenId = id;
-  nameModalOriginal = { name: t.name || "", num: t.num, showName: !!t.showName };
+  nameModalOriginal = { name: t.name || "", num: t.num, showName: !!t.showName, labelMode: t.labelMode };
   nameModalHistoryPushed = false;
   const input = document.getElementById("name-modal-input");
   input.value = t.name || "";
@@ -7376,7 +7380,7 @@ function openNameModal(id) {
 function closeNameModal(cancelled) {
   if (cancelled && nameModalTokenId != null && nameModalOriginal) {
     const t = tokens.find(tk => tk.id === nameModalTokenId);
-    if (t) { t.name = nameModalOriginal.name; t.num = nameModalOriginal.num; t.showName = nameModalOriginal.showName; renderTokens(); }
+    if (t) { t.name = nameModalOriginal.name; t.num = nameModalOriginal.num; t.showName = nameModalOriginal.showName; t.labelMode = nameModalOriginal.labelMode; renderTokens(); }
     // the live preview's first keystroke already pushed a pre-edit
     // snapshot onto the undo stack (see the input listeners) — now that
     // Cancel has manually put the token back to that exact state itself,
@@ -7393,13 +7397,14 @@ function saveNameModal() {
   if (nameModalTokenId == null) return;
   const t = tokens.find(tk => tk.id === nameModalTokenId);
   if (t) {
-    const val = sanitizeShortField(document.getElementById("name-modal-input").value);
+    const val = sanitizeNameField(document.getElementById("name-modal-input").value);
     const numVal = sanitizeShortField(document.getElementById("name-modal-number").value);
     // t.num is already live-previewed by this point, so falling back to
     // it here (rather than the true original) would just fall back to
     // whatever the field was already showing — nameModalOriginal.num is
     // what a cleared field should actually revert to
     const num = numVal || nameModalOriginal.num;
+    const labelMode = numVal ? "number" : t.labelMode;
     const colorSwatch = document.querySelector("#name-modal-color-row .tp-swatch.active");
     const color = colorSwatch ? colorSwatch.dataset.color : t.color;
     const textSwatch = document.querySelector("#name-modal-textcolor-row .tp-swatch.active");
@@ -7408,7 +7413,7 @@ function saveNameModal() {
     const highlighted = activeHighlightBtn ? activeHighlightBtn.dataset.highlight === "1" : !!t.highlighted;
     const opacityRaw = parseInt(document.getElementById("name-modal-opacity").value, 10);
     const opacity = Number.isFinite(opacityRaw) ? opacityRaw : (t.opacity != null ? t.opacity : 100);
-    const changed = val !== (t.name || "") || num !== t.num ||
+    const changed = val !== (t.name || "") || num !== t.num || labelMode !== (t.labelMode || "number") ||
       color !== t.color || badgeTextColor !== t.badgeTextColor ||
       highlighted !== !!t.highlighted || opacity !== (t.opacity != null ? t.opacity : 100);
     // Name/Number are already live on the token by this point (that's the
@@ -7421,6 +7426,7 @@ function saveNameModal() {
     if (changed) {
       t.name = val;
       t.num = num;
+      t.labelMode = labelMode;
       t.color = color;
       t.badgeTextColor = badgeTextColor;
       t.highlighted = highlighted;
@@ -7510,11 +7516,10 @@ document.getElementById("name-modal-input").addEventListener("keydown", e => {
   if (e.key === "Escape") { e.preventDefault(); closeNameModal(true); }
 });
 // both fields preview live on the token itself as you type, not just
-// after Save — letters/digits only, capped at 3 characters (see
-// sanitizeShortField); Cancel/Escape/click-outside puts the token back
-// to how it looked before the modal opened (see closeNameModal)
+// after Save — letters/digits only; Cancel/Escape/click-outside puts the
+// token back to how it looked before the modal opened (see closeNameModal)
 document.getElementById("name-modal-input").addEventListener("input", e => {
-  const clean = sanitizeShortField(e.target.value);
+  const clean = sanitizeNameField(e.target.value);
   if (clean !== e.target.value) e.target.value = clean;
   if (nameModalTokenId == null) return;
   const t = tokens.find(tk => tk.id === nameModalTokenId);
@@ -7536,6 +7541,13 @@ document.getElementById("name-modal-number").addEventListener("input", e => {
   if (!t) return;
   if (!nameModalHistoryPushed) { pushHistory(); nameModalHistoryPushed = true; }
   t.num = clean;
+  // the badge only actually shows t.num when this token's own display
+  // mode is "number" — if it was left on "position" (team-wide default,
+  // or set earlier for this player), typing here would silently save
+  // correctly but never appear on the badge, since t.pos is what renders
+  // instead. Typing an explicit number is a clear enough signal to make
+  // it the one that actually shows.
+  if (clean) t.labelMode = "number";
   renderTokens();
 });
 
