@@ -7341,12 +7341,11 @@ function toast(msg) {
 let nameModalTokenId = null;
 let nameModalOriginal = null; // { name, num, showName } as they were before this modal opened — restored on Cancel/Escape/click-outside
 let nameModalHistoryPushed = false; // true once a live-preview edit has snapshotted the pre-edit state — Save must not push a second, later (already-edited) snapshot on top of it
-// letters and digits only — short enough to stay readable as a jersey
-// number/position tag (e.g. "GK", "C7") without spilling into full free
-// text; the Name field uses the same character rule but a longer cap
-// (see sanitizeNameField), matching common jersey name-printing limits
-function sanitizeShortField(raw) {
-  return (raw || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 3);
+// the Number field is really "whatever short tag goes on the badge" —
+// a captain's "C", an asterisk, anything — so this doesn't filter
+// characters at all, just caps the length
+function capShortField(raw) {
+  return (raw || "").slice(0, 3);
 }
 function sanitizeNameField(raw) {
   return (raw || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 15);
@@ -7398,7 +7397,7 @@ function saveNameModal() {
   const t = tokens.find(tk => tk.id === nameModalTokenId);
   if (t) {
     const val = sanitizeNameField(document.getElementById("name-modal-input").value);
-    const numVal = sanitizeShortField(document.getElementById("name-modal-number").value);
+    const numVal = capShortField(document.getElementById("name-modal-number").value);
     // t.num is already live-previewed by this point, so falling back to
     // it here (rather than the true original) would just fall back to
     // whatever the field was already showing — nameModalOriginal.num is
@@ -7534,7 +7533,7 @@ document.getElementById("name-modal-input").addEventListener("input", e => {
   renderTokens();
 });
 document.getElementById("name-modal-number").addEventListener("input", e => {
-  const clean = sanitizeShortField(e.target.value);
+  const clean = capShortField(e.target.value);
   if (clean !== e.target.value) e.target.value = clean;
   if (nameModalTokenId == null) return;
   const t = tokens.find(tk => tk.id === nameModalTokenId);
