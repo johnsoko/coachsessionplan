@@ -1600,16 +1600,22 @@
               Run / Pass / Dribble
             </button>
             <div class="arrow-popover" id="arrow-popover">
+              <span class="tp-label" style="margin-top:0;">Line Style</span>
               <div class="arrow-kind-row">
-                <div class="arrow-opt" data-style="run" title="Run">
+                <div class="arrow-opt" data-style="run" title="Solid">
                   <svg width="30" height="14" viewBox="0 0 30 14"><path d="M2 11L26 3" stroke="#1B211C" stroke-width="1.8"/><path d="M20 3h6v6" stroke="#1B211C" stroke-width="1.8"/></svg>
                 </div>
-                <div class="arrow-opt selected" data-style="pass" title="Pass">
+                <div class="arrow-opt selected" data-style="pass" title="Dashed">
                   <svg width="30" height="14" viewBox="0 0 30 14"><path d="M2 11L26 3" stroke="#1B211C" stroke-width="1.8" stroke-dasharray="2.4 2.6"/></svg>
                 </div>
-                <div class="arrow-opt" data-style="dribble" title="Dribble">
+                <div class="arrow-opt" data-style="dribble" title="Zigzag">
                   <svg width="30" height="14" viewBox="0 0 30 14"><path d="M2 9c2.5-5 4.5 5 7 0s4.5 5 7 0 4.5 5 6 0" stroke="#1B211C" stroke-width="1.5" fill="none"/></svg>
                 </div>
+              </div>
+              <span class="tp-label">Arrow Endpoint</span>
+              <div class="tp-toggle-row" id="arrow-end-toggle">
+                <button data-arrowend="1" class="active">Arrow</button>
+                <button data-arrowend="0">None</button>
               </div>
               <div style="height:1px;background:var(--line);margin:6px 2px;"></div>
               <span class="tp-label" style="margin-top:0;">Color</span>
@@ -2217,7 +2223,7 @@ const EQUIPMENT_DEFAULT_SIZES = { cone: 14, flatcone: 14, minigoal: 32, largegoa
 // rather than snapping back to the original default every time
 let equipmentSizeMemory = { ...EQUIPMENT_DEFAULT_SIZES };
 const EQUIPMENT_KINDS = ["cone", "flatcone", "minigoal", "largegoal", "dummy", "ladder", "pole"];
-const drawDefaults  = { color: "#F7F8F3", width: 2.6, curved: false };
+const drawDefaults  = { color: "#F7F8F3", width: 2.6, curved: false, arrowEnd: true };
 const shapeDefaults = { color: "#F7F8F3", width: 2.4, fill: false, dashed: false };
 // same per-kind "last used" memory as equipment, applied to circle/
 // square/triangle so each shape kind remembers its own last width
@@ -2252,12 +2258,12 @@ const SURFACES = {
     viewBox: "0 0 1760 1320",
     markup: `
       <rect x="0" y="0" width="1760" height="1320" fill="#2E6B3F"/>
-      <rect x="0" y="0" width="1760" height="1320" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#2E6B3F" d="M0 0h1760v1320H0z"/>
       <path fill="#2E6B3F" d="M883 125h810l4 10q5 6 14 8v198h-258l1 131v31l1 15v6c0 14 0 14-3 19l-13 9-7 7-2 2c-27 27-41 66-40 104q2 58 42 100l2 2 10 9c8 4 8 4 10 9v98l-1 98h258v198l-8 3c-7 4-7 7-10 15H883V807l20-2q46-7 79-39l3-3c24-23 40-59 41-94v-10q1-16-3-31l-1-2q-6-26-21-48l-2-3q-37-49-98-58l-18-2zm-814 0h810v390l-20 2q-45 8-79 39l-3 3c-24 23-40 59-41 94v10q-1 16 3 31l1 2q6 26 21 48l2 3q37 49 98 58l18 2v390H69l-3-8c-4-7-7-7-15-10V981h258l-1-131v-31l-1-15v-6c0-14 0-14 3-19l13-9 7-7 2-2c27-27 41-66 40-104q-2-58-42-100l-2-2-10-9c-8-4-8-4-10-9v-98l1-98H51V143l8-3c7-4 7-7 10-15"/>
       <path fill="#fefefe" d="M47 121h1668v482h18v117h-18v481H47V720H29V603h18zm22 4-4 10c-5 5-7 6-14 8v198h258l-1 129v31l-1 16v5c0 14 0 14 3 19l13 9 7 7 2 2c27 27 41 66 40 104q-2 58-42 100l-2 2-10 9c-8 4-8 4-10 9v99l1 99H51v198l10 4c5 5 6 7 8 14h810V807l-20-2q-45-7-79-39l-3-3q-26-26-36-63l-1-2q-4-18-4-37v-2q-1-16 3-31l1-2a145 145 0 0 1 139-111V125zm814 0v390l20 2q46 8 79 39l3 3q26 26 36 63l1 2q4 18 4 37v2q1 16-3 31l-1 2a145 145 0 0 1-139 111v390h810l4-10c5-5 7-6 14-8V981h-258l1-129v-31l1-16v-5c0-14 0-14-3-19l-13-9-7-7-2-2c-27-27-41-66-40-104q2-57 42-100l2-2 10-9c8-4 8-4 10-9v-99l-1-99h258V143l-10-4q-6-5-8-14z"/>
       <path fill="#2E6B3F" d="M1457 345h254v170h-84v292h84v170h-254zM51 345h254v632H51V807h84V515H51zm832 174h8l2 1q47 3 81 34l3 2a141 141 0 0 1-9 217l-2 2c-21 17-49 26-76 28h-7V667l1-6v-2l-1-1zm-11 1h7v135l-1 6v2l1 1v139h-8l-2-1q-47-3-81-34l-3-2a141 141 0 0 1-15-194l5-5 5-6q15-16 36-26l3-2q25-12 53-13"/>
       <path fill="#2E6B3F" d="M1631 519h80v284h-80zM51 519h80v284H51zm1402 28v230c-26-13-43-45-52-71-12-36-9-75 8-109q8-15 20-29l1-1c17-20 17-20 23-20m-1144-2c26 13 43 44 52 71 12 36 9 75-8 109q-8 15-20 29l-1 1q-10 11-21 20h-2zm1402 639v13h-13c1-6 1-7 6-11zm-1660 0c6 1 7 1 11 6q3 4 2 7H51zM1698 125h13v13c-6-1-7-1-11-6q-2-3-2-7M51 125h13c-1 6-1 7-6 11q-3 3-7 2z"/>
+      <rect x="0" y="0" width="1760" height="1320" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#fefefe" d="m1536 657 5 1 1 3-3 3-4-2zm-1314 0 5 1 1 3-3 3-4-2z"/>
       <circle cx="880" cy="661" r="143" fill="none" stroke="#fefefe" stroke-width="4"/>
       <circle cx="880" cy="661" r="6" fill="#fefefe"/>
@@ -2273,12 +2279,12 @@ const SURFACES = {
     viewBox: "0 0 1320 1760",
     markup: `
       <rect x="0" y="0" width="1320" height="1760" fill="#2E6B3F"/>
-      <rect x="0" y="0" width="1320" height="1760" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#2E6B3F" d="M0 0l0 1760 1320 0L1320 0z"/>
       <path fill="#2E6B3F" d="M125 883l0 810 10 4q6 5 8 14l198 0 0-258 131 1 31 0 15 1 6 0c14 0 14 0 19-3l9-13 7-7 2-2c27-27 66-41 104-40q58 2 100 42l2 2 9 10c4 8 4 8 9 10l98 0 98-1 0 258 198 0 3-8c4-7 7-7 15-10L1197 883 807 883l-2 20q-7 46-39 79l-3 3c-23 24-59 40-94 41l-10 0q-16 1-31-3l-2-1q-26-6-48-21l-3-2q-49-37-58-98l-2-18z m0-814l0 810 390 0 2-20q8-45 39-79l3-3c23-24 59-40 94-41l10 0q16-1 31 3l2 1q26 6 48 21l3 2q49 37 58 98l2 18 390 0L1197 69l-8-3c-7-4-7-7-10-15L981 51l0 258-131-1-31 0-15-1-6 0c-14 0-14 0-19 3l-9 13-7 7-2 2c-27 27-66 41-104 40q-58-2-100-42l-2-2-9-10c-4-8-4-8-9-10l-98 0-98 1L341 51 143 51l-3 8c-4 7-7 7-15 10"/>
       <path fill="#fefefe" d="M121 47l0 1668 482 0 0 18 117 0 0-18 481 0L1201 47 720 47 720 29 603 29l0 18z m4 22l10-4c5-5 6-7 8-14l198 0 0 258 129-1 31 0 16-1 5 0c14 0 14 0 19 3l9 13 7 7 2 2c27 27 66 41 104 40q58-2 100-42l2-2 9-10c4-8 4-8 9-10l99 0 99 1L981 51l198 0 4 10c5 5 7 6 14 8l0 810L807 879l-2-20q-7-45-39-79l-3-3q-26-26-63-36l-2-1q-18-4-37-4l-2 0q-16-1-31 3l-2 1a145 145 0 0 0-111 139L125 879z m0 814l390 0 2 20q8 46 39 79l3 3q26 26 63 36l2 1q18 4 37 4l2 0q16 1 31-3l2-1a145 145 0 0 0 111-139l390 0 0 810-10 4c-5 5-6 7-8 14L981 1711l0-258-129 1-31 0-16 1-5 0c-14 0-14 0-19-3l-9-13-7-7-2-2c-27-27-66-41-104-40q-57 2-100 42l-2 2-9 10c-4 8-4 8-9 10l-99 0-99-1 0 258L143 1711l-4-10q-5-6-14-8z"/>
       <path fill="#2E6B3F" d="M345 1457l0 254 170 0 0-84 292 0 0 84 170 0 0-254zM345 51l0 254 632 0L977 51 807 51l0 84L515 135 515 51z m174 832l0 8 1 2q3 47 34 81l2 3a141 141 0 0 0 217-9l2-2c17-21 26-49 28-76l0-7L667 883l-6 1-2 0-1-1z m1-11l0 7 135 0 6-1 2 0 1 1 139 0 0-8-1-2q-3-47-34-81l-2-3a141 141 0 0 0-194-15l-5 5-6 5q-16 15-26 36l-2 3q-12 25-13 53"/>
       <path fill="#2E6B3F" d="M519 1631l0 80 284 0 0-80zM519 51l0 80 284 0L803 51z m28 1402l230 0c-13-26-45-43-71-52-36-12-75-9-109 8q-15 8-29 20l-1 1c-20 17-20 17-20 23m-2-1144c13 26 44 43 71 52 36 12 75 9 109-8q15-8 29-20l1-1q11-10 20-21l0-2z m639 1402l13 0 0-13c-6 1-7 1-11 6z m0-1660c1 6 1 7 6 11q4 3 7 2L1197 51zM125 1698l0 13 13 0c-1-6-1-7-6-11q-3-2-7-2M125 51l0 13c6-1 7-1 11-6q3-3 2-7z"/>
+      <rect x="0" y="0" width="1320" height="1760" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#fefefe" d="M657 1536l1 5 3 1 3-3-2-4z m0-1314l1 5 3 1 3-3-2-4z"/>
     `
   },
@@ -2288,7 +2294,6 @@ const SURFACES = {
     viewBox: "0 0 1320 1760",
     markup: `
       <rect x="0" y="0" width="1320" height="1760" fill="#2E6B3F"/>
-      <rect x="0" y="0" width="1320" height="1760" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#2E6B3F" d="M-1 162L-1 1 1319 1l0 1760-1320 0q-0.1-78.3 0.4-157.7 3.5-1 6.4-0.8L1256.5 1602.5 1256.5 959.9 1280 959.9 1280 804.5l-23.6 0L1256.4 162.1l-1251 0z"/>
       <path fill="#2E6B3F" d="M-1 1597c0-194 0-388 0.2-582.9a9 9 0 0 1 4.4 2.7q40.6 42.6 97.9 55.4c13 2.8 26.5 4 40 5.9L141.5 1597z m0-846q-0.1-290.8 0.5-582.6 71.1-0.6 141.8-0.5l0 519.5c-7.8 0.6-15.5 0.7-23 1.9a193 193 0 0 0-115.7 59.6c-0.9 1-2.4 1.4-3.6 2.1"/>
       <path fill="#f9fdf9" d="M-1 751.5c1.2-1.2 2.7-1.6 3.6-2.6a193 193 0 0 1 115.7-59.6c7.5-1.2 15.2-1.3 23-2L141.3 168l-141.8 0q-0.6-2.3-0.5-5.5 3.2-0.4 6.5-0.3L1256.4 162.2l0 642.4L1280 804.6 1280 960l-23.5 0 0 642.5-1250.8 0q-3 0-6.3 0.3-0.5-2-0.4-5.3 71.3-0.5 142.5-0.4l0-518.9c-13.5-2-27-3-40-6a189 189 0 0 1-97.9-55.3 16 16 0 0 0-4.4-3.1q-0.3-4.1 0.1-9.1 56.4 64.1 142.3 67L141.6 895c0-3.6-1.6-7.2-2-10.8q-0.3-2.4 0.4-4.7c0.5-2.3 1.6-4.4 1.6-6.6L141.6 697.5l-0.3-5.5c-14.6 2.3-28.8 3.8-42.6 7q-45.8 10.6-80.4 42.7-9.9 9.4-19.3 19.3z m148 611l0 234.3L1227 1596.8a28 28 0 0 1 23.8-24L1250.8 1309 907 1309l0-258.7c0-3.8-1-6-4-8.2q-7.2-4.8-13.7-10.7a201 201 0 0 1-50.2-68.6 194 194 0 0 1-14-109.6 193 193 0 0 1 78-128 9 9 0 0 0 4-7.8l-0.1-256 0-5.7L1250.7 455.7 1250.7 192c-15.8-5.1-18.8-8.2-24-24l-1079.4 0 0 519.3a195.4 195.4 0 0 1 191.5 184 190 190 0 0 1-43.7 134.2c-38.2 46.3-88.1 69.5-148 71.8z m1104-75l0-210.7-111.7 0L1139.3 687.7 1250.7 687.7 1250.7 461.2l-338 0 0 842.3L1251 1303.5z m-1104-555l0 140c0.1 2.4 1.5 4.8 1.9 7.3a16 16 0 0 1-0.1 5.2c-0.4 2.5-1.7 4.9-1.7 7.4l0 178.8a189.1 189.1 0 0 0 0-378z m1104 280L1251 693.2l-106.2 0 0 378.3L1251 1071.5zM898.8 735.2c-103.2 85.4-87.4 235.6 7.8 302.3L906.6 729.3zM1249 1579a21 21 0 0 0-16.3 17.7L1251 1596.7l0-9.6q-0.3-4-2-8.1m-0.6-1411.1L1233 167.9c0.7 9.2 8.6 16.9 17.9 17.7l0-15.4q-0.3-1.2-2.6-2.3"/>
@@ -2299,6 +2304,7 @@ const SURFACES = {
       <path fill="#2E6B3F" d="M1251 1013l0 58.5-106.2 0L1144.8 693.2 1251 693.2z"/>
       <path fill="#2E6B3F" d="M899 735l7.6-5.7 0 308.2c-95.2-66.7-111-216.9-7.5-302.5"/>
       <path fill="#2E6B3F" d="M1249.4 1579a36 36 0 0 1 1.5 8.1q0.2 4.7 0 9.6l-18.2 0a21 21 0 0 1 16.7-17.8m-0.6-1411c1 0.8 2 1.5 2.1 2.3q0.2 7.7 0 15.4A20 20 0 0 1 1233.2 168z"/>
+      <rect x="0" y="0" width="1320" height="1760" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#e9f6e9" d="M1023 886.2c-2.5 2.4-4.9 2.1-6.3-0.5-0.6-1.2-0.5-3.9 0.3-4.7 1.1-1 3.6-1.6 5-1.1 3 1 2.8 3.6 1 6.3"/>
     `
   },
@@ -2308,7 +2314,6 @@ const SURFACES = {
     viewBox: "0 0 1320 1760",
     markup: `
       <rect x="0" y="0" width="1320" height="1760" fill="#2E6B3F"/>
-      <rect x="0" y="0" width="1320" height="1760" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#2E6B3F" d="M1321 1598L1321 1759 1 1759l0-1760 1320 0q0.1 78.3-0.4 157.7-3.5 1-6.4 0.8L63.5 157.5 63.5 800.1 40 800.1 40 955.5l23.6 0L63.6 1597.9l1251 0z"/>
       <path fill="#2E6B3F" d="M1321 163c0 194 0 388-0.2 582.9a9 9 0 0 1-4.4-2.7q-40.6-42.6-97.9-55.4c-13-2.8-26.5-4-40-5.9L1178.5 163z m0 846q0.1 290.8-0.5 582.6-71.1 0.6-141.8 0.5l0-519.5c7.8-0.6 15.5-0.7 23-1.9a193 193 0 0 0 115.7-59.6c0.9-1 2.4-1.4 3.6-2.1"/>
       <path fill="#f9fdf9" d="M1321 1008.5c-1.2 1.2-2.7 1.6-3.6 2.6a193 193 0 0 1-115.7 59.6c-7.5 1.2-15.2 1.3-23 2L1178.7 1592l141.8 0q0.6 2.3 0.5 5.5-3.2 0.4-6.5 0.3L63.6 1597.8l0-642.4L40 955.4 40 800l23.5 0 0-642.5 1250.8 0q3 0 6.3-0.3 0.5 2 0.4 5.3-71.3 0.5-142.5 0.4l0 518.9c13.5 2 27 3 40 6a189 189 0 0 1 97.9 55.3 16 16 0 0 0 4.4 3.1q0.3 4.1-0.1 9.1-56.4-64.1-142.3-67L1178.4 865c0 3.6 1.6 7.2 2 10.8q0.3 2.4-0.4 4.7c-0.5 2.3-1.6 4.4-1.6 6.6L1178.4 1062.5l0.3 5.5c14.6-2.3 28.8-3.8 42.6-7q45.8-10.6 80.4-42.7 9.9-9.4 19.3-19.3z m-148-611l0-234.3L93 163.2a28 28 0 0 1-23.8 24L69.2 451 413 451l0 258.7c0 3.8 1 6 4 8.2q7.2 4.8 13.7 10.7a201 201 0 0 1 50.2 68.6 194 194 0 0 1 14 109.6 193 193 0 0 1-78 128 9 9 0 0 0-4 7.8l0.1 256 0 5.7L69.3 1304.3 69.3 1568c15.8 5.1 18.8 8.2 24 24l1079.4 0 0-519.3a195.4 195.4 0 0 1-191.5-184 190 190 0 0 1 43.7-134.2c38.2-46.3 88.1-69.5 148-71.8z m-1104 75l0 210.7 111.7 0L180.7 1072.3 69.3 1072.3 69.3 1298.8l338 0 0-842.3L69 456.5z m1104 555l0-140c-0.1-2.4-1.5-4.8-1.9-7.3a16 16 0 0 1 0.1-5.2c0.4-2.5 1.7-4.9 1.7-7.4l0-178.8a189.1 189.1 0 0 0 0 378z m-1104-280L69 1066.8l106.2 0 0-378.3L69 688.5zM421.2 1024.8c103.2-85.4 87.4-235.6-7.8-302.3L413.4 1030.7zM71 181a21 21 0 0 0 16.3-17.7L69 163.3l0 9.6q0.3 4 2 8.1m0.6 1411.1L87 1592.1c-0.7-9.2-8.6-16.9-17.9-17.7l0 15.4q0.3 1.2 2.6 2.3"/>
@@ -2319,6 +2324,7 @@ const SURFACES = {
       <path fill="#2E6B3F" d="M69 747l0-58.5 106.2 0L175.2 1066.8 69 1066.8z"/>
       <path fill="#2E6B3F" d="M421 1025l-7.6 5.7 0-308.2c95.2 66.7 111 216.9 7.5 302.5"/>
       <path fill="#2E6B3F" d="M70.6 181a36 36 0 0 1-1.5-8.1q-0.2-4.7 0-9.6l18.2 0a21 21 0 0 1-16.7 17.8m0.6 1411c-1-0.8-2-1.5-2.1-2.3q-0.2-7.7 0-15.4A20 20 0 0 1 86.8 1592z"/>
+      <rect x="0" y="0" width="1320" height="1760" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#e9f6e9" d="M297 873.8c2.5-2.4 4.9-2.1 6.3 0.5 0.6 1.2 0.5 3.9-0.3 4.7-1.1 1-3.6 1.6-5 1.1-3-1-2.8-3.6-1-6.3"/>
     `
   },
@@ -2327,7 +2333,6 @@ const SURFACES = {
     viewBox: "0 0 1760 1320",
     markup: `
       <rect x="0" y="0" width="1760" height="1320" fill="#2E6B3F"/>
-      <rect x="0" y="0" width="1760" height="1320" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#2E6B3F" d="M162 1321H1V1h1760v1320q-78.3.1-157.7-.4-1-3.5-.8-6.4V63.5H959.9V40H804.5v23.6H162.1v1251z"/>
       <path fill="#2E6B3F" d="M1597 1321c-194 0-388 0-582.9-.2a9 9 0 0 1 2.7-4.4q42.6-40.6 55.4-97.9c2.8-13 4-26.5 5.9-40H1597zm-846 0q-290.8.1-582.6-.5-.6-71.1-.5-141.8h519.5c.6 7.8.7 15.5 1.9 23a193 193 0 0 0 59.6 115.7c1 .9 1.4 2.4 2.1 3.6"/>
       <path fill="#f9fdf9" d="M751.5 1321c-1.2-1.2-1.6-2.7-2.6-3.6a193 193 0 0 1-59.6-115.7c-1.2-7.5-1.3-15.2-2-23H168v141.8q-2.3.6-5.5.5-.4-3.2-.3-6.5V63.6h642.4V40H960v23.5h642.5v1250.8q0 3 .3 6.3-2 .5-5.3.4-.5-71.3-.4-142.5h-518.9c-2 13.5-3 27-6 40a189 189 0 0 1-55.3 97.9 16 16 0 0 0-3.1 4.4q-4.1.3-9.1-.1 64.1-56.4 67-142.3H895c-3.6 0-7.2 1.6-10.8 2q-2.4.3-4.7-.4c-2.3-.5-4.4-1.6-6.6-1.6H697.5l-5.5.3c2.3 14.6 3.8 28.8 7 42.6q10.6 45.8 42.7 80.4 9.4 9.9 19.3 19.3zm611-148h234.3V93a28 28 0 0 1-24-23.8H1309V413h-258.7c-3.8 0-6 1-8.2 4q-4.8 7.2-10.7 13.7a201 201 0 0 1-68.6 50.2 194 194 0 0 1-109.6 14 193 193 0 0 1-128-78 9 9 0 0 0-7.8-4l-256 .1h-5.7V69.3H192c-5.1 15.8-8.2 18.8-24 24v1079.4h519.3a195.4 195.4 0 0 1 184-191.5 190 190 0 0 1 134.2 43.7c46.3 38.2 69.5 88.1 71.8 148zm-75-1104h-210.7v111.7H687.7V69.3H461.2v338h842.3V69zm-555 1104h140c2.4-.1 4.8-1.5 7.3-1.9a16 16 0 0 1 5.2.1c2.5.4 4.9 1.7 7.4 1.7h178.8a189.1 189.1 0 0 0-378 0zm280-1104H693.2v106.2h378.3V69zM735.2 421.2c85.4 103.2 235.6 87.4 302.3-7.8H729.3zM1579 71a21 21 0 0 0 17.7 16.3V69h-9.6q-4 .3-8.1 2m-1411.1.6V87c9.2-.7 16.9-8.6 17.7-17.9h-15.4q-1.2.3-2.3 2.6"/>
@@ -2338,6 +2343,7 @@ const SURFACES = {
       <path fill="#2E6B3F" d="M1013 69h58.5v106.2H693.2V69z"/>
       <path fill="#2E6B3F" d="m735 421-5.7-7.6h308.2c-66.7 95.2-216.9 111-302.5 7.5"/>
       <path fill="#2E6B3F" d="M1579 70.6a36 36 0 0 1 8.1-1.5q4.7-.2 9.6 0v18.2a21 21 0 0 1-17.8-16.7m-1411 .6c.8-1 1.5-2 2.3-2.1q7.7-.2 15.4 0A20 20 0 0 1 168 86.8z"/>
+      <rect x="0" y="0" width="1760" height="1320" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#e9f6e9" d="M886.2 297c2.4 2.5 2.1 4.9-.5 6.3-1.2.6-3.9.5-4.7-.3-1-1.1-1.6-3.6-1.1-5 1-3 3.6-2.8 6.3-1"/>
     `
   },
@@ -2346,7 +2352,6 @@ const SURFACES = {
     viewBox: "0 0 1760 1320",
     markup: `
       <rect x="0" y="0" width="1760" height="1320" fill="#2E6B3F"/>
-      <rect x="0" y="0" width="1760" height="1320" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#2E6B3F" d="M162-1H1V1319h1760v-1320q-78.3-0.1-157.7 0.4-1 3.5-0.8 6.4V1256.5H959.9V1280H804.5v-23.6H162.1v-1251z"/>
       <path fill="#2E6B3F" d="M1597-1c-194 0-388 0-582.9 0.2a9 9 0 0 0 2.7 4.4q42.6 40.6 55.4 97.9c2.8 13 4 26.5 5.9 40H1597z m-846 0q-290.8-0.1-582.6 0.5-0.6 71.1-0.5 141.8h519.5c0.6-7.8 0.7-15.5 1.9-23a193 193 0 0 1 59.6-115.7c1-0.9 1.4-2.4 2.1-3.6"/>
       <path fill="#f9fdf9" d="M751.5-1c-1.2 1.2-1.6 2.7-2.6 3.6a193 193 0 0 0-59.6 115.7c-1.2 7.5-1.3 15.2-2 23H168v-141.8q-2.3-0.6-5.5-0.5-0.4 3.2-0.3 6.5V1256.4h642.4V1280H960v-23.5h642.5v-1250.8q0-3 0.3-6.3-2-0.5-5.3-0.4-0.5 71.3-0.4 142.5h-518.9c-2-13.5-3-27-6-40a189 189 0 0 0-55.3-97.9 16 16 0 0 1-3.1-4.4q-4.1-0.3-9.1 0.1 64.1 56.4 67 142.3H895c-3.6 0-7.2-1.6-10.8-2q-2.4-0.3-4.7 0.4c-2.3 0.5-4.4 1.6-6.6 1.6H697.5l-5.5-0.3c2.3-14.6 3.8-28.8 7-42.6q10.6-45.8 42.7-80.4 9.4-9.9 19.3-19.3z m611 148h234.3V1227a28 28 0 0 0-24 23.8H1309V907h-258.7c-3.8 0-6-1-8.2-4q-4.8-7.2-10.7-13.7a201 201 0 0 0-68.6-50.2 194 194 0 0 0-109.6-14 193 193 0 0 0-128 78 9 9 0 0 1-7.8 4l-256-0.1h-5.7V1250.7H192c-5.1-15.8-8.2-18.8-24-24v-1079.4h519.3a195.4 195.4 0 0 0 184 191.5 190 190 0 0 0 134.2-43.7c46.3-38.2 69.5-88.1 71.8-148z m-75 1104h-210.7v-111.7H687.7V1250.7H461.2v-338h842.3V1251z m-555-1104h140c2.4 0.1 4.8 1.5 7.3 1.9a16 16 0 0 0 5.2-0.1c2.5-0.4 4.9-1.7 7.4-1.7h178.8a189.1 189.1 0 0 1-378 0z m280 1104H693.2v-106.2h378.3V1251zM735.2 898.8c85.4-103.2 235.6-87.4 302.3 7.8H729.3zM1579 1249a21 21 0 0 1 17.7-16.3V1251h-9.6q-4-0.3-8.1-2m-1411.1-0.6V1233c9.2 0.7 16.9 8.6 17.7 17.9h-15.4q-1.2-0.3-2.3-2.6"/>
@@ -2357,6 +2362,7 @@ const SURFACES = {
       <path fill="#2E6B3F" d="M1013 1251h58.5v-106.2H693.2V1251z"/>
       <path fill="#2E6B3F" d="M735 899l-5.7 7.6h308.2c-66.7-95.2-216.9-111-302.5-7.5"/>
       <path fill="#2E6B3F" d="M1579 1249.4a36 36 0 0 0 8.1 1.5q4.7 0.2 9.6 0v-18.2a21 21 0 0 0-17.8 16.7m-1411-0.6c0.8 1 1.5 2 2.3 2.1q7.7 0.2 15.4 0A20 20 0 0 0 168 1233.2z"/>
+      <rect x="0" y="0" width="1760" height="1320" fill="url(#stripes)" opacity="0.5"/>
       <path fill="#e9f6e9" d="M886.2 1023c2.4-2.5 2.1-4.9-0.5-6.3-1.2-0.6-3.9-0.5-4.7 0.3-1 1.1-1.6 3.6-1.1 5 1 3 3.6 2.8 6.3 1"/>
     `
   },
@@ -2451,7 +2457,7 @@ const SURFACES = {
     `
   }
 };
-const STRIPES_DEFS = `<defs><pattern id="stripes" width="62" height="420" patternUnits="userSpaceOnUse"><rect width="31" height="420" fill="rgba(255,255,255,0.11)"/></pattern></defs>`;
+const STRIPES_DEFS = `<defs><pattern id="stripes" width="92" height="420" patternUnits="userSpaceOnUse"><rect width="46" height="420" fill="rgba(255,255,255,0.11)"/></pattern></defs>`;
 
 // order matches the previous static button list
 const SURFACE_LIST = [
@@ -3619,16 +3625,17 @@ function setEquipmentSize(size) {
 }
 
 function syncArrowPopover() {
-  // width and kind now apply immediately to whatever's selected, just
-  // like curved (see setArrowCurved's comment) — so their display reads
-  // from that same ungated source, unlike color below, which still only
-  // sets the default for the next new line
+  // width, kind, and arrowEnd now apply immediately to whatever's
+  // selected, just like curved (see setArrowCurved's comment) — so their
+  // display reads from that same ungated source, unlike color below,
+  // which still only sets the default for the next new line
   const gated = activeShapesOfKind(ARROW_KINDS)[0];
   const s = selectedShapesOfKindAnyTool(ARROW_KINDS)[0];
   const color = gated ? (gated.color || drawDefaults.color) : drawDefaults.color;
   const width = s ? (s.width || drawDefaults.width) : drawDefaults.width;
   const kind  = s ? s.style : arrowStyle;
   const curved = (s && (s.style === "run" || s.style === "pass")) ? !!s.curved : drawDefaults.curved;
+  const arrowEnd = s ? (s.arrowEnd !== false) : drawDefaults.arrowEnd;
   document.querySelectorAll("#arrow-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
   // older saved arrows may have an arbitrary width from before this was
   // simplified to three presets — match to the closest preset for
@@ -3638,6 +3645,7 @@ function syncArrowPopover() {
   document.querySelectorAll("#arrow-size-toggle button").forEach(b => b.classList.toggle("active", parseFloat(b.dataset.width) === closestWidth));
   document.querySelectorAll("#arrow-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o.dataset.style === kind));
   document.querySelectorAll("#arrow-curve-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.curved === "1") === curved));
+  document.querySelectorAll("#arrow-end-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.arrowend === "1") === arrowEnd));
 }
 function setArrowCurved(curved) {
   pushHistory();
@@ -3650,6 +3658,19 @@ function setArrowCurved(curved) {
     renderShapes();
   }
   drawDefaults.curved = curved;
+  syncArrowPopover();
+}
+// whether the line ends in an arrowhead at all — independent of its
+// solid/dashed/zigzag pattern (arrowStyle/s.style) and of curved above;
+// applies immediately to whatever's selected, the same as those two
+function setArrowEnd(hasArrow) {
+  pushHistory();
+  const matched = selectedShapesOfKindAnyTool(ARROW_KINDS);
+  if (matched.length) {
+    matched.forEach(s => { s.arrowEnd = hasArrow; });
+    renderShapes();
+  }
+  drawDefaults.arrowEnd = hasArrow;
   syncArrowPopover();
 }
 function setArrowColor(color) {
@@ -3914,6 +3935,9 @@ function initArrowPopover() {
   document.querySelectorAll("#arrow-curve-toggle button").forEach(btn => {
     btn.addEventListener("click", () => setArrowCurved(btn.dataset.curved === "1"));
   });
+  document.querySelectorAll("#arrow-end-toggle button").forEach(btn => {
+    btn.addEventListener("click", () => setArrowEnd(btn.dataset.arrowend === "1"));
+  });
   syncArrowPopover();
 }
 function initShapePopover() {
@@ -4171,9 +4195,13 @@ function drawShape(s, highlight) {
   if (s.style === "run" || s.style === "pass" || s.style === "dribble") {
     const p1 = px(s.x1, s.y1), p2 = px(s.x2, s.y2);
     ctx.setLineDash(s.style === "pass" ? [3, 7] : []);
+    const hasArrowhead = s.arrowEnd !== false; // undefined (older saved shapes) still means "yes, has one"
     // dribble's arrowhead is a bit bigger than run/pass's, to read clearly
-    // against the busier zigzag line leading into it
-    const headLen = (8 + width*1.8) * (s.style === "dribble" ? 1.35 : 1);
+    // against the busier zigzag line leading into it. With the arrowhead
+    // off, headLen collapses to 0 — otherwise the line would still be
+    // trimmed short for a head that's never actually drawn, leaving a
+    // visible gap before the real endpoint.
+    const headLen = hasArrowhead ? (8 + width*1.8) * (s.style === "dribble" ? 1.35 : 1) : 0;
     let angle, lx2, ly2, cp;
     if (s.curved) {
       const bc = s._partialControl || bezierControlFor(s);
@@ -4210,7 +4238,7 @@ function drawShape(s, highlight) {
       ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(lx2, ly2); ctx.stroke();
     }
     ctx.setLineDash([]);
-    drawArrowhead(p2.x, p2.y, angle, headLen, color);
+    if (hasArrowhead) drawArrowhead(p2.x, p2.y, angle, headLen, color);
   } else if (SHAPE_KINDS.includes(s.style)) {
     const p1 = px(s.x1, s.y1), p2 = px(s.x2, s.y2);
     ctx.setLineDash(s.dashed ? [6, 4] : []);
@@ -4770,7 +4798,7 @@ function onStageMove(e) {
   ctx.setLineDash(arrowStyle === "pass" ? [3,7] : []);
   const p1 = px(drawStart.x, drawStart.y), p2 = px(p.x, p.y);
   const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x);
-  const headLen = (8 + drawDefaults.width*1.8) * (arrowStyle === "dribble" ? 1.35 : 1) * hf;
+  const headLen = drawDefaults.arrowEnd === false ? 0 : (8 + drawDefaults.width*1.8) * (arrowStyle === "dribble" ? 1.35 : 1) * hf;
   const lx2 = p2.x - headLen*0.8*Math.cos(angle), ly2 = p2.y - headLen*0.8*Math.sin(angle);
   if (arrowStyle === "dribble") {
     // small zigzag along the straight line up to the arrowhead — segment
@@ -4787,7 +4815,7 @@ function onStageMove(e) {
     ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(lx2,ly2); ctx.stroke();
   }
   ctx.setLineDash([]);
-  drawArrowhead(p2.x, p2.y, angle, headLen, drawDefaults.color);
+  if (drawDefaults.arrowEnd !== false) drawArrowhead(p2.x, p2.y, angle, headLen, drawDefaults.color);
   ctx.restore();
 }
 function onStageUp(e) {
@@ -4825,7 +4853,7 @@ function onStageUp(e) {
     // dribble now works exactly like run/pass — a simple two-point drag,
     // draggable/curvable the same way — the zigzag is purely a rendering
     // style, not a different underlying shape
-    shape = { id: nextId++, style: arrowStyle, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: drawDefaults.color, width: drawDefaults.width, curved: drawDefaults.curved };
+    shape = { id: nextId++, style: arrowStyle, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: drawDefaults.color, width: drawDefaults.width, curved: drawDefaults.curved, arrowEnd: drawDefaults.arrowEnd };
     if (shape.curved) { shape.cx = (shape.x1 + shape.x2) / 2; shape.cy = (shape.y1 + shape.y2) / 2; }
   }
   shapes.push(shape);
@@ -5167,9 +5195,13 @@ function phaseThumbHTML(ph, opts) {
     if (s.style === "run" || s.style === "pass" || s.style === "dribble") {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
       const dash = s.style === "pass" ? `stroke-dasharray="${toVB(2)} ${toVB(5)}"` : "";
+      const hasArrowhead = s.arrowEnd !== false; // undefined (older saved shapes) still means "yes, has one"
       // dribble's arrowhead is a bit bigger than run/pass's, to read
-      // clearly against the busier zigzag line leading into it
-      const headLen = Math.max(toVB(8), width * 4) * (s.style === "dribble" ? 1.35 : 1);
+      // clearly against the busier zigzag line leading into it. With the
+      // arrowhead off, headLen collapses to 0 so the line reaches the
+      // true endpoint instead of being trimmed short for a head that's
+      // never actually drawn.
+      const headLen = hasArrowhead ? Math.max(toVB(8), width * 4) * (s.style === "dribble" ? 1.35 : 1) : 0;
       const bc = es.curved ? (es._partialControl || bezierControlFor(es)) : null;
       const cp = bc ? pxAt(bc.x, bc.y) : p1;
       const angle = es.curved ? Math.atan2(p2.y - cp.y, p2.x - cp.x) : Math.atan2(p2.y - p1.y, p2.x - p1.x);
@@ -5198,7 +5230,7 @@ function phaseThumbHTML(ph, opts) {
           ? `<path d="M${p1.x} ${p1.y} Q ${cp.x} ${cp.y} ${trimX} ${trimY}" fill="none" stroke="${color}" stroke-width="${width}" ${dash} stroke-linecap="round"/>`
           : `<line x1="${p1.x}" y1="${p1.y}" x2="${trimX}" y2="${trimY}" stroke="${color}" stroke-width="${width}" ${dash} stroke-linecap="round"/>`;
       }
-      const head = `<polygon points="${p2.x},${p2.y} ${hx1},${hy1} ${hx2},${hy2}" fill="${color}"/>`;
+      const head = hasArrowhead ? `<polygon points="${p2.x},${p2.y} ${hx1},${hy1} ${hx2},${hy2}" fill="${color}"/>` : "";
       return body + head;
     }
     if (s.style === "circle") {
