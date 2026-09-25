@@ -698,7 +698,9 @@
   .output-author .date { font-size: 12px; color: var(--ink-faint); }
   .output-icon-row { display: flex; gap: 6px; }
   .output-title { font-family: var(--display); font-size: 30px; font-weight: 700; margin-bottom: 18px; }
-  .output-phase-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin: 22px 0 10px; }
+  .output-phase-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin: 22px 0 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .output-phase-label-dims { font-size: 12px; font-weight: 500; color: var(--ink-faint); white-space: nowrap; flex-shrink: 0; }
+  .output-phase-label-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .output-section { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); }
   .output-section-label { font-family: var(--display); font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
   .output-section p { font-size: 13.5px; color: var(--ink-soft); line-height: 1.6; margin: 0 0 4px; }
@@ -745,7 +747,7 @@
   #output-phases-container { margin-top: 34px; }
   .output-phase-block { margin-top: 44px; }
   .output-phase-block:first-child { margin-top: 0; }
-  .output-phase-block .output-phase-label { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--ink); margin: 0 0 12px; }
+  .output-phase-block .output-phase-label { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--ink); margin: 0 0 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
   .output-phase-notes { margin-top: 4px; }
   .output-info-block { margin-bottom: 12px; }
   .output-info-block:last-child { margin-bottom: 0; }
@@ -5480,7 +5482,17 @@ function renderOutputContent() {
     const label = outputSettings.showPhaseTitles ? (() => {
       const l = document.createElement("div");
       l.className = "output-phase-label";
-      l.textContent = (ph.title || "").trim() || (phaseNoun() + " " + (idx + 1));
+      const titleSpan = document.createElement("span");
+      titleSpan.className = "output-phase-label-title";
+      titleSpan.textContent = (ph.title || "").trim() || (phaseNoun() + " " + (idx + 1));
+      l.appendChild(titleSpan);
+      const dims = phaseDimensionsText(ph);
+      if (dims) {
+        const dimsSpan = document.createElement("span");
+        dimsSpan.className = "output-phase-label-dims";
+        dimsSpan.textContent = dims;
+        l.appendChild(dimsSpan);
+      }
       return l;
     })() : null;
 
@@ -7853,6 +7865,17 @@ function renderInfoBlockHTML(b) {
   const titleHtml = titleLabel ? `<div class="output-info-block-title">${escapeHtml(titleLabel)}</div>` : "";
   const bodyHtml = `<ul class="output-bullet-list">${lines.map(l => `<li>${escapeHtml(l)}</li>`).join("")}</ul>`;
   return `<div class="output-info-block">${titleHtml}${bodyHtml}</div>`;
+}
+// combined "20 × 30m" style label from the Panel's separate Playing
+// Area Length/Width fields — blank if neither is set, just the one
+// number if only one is (no stray "×" or unit floating on its own)
+function phaseDimensionsText(ph) {
+  const l = (ph.playingAreaLength || "").toString().trim();
+  const w = (ph.playingAreaWidth || "").toString().trim();
+  if (l && w) return `${l} × ${w}m`;
+  if (l) return `${l}m`;
+  if (w) return `${w}m`;
+  return "";
 }
 function phaseInfoBlocksText(ph) {
   return (ph.infoBlocks || [])
