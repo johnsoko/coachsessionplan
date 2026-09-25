@@ -7872,7 +7872,7 @@ function renderInfoBlockHTML(b) {
 function phaseDimensionsText(ph) {
   const l = (ph.playingAreaLength || "").toString().trim();
   const w = (ph.playingAreaWidth || "").toString().trim();
-  if (l && w) return `${l} × ${w}m`;
+  if (l && w) return `${l}m x ${w}m`;
   if (l) return `${l}m`;
   if (w) return `${w}m`;
   return "";
