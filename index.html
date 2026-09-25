@@ -544,7 +544,6 @@
   .thumb-play-btn.playing { background: var(--bib); color: #201200; }
   .phase-note-label { font-family: var(--display); font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
   .note-blocks { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; padding: 10px 8px; background: var(--paper); min-height: 110px; }
-  #drill-description-blocks { min-height: 36px; }
   .note-block-row { display: flex; align-items: flex-start; gap: 3px; border-radius: 5px; position: relative; }
   .note-block-row:hover { background: var(--paper-raised); }
   .note-block-row.dragging { opacity: 0.4; }
@@ -1886,10 +1885,6 @@
                 <input type="color" id="pd-load-color-input" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;">
               </div>
             </div>
-            <div class="notes-field">
-              <label>Practice Overview / Objective</label>
-              <textarea class="field-input" id="pd-objective" rows="3" placeholder="Concise summary shown on Session Overview"></textarea>
-            </div>
             <div class="notes-divider" style="margin:22px 0;"></div>
             <div class="pd-blocks-header">
               <label class="tp-label" style="margin:0;">Block Information</label>
@@ -1942,10 +1937,6 @@
             </div>
           </div>
           <div class="output-title" id="output-title">Overload to finish</div>
-          <div class="output-section" id="output-description-section" style="margin-top:0; padding-top:0; border-top:none; margin-bottom:22px;">
-            <div class="output-section-label" id="output-description-label">Drill Description</div>
-            <div id="output-description-text"></div>
-          </div>
           <button class="btn btn-primary" id="output-play-full-btn">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4 2.5v9l8-4.5z" fill="currentColor"/></svg>
             Play Full Animation
@@ -1986,13 +1977,6 @@
             <span class="chip">Finishing <button>×</button></span>
             <button class="chip-add" id="add-tag-btn">+ add</button>
           </div>
-        </div>
-
-        <div class="notes-divider"></div>
-
-        <div class="notes-field">
-          <label id="drill-description-label">Drill Description</label>
-          <div class="note-blocks" id="drill-description-blocks"></div>
         </div>
 
         <div class="notes-divider"></div>
@@ -2134,7 +2118,6 @@
       <div class="output-settings-divider"></div>
       <div class="output-settings-section-label">Display Options</div>
       <div class="output-checks">
-        <label><input type="checkbox" id="opt-show-desc" checked> Show Description</label>
         <label><input type="checkbox" id="opt-show-anim" checked> Show Animation Button</label>
         <label><input type="checkbox" id="opt-show-titles" checked> Show Phase Titles</label>
         <label><input type="checkbox" id="opt-show-phase-notes" checked> Show Phase Notes</label>
@@ -4916,10 +4899,16 @@ function newSceneObj(contentSrc) {
 // contentSrc here is a whole PHASE to copy the active scene's content
 // from (or null for blank); surfaceSrc always supplies the field type
 const DEFAULT_LOAD_COLOR = "#3B6FB6";
-// two blocks every phase starts with — title is left blank so the coach's
-// own wording shows through, with the label itself as a placeholder hint
+// three blocks every phase starts with — title is left blank so the
+// coach's own wording shows through, with the label itself as a
+// placeholder hint. Overview leads (it introduces the activity before
+// Organisation/Coaching Points get into the how) and is what used to be
+// the separate, session-wide "Session Overview"/"Drill Description"
+// field — now per-activity like everything else here, since a single
+// session-wide summary didn't fit a practice plan with several activities
 function defaultInfoBlocks() {
   return [
+    { id: nextId++, enabled: true, title: "Overview", lines: [""], placeholder: "Overview" },
     { id: nextId++, enabled: true, title: "Organisation", lines: [""], placeholder: "Organisation" },
     { id: nextId++, enabled: true, title: "Coaching Points", lines: [""], placeholder: "Coaching Points" }
   ];
@@ -4946,7 +4935,6 @@ function newPhaseObj(contentSrc, surfaceSrc) {
     id: phaseNextId++, surface: surfaceSrc || "full", scenes: [scene], activeSceneId: scene.id,
     noteBlocks: [""], title: contentSrc ? (contentSrc.title || "") : "", duration: contentSrc ? (contentSrc.duration || "") : "",
     dimensions: contentSrc ? (contentSrc.dimensions || "") : "",
-    objective: contentSrc ? (contentSrc.objective || "") : "",
     load: contentSrc ? (contentSrc.load || "") : "",
     loadColor: contentSrc ? (contentSrc.loadColor || DEFAULT_LOAD_COLOR) : DEFAULT_LOAD_COLOR,
     infoBlocks: contentSrc && contentSrc.infoBlocks ? contentSrc.infoBlocks.map(b => ({...b, id: nextId++})) : defaultInfoBlocks(),
@@ -5448,7 +5436,6 @@ function escapeHtml(str) {
 }
 let outputSettings = {
   layout: "large",       // large | small | rows
-  showDescription: true,
   showAnimationButton: true,
   showPhaseTitles: true,
   showPhaseNotes: true,
@@ -5466,18 +5453,11 @@ function renderOutputContent() {
   const container = document.getElementById("output-phases-container");
   if (!container) return; // not on the Output view yet
 
-  document.getElementById("output-description-section").style.display = outputSettings.showDescription ? "block" : "none";
-  // same field/label swap as the Details tab: "Session Overview" for a
-  // practice plan, "Drill Description" for a single standalone drill
-  const descLabel = document.getElementById("output-description-label");
-  if (descLabel) descLabel.textContent = isStandaloneDrillMode ? "Drill Description" : "Session Overview";
-  const descText = document.getElementById("output-description-text");
-  if (descText) {
-    const blocks = (drillDescriptionBlocks || []).filter(t => t.trim());
-    descText.innerHTML = blocks.length
-      ? blocks.map(t => `<p>${escapeHtml(t)}</p>`).join("")
-      : `<p class="output-empty">No description yet.</p>`;
-  }
+  // Overview is now just the first Block Information entry on each
+  // phase (see defaultInfoBlocks), rendered per-phase below alongside
+  // Organisation/Coaching Points under the existing "Show Phase Notes"
+  // setting — the old session-wide description section above the phase
+  // list is gone, so there's nothing separate to toggle or fill in here
   const clipsSection = document.getElementById("output-clips-section");
   if (clipsSection) {
     const showClips = outputSettings.showVideos && sessionClips.length > 0;
@@ -6325,18 +6305,6 @@ function renderPhaseNotes() {
     list.appendChild(card);
   });
 }
-let drillDescriptionBlocks = ["Emphasize quick first touch out of feet before the overlap run."];
-function renderDrillDescriptionBlocks() {
-  const wrap = document.getElementById("drill-description-blocks");
-  if (!wrap) return;
-  if (!drillDescriptionBlocks.length) drillDescriptionBlocks = [""];
-  renderNoteBlocks(drillDescriptionBlocks, wrap);
-  // same field either way — just called "Session Overview" for a practice
-  // plan (covering the whole session) vs "Drill Description" for a single
-  // standalone drill, matching how phaseNoun() already renames "Phase" too
-  const label = document.getElementById("drill-description-label");
-  if (label) label.textContent = isStandaloneDrillMode ? "Drill Description" : "Session Overview";
-}
 let draggedBlock = null; // { blocks, index }
 function focusNoteBlock(wrap, idx) {
   const els = wrap.querySelectorAll(".note-block-text");
@@ -6439,13 +6407,12 @@ function refreshAnimatePanel() {
 /* ─────────────────────────────────────────────────────────
    PHASE DETAIL PANEL — the right toolkit's "Panel" view.
    A focused editor for the active phase's own metadata (title,
-   duration, load, objective) plus a reorderable set of titled
-   free-text blocks (Organisation, Coaching Points, etc.),
+   duration, load) plus a reorderable set of titled free-text
+   blocks (Overview, Organisation, Coaching Points, etc.),
    separate from the Details tab's plain per-phase notes.
 ───────────────────────────────────────────────────────── */
 let rightPanelMode = "toolkit"; // "toolkit" | "detail" | "animate"
 function ensurePhaseDetailFields(ph) {
-  if (ph.objective == null) ph.objective = "";
   if (ph.load == null) ph.load = "";
   if (!ph.loadColor) ph.loadColor = DEFAULT_LOAD_COLOR;
   if (!ph.infoBlocks || !ph.infoBlocks.length) ph.infoBlocks = defaultInfoBlocks();
@@ -6469,7 +6436,6 @@ function renderPhaseDetailPanel() {
   document.getElementById("pd-load").value = ph.load || "";
   document.getElementById("pd-load-swatch").style.background = ph.loadColor;
   document.getElementById("pd-load-color-input").value = ph.loadColor;
-  document.getElementById("pd-objective").value = ph.objective || "";
   renderPhaseDetailBlocks(ph);
 }
 function renderPhaseDetailBlocks(ph) {
@@ -6605,11 +6571,6 @@ document.getElementById("pd-load-color-input").addEventListener("input", e => {
   if (targetId === activePhaseId) document.getElementById("pd-load-swatch").style.background = e.target.value;
   const timetableSwatch = document.querySelector(`.phase-note-card[data-phase-id="${targetId}"] .pn-load-swatch`);
   if (timetableSwatch) timetableSwatch.style.background = e.target.value;
-});
-document.getElementById("pd-objective").addEventListener("input", e => {
-  const ph = phases.find(p => p.id === activePhaseId);
-  if (!ph) return;
-  ph.objective = e.target.value;
 });
 document.getElementById("pd-add-block").addEventListener("click", () => {
   const ph = phases.find(p => p.id === activePhaseId);
@@ -7126,7 +7087,7 @@ function renderModeContent(mode) {
     renderAnimateOutputPhaseLists();
     document.getElementById("output-title").textContent = document.getElementById("title-input").value;
   }
-  if (mode === "notes") { renderPhaseNotes(); renderDrillDescriptionBlocks(); }
+  if (mode === "notes") { renderPhaseNotes(); }
   if (mode === "draw") { renderPhaseList(); renderObjectsList(); refreshAnimatePanel(); }
 }
 function switchMode(mode) {
@@ -7606,7 +7567,6 @@ document.getElementById("output-layout-grid").addEventListener("click", e => {
   outputSettings.layout = btn.dataset.layout;
   renderOutputContent();
 });
-document.getElementById("opt-show-desc").addEventListener("change", e => { outputSettings.showDescription = e.target.checked; renderOutputContent(); });
 document.getElementById("opt-show-anim").addEventListener("change", e => { outputSettings.showAnimationButton = e.target.checked; renderOutputContent(); });
 document.getElementById("opt-show-titles").addEventListener("change", e => { outputSettings.showPhaseTitles = e.target.checked; renderOutputContent(); });
 document.getElementById("opt-show-phase-notes").addEventListener("change", e => { outputSettings.showPhaseNotes = e.target.checked; renderOutputContent(); });
@@ -7778,7 +7738,7 @@ function serializeAppState() {
   return {
     title: document.getElementById("title-input").value,
     phases, phaseNextId, sceneNextId, nextId,
-    drillDescriptionBlocks, outputSettings, sessionClips,
+    outputSettings, sessionClips,
     practiceDate: document.getElementById("practice-date-input").value,
     practiceStartTime: document.getElementById("practice-starttime-input").value,
     duration: document.getElementById("practice-duration-input").value,
@@ -7856,6 +7816,28 @@ function migrateLegacyNoteBlocks(ph) {
   ph.infoBlocks.push({ id: nextId++, enabled: true, title: "Notes", text, placeholder: "Notes" });
   ph.noteBlocks = [""];
 }
+// a phase's `objective` field predates Overview being a normal Block
+// Information entry (see defaultInfoBlocks) — its own Panel textarea was
+// retired once Overview took over that job, but a phase saved with real
+// objective content before that still has it sitting there, invisible
+// now that nothing reads or edits it anymore. This carries it into the
+// phase's Overview block (only when that block has no content of its
+// own, so it can't clobber anything already filled in) the one time a
+// phase is loaded, then clears the old field so it isn't migrated again.
+function migrateLegacyObjective(ph) {
+  const text = (ph.objective || "").trim();
+  if (!text) return;
+  if (!ph.infoBlocks) ph.infoBlocks = [];
+  const overview = ph.infoBlocks.find(b => (b.title || b.placeholder) === "Overview");
+  const hasContent = overview && (Array.isArray(overview.lines) ? overview.lines : [overview.text || ""]).some(l => (l || "").trim());
+  if (hasContent) { ph.objective = ""; return; }
+  if (overview) {
+    overview.lines = [text];
+  } else {
+    ph.infoBlocks.unshift({ id: nextId++, enabled: true, title: "Overview", lines: [text], placeholder: "Overview" });
+  }
+  ph.objective = "";
+}
 // combined plain-text summary of a phase's enabled Block Information —
 // for the handful of places that need a single flat "notes" string
 // (search snippets, drill library exports, older single-field Notes
@@ -7883,6 +7865,39 @@ function phaseInfoBlocksText(ph) {
     .join(" ")
     .trim();
 }
+// just the Overview block's own text (not Organisation/Coaching Points
+// too) — for the save payload's separate `description` field, which
+// used to come from the old session-wide description field and is kept
+// as a short, focused summary rather than every block run together
+function phaseOverviewText(ph) {
+  const b = (ph.infoBlocks || []).find(b => (b.title || b.placeholder) === "Overview");
+  if (!b) return "";
+  return (Array.isArray(b.lines) ? b.lines : [b.text || ""]).filter(l => (l || "").trim()).join(" ").trim();
+}
+// the overview/description used to be one session-wide field (saved as
+// data.drillDescriptionBlocks) rather than belonging to any specific
+// activity — now that Overview is just the first per-activity Block
+// Information entry (see defaultInfoBlocks), this carries that old text
+// into phase 1's Overview block the one time old data is loaded, so
+// nothing written is lost. Only runs when phase 1 doesn't already have
+// real Overview content, so it can't clobber anything already filled in
+// and won't re-migrate on every later load.
+function migrateLegacySessionDescription(data, phaseList) {
+  const text = (Array.isArray(data.drillDescriptionBlocks) ? data.drillDescriptionBlocks : [])
+    .filter(t => (t || "").trim()).join(" ").trim();
+  if (!text) return;
+  const ph = phaseList[0];
+  if (!ph) return;
+  if (!ph.infoBlocks) ph.infoBlocks = [];
+  const overview = ph.infoBlocks.find(b => (b.title || b.placeholder) === "Overview");
+  const hasContent = overview && (Array.isArray(overview.lines) ? overview.lines : [overview.text || ""]).some(l => (l || "").trim());
+  if (hasContent) return;
+  if (overview) {
+    overview.lines = [text];
+  } else {
+    ph.infoBlocks.unshift({ id: nextId++, enabled: true, title: "Overview", lines: [text], placeholder: "Overview" });
+  }
+}
 function loadAppState(data) {
   if (data.title != null) {
     document.getElementById("title-input").value = data.title;
@@ -7895,7 +7910,8 @@ function loadAppState(data) {
   phases.forEach(repairPhaseSceneIdContinuity);
   phases.forEach(migrateLegacyDribbleShapes);
   phases.forEach(migrateLegacyNoteBlocks);
-  if (Array.isArray(data.drillDescriptionBlocks)) drillDescriptionBlocks = data.drillDescriptionBlocks;
+  phases.forEach(migrateLegacyObjective);
+  migrateLegacySessionDescription(data, phases);
   if (data.outputSettings) Object.assign(outputSettings, data.outputSettings);
   if (Array.isArray(data.sessionClips)) sessionClips = data.sessionClips;
   document.getElementById("practice-date-input").value = data.practiceDate || "";
@@ -8116,7 +8132,7 @@ async function saveStandaloneDrill() {
       // reopen and keep editing it — lives in `phases` below.
       surface: ph.surface, scenes: ph.scenes,
       notes: phaseInfoBlocksText(ph),
-      description: (drillDescriptionBlocks || []).filter(t => t.trim()).join(" "),
+      description: phaseOverviewText(ph),
       dimensions: ph.dimensions || "",
       tags: getTags(), creatorName,
       phases, phaseNextId, sceneNextId, nextId,
@@ -8199,7 +8215,7 @@ async function syncPhasesToLibrary() {
   if (token) headers["authorization"] = "Bearer " + token;
   for (const ph of toSync) {
     const notes = phaseInfoBlocksText(ph);
-    const description = (drillDescriptionBlocks || []).filter(t => t.trim()).join(" ");
+    const description = phaseOverviewText(ph);
     const creatorName = (typeof Clerk !== "undefined" && Clerk.user)
       ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
     const payload = {
@@ -8288,7 +8304,6 @@ function seedFreshDrill() {
   applyStandaloneDrillModeUI();
   history.replaceState(null, "", location.pathname);
   tokens = []; shapes = []; phases = []; phaseNextId = 1; sceneNextId = 1; nextId = 1;
-  drillDescriptionBlocks = [""];
   sessionClips = [];
   document.getElementById("title-input").value = "";
   document.getElementById("notes-title-input").value = "";
@@ -8305,7 +8320,6 @@ function seedFreshDrill() {
   phases = [firstPhase];
   activePhaseId = firstPhase.id;
   renderPhaseList();
-  renderDrillDescriptionBlocks();
   document.getElementById("output-date").textContent = "Last edited " + new Date().toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
   switchMode("draw");
   showScreen("app");
@@ -8722,7 +8736,7 @@ async function openStandaloneDrillEditorExisting(id) {
       sceneNextId = data.sceneNextId || (maxSceneId + 1);
       nextId = data.nextId || (maxTokenShapeId + 1);
       phases.forEach(migrateLegacyNoteBlocks);
-    } else {
+      phases.forEach(migrateLegacyObjective);
       // legacy single-phase drill (saved before multi-phase support) —
       // preserve the original token/shape ids across scenes — the tween
       // and shape-wipe animation logic matches the SAME object between
