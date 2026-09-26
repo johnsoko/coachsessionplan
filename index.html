@@ -1594,6 +1594,11 @@
                 <button data-arrowend="1" class="active">Arrow</button>
                 <button data-arrowend="0">None</button>
               </div>
+              <span class="tp-label">Arrow Start</span>
+              <div class="tp-toggle-row" id="arrow-start-toggle">
+                <button data-arrowstart="1">Arrow</button>
+                <button data-arrowstart="0" class="active">None</button>
+              </div>
               <div style="height:1px;background:var(--line);margin:6px 2px;"></div>
               <span class="tp-label" style="margin-top:0;">Color</span>
               <div class="tp-swatch-row" id="arrow-swatch-row"></div>
@@ -2184,7 +2189,7 @@ const EQUIPMENT_DEFAULT_SIZES = { cone: 14, flatcone: 14, minigoal: 32, largegoa
 // rather than snapping back to the original default every time
 let equipmentSizeMemory = { ...EQUIPMENT_DEFAULT_SIZES };
 const EQUIPMENT_KINDS = ["cone", "flatcone", "minigoal", "largegoal", "dummy", "ladder", "pole"];
-const drawDefaults  = { color: "#F7F8F3", width: 2.6, curved: false, arrowEnd: true };
+const drawDefaults  = { color: "#F7F8F3", width: 2.6, curved: false, arrowEnd: true, arrowStart: false };
 const shapeDefaults = { color: "#F7F8F3", width: 2.4, fill: false, dashed: false };
 // same per-kind "last used" memory as equipment, applied to circle/
 // square/triangle so each shape kind remembers its own last width
@@ -3597,6 +3602,7 @@ function syncArrowPopover() {
   const kind  = s ? s.style : arrowStyle;
   const curved = (s && (s.style === "run" || s.style === "pass")) ? !!s.curved : drawDefaults.curved;
   const arrowEnd = s ? (s.arrowEnd !== false) : drawDefaults.arrowEnd;
+  const arrowStart = s ? (s.arrowStart === true) : drawDefaults.arrowStart;
   document.querySelectorAll("#arrow-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
   // older saved arrows may have an arbitrary width from before this was
   // simplified to three presets — match to the closest preset for
@@ -3607,6 +3613,7 @@ function syncArrowPopover() {
   document.querySelectorAll("#arrow-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o.dataset.style === kind));
   document.querySelectorAll("#arrow-curve-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.curved === "1") === curved));
   document.querySelectorAll("#arrow-end-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.arrowend === "1") === arrowEnd));
+  document.querySelectorAll("#arrow-start-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.arrowstart === "1") === arrowStart));
 }
 function setArrowCurved(curved) {
   pushHistory();
@@ -3632,6 +3639,19 @@ function setArrowEnd(hasArrow) {
     renderShapes();
   }
   drawDefaults.arrowEnd = hasArrow;
+  syncArrowPopover();
+}
+// same as setArrowEnd above, but for the start point — the two are
+// independent so an arrow can have a head at either end, both (double-
+// headed), or neither
+function setArrowStart(hasArrow) {
+  pushHistory();
+  const matched = selectedShapesOfKindAnyTool(ARROW_KINDS);
+  if (matched.length) {
+    matched.forEach(s => { s.arrowStart = hasArrow; });
+    renderShapes();
+  }
+  drawDefaults.arrowStart = hasArrow;
   syncArrowPopover();
 }
 function setArrowColor(color) {
@@ -3899,6 +3919,9 @@ function initArrowPopover() {
   document.querySelectorAll("#arrow-end-toggle button").forEach(btn => {
     btn.addEventListener("click", () => setArrowEnd(btn.dataset.arrowend === "1"));
   });
+  document.querySelectorAll("#arrow-start-toggle button").forEach(btn => {
+    btn.addEventListener("click", () => setArrowStart(btn.dataset.arrowstart === "1"));
+  });
   syncArrowPopover();
 }
 function initShapePopover() {
@@ -4157,13 +4180,15 @@ function drawShape(s, highlight) {
     const p1 = px(s.x1, s.y1), p2 = px(s.x2, s.y2);
     ctx.setLineDash(s.style === "pass" ? [3, 7] : []);
     const hasArrowhead = s.arrowEnd !== false; // undefined (older saved shapes) still means "yes, has one"
+    const hasStartArrowhead = s.arrowStart === true; // undefined/false means no head at the start — opposite default from the end
     // dribble's arrowhead is a bit bigger than run/pass's, to read clearly
-    // against the busier zigzag line leading into it. With the arrowhead
-    // off, headLen collapses to 0 — otherwise the line would still be
-    // trimmed short for a head that's never actually drawn, leaving a
-    // visible gap before the real endpoint.
+    // against the busier zigzag line leading into it. With a given end's
+    // arrowhead off, its headLen collapses to 0 — otherwise the line
+    // would still be trimmed short for a head that's never actually
+    // drawn, leaving a visible gap before the real endpoint.
     const headLen = hasArrowhead ? (8 + width*1.8) * (s.style === "dribble" ? 1.35 : 1) : 0;
-    let angle, lx2, ly2, cp;
+    const headLenStart = hasStartArrowhead ? (8 + width*1.8) * (s.style === "dribble" ? 1.35 : 1) : 0;
+    let angle, lx2, ly2, lx1, ly1, cp;
     if (s.curved) {
       const bc = s._partialControl || bezierControlFor(s);
       cp = px(bc.x, bc.y);
@@ -4172,34 +4197,48 @@ function drawShape(s, highlight) {
       // there runs from the (derived) control point to the endpoint
       angle = Math.atan2(p2.y-cp.y, p2.x-cp.x);
       lx2 = p2.x - headLen*0.8*Math.cos(angle); ly2 = p2.y - headLen*0.8*Math.sin(angle);
+      // same trim at the start, using the tangent there instead (control
+      // point to p1, i.e. the reverse of "arriving at p1 from the curve")
+      const startAngle = Math.atan2(p1.y-cp.y, p1.x-cp.x);
+      lx1 = p1.x - headLenStart*0.8*Math.cos(startAngle); ly1 = p1.y - headLenStart*0.8*Math.sin(startAngle);
     } else {
       angle = Math.atan2(p2.y-p1.y, p2.x-p1.x);
       lx2 = p2.x - headLen*0.8*Math.cos(angle); ly2 = p2.y - headLen*0.8*Math.sin(angle);
+      // reverse direction for the start trim — same line, opposite end
+      lx1 = p1.x + headLenStart*0.8*Math.cos(angle); ly1 = p1.y + headLenStart*0.8*Math.sin(angle);
     }
     if (s.style === "dribble") {
       // small zigzag traced along the same straight-or-curved path the
       // line would otherwise follow — a rendering style only, not a
       // different underlying shape, so it curves/resizes/drags exactly
-      // like a run or pass arrow
+      // like a run or pass arrow. Runs between the two (possibly
+      // trimmed-for-an-arrowhead) ends, not the raw p1/p2, so the zigzag
+      // doesn't overlap either head.
       const amplitude = 4 + width * 0.6;
       const approxLen = s.curved
-        ? Math.hypot(cp.x-p1.x, cp.y-p1.y) + Math.hypot(lx2-cp.x, ly2-cp.y)
-        : Math.hypot(lx2-p1.x, ly2-p1.y);
+        ? Math.hypot(cp.x-lx1, cp.y-ly1) + Math.hypot(lx2-cp.x, ly2-cp.y)
+        : Math.hypot(lx2-lx1, ly2-ly1);
       const segments = Math.max(4, Math.round(approxLen / 9));
       const getPointAtT = s.curved
-        ? (t) => ({ x: (1-t)*(1-t)*p1.x + 2*(1-t)*t*cp.x + t*t*lx2, y: (1-t)*(1-t)*p1.y + 2*(1-t)*t*cp.y + t*t*ly2 })
-        : (t) => ({ x: p1.x + (lx2-p1.x)*t, y: p1.y + (ly2-p1.y)*t });
+        ? (t) => ({ x: (1-t)*(1-t)*lx1 + 2*(1-t)*t*cp.x + t*t*lx2, y: (1-t)*(1-t)*ly1 + 2*(1-t)*t*cp.y + t*t*ly2 })
+        : (t) => ({ x: lx1 + (lx2-lx1)*t, y: ly1 + (ly2-ly1)*t });
       const zz = zigzagPoints(getPointAtT, segments, amplitude, 0.16);
       ctx.beginPath();
       zz.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
       ctx.stroke();
     } else if (s.curved) {
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.quadraticCurveTo(cp.x, cp.y, lx2, ly2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lx1, ly1); ctx.quadraticCurveTo(cp.x, cp.y, lx2, ly2); ctx.stroke();
     } else {
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(lx2, ly2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lx1, ly1); ctx.lineTo(lx2, ly2); ctx.stroke();
     }
     ctx.setLineDash([]);
     if (hasArrowhead) drawArrowhead(p2.x, p2.y, angle, headLen, color);
+    if (hasStartArrowhead) {
+      // tip at p1, facing back along the line — the reverse of angle for
+      // a straight line, or the curve's own start tangent when curved
+      const startHeadAngle = s.curved ? Math.atan2(p1.y-cp.y, p1.x-cp.x) : angle + Math.PI;
+      drawArrowhead(p1.x, p1.y, startHeadAngle, headLenStart, color);
+    }
   } else if (SHAPE_KINDS.includes(s.style)) {
     const p1 = px(s.x1, s.y1), p2 = px(s.x2, s.y2);
     ctx.setLineDash(s.dashed ? [6, 4] : []);
@@ -4781,23 +4820,26 @@ function onStageMove(e) {
   const p1 = px(drawStart.x, drawStart.y), p2 = px(p.x, p.y);
   const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x);
   const headLen = drawDefaults.arrowEnd === false ? 0 : (8 + drawDefaults.width*1.8) * (arrowStyle === "dribble" ? 1.35 : 1) * hf;
+  const headLenStart = drawDefaults.arrowStart !== true ? 0 : (8 + drawDefaults.width*1.8) * (arrowStyle === "dribble" ? 1.35 : 1) * hf;
   const lx2 = p2.x - headLen*0.8*Math.cos(angle), ly2 = p2.y - headLen*0.8*Math.sin(angle);
+  const lx1 = p1.x + headLenStart*0.8*Math.cos(angle), ly1 = p1.y + headLenStart*0.8*Math.sin(angle);
   if (arrowStyle === "dribble") {
     // small zigzag along the straight line up to the arrowhead — segment
     // count scales with the line's own length so short and long drags
     // both get a consistent-looking zigzag density, not stretched teeth
     const amplitude = (4 + drawDefaults.width * 0.6) * hf;
-    const lineLen = Math.hypot(lx2 - p1.x, ly2 - p1.y);
+    const lineLen = Math.hypot(lx2 - lx1, ly2 - ly1);
     const segments = Math.max(4, Math.round(lineLen / (9 * hf)));
-    const zz = zigzagPoints(t => ({ x: p1.x + (lx2 - p1.x) * t, y: p1.y + (ly2 - p1.y) * t }), segments, amplitude, 0.16);
+    const zz = zigzagPoints(t => ({ x: lx1 + (lx2 - lx1) * t, y: ly1 + (ly2 - ly1) * t }), segments, amplitude, 0.16);
     ctx.beginPath();
     zz.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
     ctx.stroke();
   } else {
-    ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(lx2,ly2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(lx1,ly1); ctx.lineTo(lx2,ly2); ctx.stroke();
   }
   ctx.setLineDash([]);
   if (drawDefaults.arrowEnd !== false) drawArrowhead(p2.x, p2.y, angle, headLen, drawDefaults.color);
+  if (drawDefaults.arrowStart === true) drawArrowhead(p1.x, p1.y, angle + Math.PI, headLenStart, drawDefaults.color);
   ctx.restore();
 }
 function onStageUp(e) {
@@ -4835,7 +4877,7 @@ function onStageUp(e) {
     // dribble now works exactly like run/pass — a simple two-point drag,
     // draggable/curvable the same way — the zigzag is purely a rendering
     // style, not a different underlying shape
-    shape = { id: nextId++, style: arrowStyle, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: drawDefaults.color, width: drawDefaults.width, curved: drawDefaults.curved, arrowEnd: drawDefaults.arrowEnd };
+    shape = { id: nextId++, style: arrowStyle, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: drawDefaults.color, width: drawDefaults.width, curved: drawDefaults.curved, arrowEnd: drawDefaults.arrowEnd, arrowStart: drawDefaults.arrowStart };
     if (shape.curved) { shape.cx = (shape.x1 + shape.x2) / 2; shape.cy = (shape.y1 + shape.y2) / 2; }
   }
   shapes.push(shape);
@@ -5183,12 +5225,14 @@ function phaseThumbHTML(ph, opts) {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
       const dash = s.style === "pass" ? `stroke-dasharray="${toVB(2)} ${toVB(5)}"` : "";
       const hasArrowhead = s.arrowEnd !== false; // undefined (older saved shapes) still means "yes, has one"
+      const hasStartArrowhead = s.arrowStart === true; // undefined/false means no head at the start — opposite default from the end
       // dribble's arrowhead is a bit bigger than run/pass's, to read
-      // clearly against the busier zigzag line leading into it. With the
-      // arrowhead off, headLen collapses to 0 so the line reaches the
-      // true endpoint instead of being trimmed short for a head that's
-      // never actually drawn.
+      // clearly against the busier zigzag line leading into it. With a
+      // given end's arrowhead off, its headLen collapses to 0 so the
+      // line reaches that true endpoint instead of being trimmed short
+      // for a head that's never actually drawn.
       const headLen = hasArrowhead ? Math.max(toVB(8), width * 4) * (s.style === "dribble" ? 1.35 : 1) : 0;
+      const headLenStart = hasStartArrowhead ? Math.max(toVB(8), width * 4) * (s.style === "dribble" ? 1.35 : 1) : 0;
       const bc = es.curved ? (es._partialControl || bezierControlFor(es)) : null;
       const cp = bc ? pxAt(bc.x, bc.y) : p1;
       const angle = es.curved ? Math.atan2(p2.y - cp.y, p2.x - cp.x) : Math.atan2(p2.y - p1.y, p2.x - p1.x);
@@ -5196,6 +5240,13 @@ function phaseThumbHTML(ph, opts) {
       const a1 = angle - 0.45, a2 = angle + 0.45;
       const hx1 = p2.x - headLen * Math.cos(a1), hy1 = p2.y - headLen * Math.sin(a1);
       const hx2 = p2.x - headLen * Math.cos(a2), hy2 = p2.y - headLen * Math.sin(a2);
+      // same trim/head-corner math at the start, using its own tangent
+      // (curved: control point to p1; straight: same angle, reversed)
+      const startAngle = es.curved ? Math.atan2(p1.y - cp.y, p1.x - cp.x) : angle + Math.PI;
+      const trimX1 = p1.x - headLenStart * 0.7 * Math.cos(startAngle), trimY1 = p1.y - headLenStart * 0.7 * Math.sin(startAngle);
+      const sa1 = startAngle - 0.45, sa2 = startAngle + 0.45;
+      const shx1 = p1.x - headLenStart * Math.cos(sa1), shy1 = p1.y - headLenStart * Math.sin(sa1);
+      const shx2 = p1.x - headLenStart * Math.cos(sa2), shy2 = p1.y - headLenStart * Math.sin(sa2);
       let body;
       if (s.style === "dribble") {
         // small zigzag traced along the same straight-or-curved path up
@@ -5203,22 +5254,23 @@ function phaseThumbHTML(ph, opts) {
         // reveals exactly like a run/pass arrow otherwise would
         const amplitude = Math.max(toVB(3), width * 1.8);
         const approxLen = es.curved
-          ? Math.hypot(cp.x-p1.x, cp.y-p1.y) + Math.hypot(trimX-cp.x, trimY-cp.y)
-          : Math.hypot(trimX-p1.x, trimY-p1.y);
+          ? Math.hypot(cp.x-trimX1, cp.y-trimY1) + Math.hypot(trimX-cp.x, trimY-cp.y)
+          : Math.hypot(trimX-trimX1, trimY-trimY1);
         const segments = Math.max(4, Math.round(approxLen / toVB(9)));
         const getPointAtT = es.curved
-          ? (t) => ({ x: (1-t)*(1-t)*p1.x + 2*(1-t)*t*cp.x + t*t*trimX, y: (1-t)*(1-t)*p1.y + 2*(1-t)*t*cp.y + t*t*trimY })
-          : (t) => ({ x: p1.x + (trimX-p1.x)*t, y: p1.y + (trimY-p1.y)*t });
+          ? (t) => ({ x: (1-t)*(1-t)*trimX1 + 2*(1-t)*t*cp.x + t*t*trimX, y: (1-t)*(1-t)*trimY1 + 2*(1-t)*t*cp.y + t*t*trimY })
+          : (t) => ({ x: trimX1 + (trimX-trimX1)*t, y: trimY1 + (trimY-trimY1)*t });
         const zz = zigzagPoints(getPointAtT, segments, amplitude, 0.16);
         const d = zz.map((pt, i) => (i===0?"M":"L") + pt.x.toFixed(1) + " " + pt.y.toFixed(1)).join(" ");
         body = `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
       } else {
         body = es.curved
-          ? `<path d="M${p1.x} ${p1.y} Q ${cp.x} ${cp.y} ${trimX} ${trimY}" fill="none" stroke="${color}" stroke-width="${width}" ${dash} stroke-linecap="round"/>`
-          : `<line x1="${p1.x}" y1="${p1.y}" x2="${trimX}" y2="${trimY}" stroke="${color}" stroke-width="${width}" ${dash} stroke-linecap="round"/>`;
+          ? `<path d="M${trimX1} ${trimY1} Q ${cp.x} ${cp.y} ${trimX} ${trimY}" fill="none" stroke="${color}" stroke-width="${width}" ${dash} stroke-linecap="round"/>`
+          : `<line x1="${trimX1}" y1="${trimY1}" x2="${trimX}" y2="${trimY}" stroke="${color}" stroke-width="${width}" ${dash} stroke-linecap="round"/>`;
       }
       const head = hasArrowhead ? `<polygon points="${p2.x},${p2.y} ${hx1},${hy1} ${hx2},${hy2}" fill="${color}"/>` : "";
-      return body + head;
+      const startHead = hasStartArrowhead ? `<polygon points="${p1.x},${p1.y} ${shx1},${shy1} ${shx2},${shy2}" fill="${color}"/>` : "";
+      return body + head + startHead;
     }
     if (s.style === "circle") {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
