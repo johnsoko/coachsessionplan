@@ -4876,7 +4876,10 @@ function onStageUp(e) {
   // means the tool was being used as intended, so it stays armed.
   function noShapeCreated() {
     renderShapes();
-    if (deselectedShapeOnThisDraw) setTool("select");
+    // keepPanelOpen (see the canvas-area click handler for the same
+    // reasoning): deselecting shouldn't force reopening the popover
+    // before picking a style and drawing the next line
+    if (deselectedShapeOnThisDraw) setTool("select", true);
   }
   let shape;
   if (currentTool === "shape") {
