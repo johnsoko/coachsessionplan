@@ -4578,6 +4578,19 @@ function revealedShapeAt(s, progress) {
     const { end, control } = partialCurve(s, progress);
     return { ...s, x2: end.x, y2: end.y, curved: true, _partialControl: control };
   }
+  if (SHAPE_KINDS.includes(s.style)) {
+    // zone markers (circle/square/triangle) scale up from their own
+    // center rather than growing out of one corner — corner-anchored
+    // growth (the arrow behavior above) reads as a directional line
+    // being drawn, which fits a run/pass but looks like an odd wipe for
+    // a shape that has no inherent direction of its own
+    const cx = (s.x1 + s.x2) / 2, cy = (s.y1 + s.y2) / 2;
+    return {
+      ...s,
+      x1: cx + (s.x1 - cx) * progress, y1: cy + (s.y1 - cy) * progress,
+      x2: cx + (s.x2 - cx) * progress, y2: cy + (s.y2 - cy) * progress
+    };
+  }
   return { ...s, x2: s.x1 + (s.x2 - s.x1) * progress, y2: s.y1 + (s.y2 - s.y1) * progress, curved: false };
 }
 // mirrors renderShapes()'s draw order (zone-marker shapes underneath,
@@ -5222,6 +5235,18 @@ function phaseThumbHTML(ph, opts) {
       // progress===1, so no need to special-case it away from here
       const { end, control } = progress < 1 ? partialCurve(s, progress) : { end: { x: s.x2, y: s.y2 }, control: null };
       es = { ...s, x2: end.x, y2: end.y, curved: true, _partialControl: control };
+    } else if (progress < 1 && SHAPE_KINDS.includes(s.style)) {
+      // zone markers scale up from their own center (matches
+      // revealedShapeAt() in the main engine) rather than growing from
+      // one corner, which reads as a directional line being drawn —
+      // fitting for an arrow, but an odd wipe for a shape with no
+      // inherent direction of its own
+      const cx = (s.x1 + s.x2) / 2, cy = (s.y1 + s.y2) / 2;
+      es = {
+        ...s,
+        x1: cx + (s.x1 - cx) * progress, y1: cy + (s.y1 - cy) * progress,
+        x2: cx + (s.x2 - cx) * progress, y2: cy + (s.y2 - cy) * progress
+      };
     } else if (progress < 1) {
       es = { ...s, x2: s.x1 + (s.x2 - s.x1) * progress, y2: s.y1 + (s.y2 - s.y1) * progress, curved: false };
     } else {
