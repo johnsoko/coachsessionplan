@@ -4591,7 +4591,28 @@ function hitTestShape(s, x, y, tolerance) {
   if (SHAPE_KINDS.includes(s.style)) {
     const minX = Math.min(p1.x, p2.x) - padTol, maxX = Math.max(p1.x, p2.x) + padTol;
     const minY = Math.min(p1.y, p2.y) - padTol, maxY = Math.max(p1.y, p2.y) + padTol;
-    return p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
+    const inPaddedBox = p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
+    if (!inPaddedBox) return false;
+    // with Select active, anywhere in the shape's box is a hit — the
+    // shape looks and acts like one solid object, so grabbing it
+    // shouldn't require finding its exact outline. With a drawing tool
+    // armed, though, that same generous area was swallowing every
+    // attempt to start a new line whose first point simply landed
+    // somewhere inside or near an existing shape (very likely, since
+    // shapes are often drawn as zones the coach then draws runs through
+    // or out of) — so here it's tightened to only the border itself:
+    // distance to the nearest of the four (unpadded) sides, whether
+    // approaching from inside or just outside.
+    if (currentTool !== "select") {
+      const boxMinX = Math.min(p1.x, p2.x), boxMaxX = Math.max(p1.x, p2.x);
+      const boxMinY = Math.min(p1.y, p2.y), boxMaxY = Math.max(p1.y, p2.y);
+      const distToBorder = Math.min(
+        Math.abs(p.x - boxMinX), Math.abs(p.x - boxMaxX),
+        Math.abs(p.y - boxMinY), Math.abs(p.y - boxMaxY)
+      );
+      return distToBorder < lineTol;
+    }
+    return true;
   }
   if ((s.style === "run" || s.style === "pass" || s.style === "dribble") && s.curved) {
     const bc = bezierControlFor(s);
