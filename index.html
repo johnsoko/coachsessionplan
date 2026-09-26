@@ -5451,9 +5451,22 @@ function renderAnimateOutputPhaseLists() {
   // own multi-phase write-up is built separately by renderOutputContent()
   renderOutputContent();
 }
+// the signed-in account's display name, for both the save payload's
+// creatorName and the live Output header — same Clerk fields either way
+// (full name first, then first name), falling back to "Coach" only when
+// nobody's signed in or Clerk hasn't loaded yet
+function currentCreatorName() {
+  return (typeof Clerk !== "undefined" && Clerk.user) ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
+}
 function renderOutputContent() {
   const container = document.getElementById("output-phases-container");
   if (!container) return; // not on the Output view yet
+
+  const authorName = currentCreatorName();
+  const authorNameEl = document.getElementById("output-author-name");
+  if (authorNameEl) authorNameEl.textContent = authorName;
+  const avatarEl = document.getElementById("output-avatar");
+  if (avatarEl) avatarEl.textContent = authorName[0].toUpperCase();
 
   // Overview is now just the first Block Information entry on each
   // phase (see defaultInfoBlocks), rendered per-phase below alongside
@@ -8143,7 +8156,7 @@ async function saveStandaloneDrill() {
     document.getElementById("title-input").focus();
     return;
   }
-  const creatorName = (typeof Clerk !== "undefined" && Clerk.user) ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
+  const creatorName = currentCreatorName();
   const payload = {
     title,
     data: {
@@ -8239,8 +8252,7 @@ async function syncPhasesToLibrary() {
   for (const ph of toSync) {
     const notes = phaseInfoBlocksText(ph);
     const description = phaseOverviewText(ph);
-    const creatorName = (typeof Clerk !== "undefined" && Clerk.user)
-      ? (Clerk.user.fullName || Clerk.user.firstName || "Coach") : "Coach";
+    const creatorName = currentCreatorName();
     const payload = {
       title: ph.title || "Untitled Drill",
       // include the full structured phase (with its real infoBlocks —
