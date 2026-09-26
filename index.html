@@ -8816,6 +8816,7 @@ async function openStandaloneDrillEditorExisting(id) {
       nextId = data.nextId || (maxTokenShapeId + 1);
       phases.forEach(migrateLegacyNoteBlocks);
       phases.forEach(migrateLegacyObjective);
+    } else {
       // legacy single-phase drill (saved before multi-phase support) —
       // preserve the original token/shape ids across scenes — the tween
       // and shape-wipe animation logic matches the SAME object between
