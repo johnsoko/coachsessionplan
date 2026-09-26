@@ -2710,6 +2710,20 @@ document.querySelectorAll(".arrow-popover, .team-popover").forEach(p => {
   p.addEventListener("click", e => e.stopPropagation());
 });
 document.addEventListener("click", e => {
+  // clicking the empty space around the field (not the field itself) while
+  // a tool is armed means the coach is done with it for now — jump back to
+  // Select so they don't have to go find that button. The panel stays open
+  // (keepPanelOpen) so picking a different option (a different arrow style,
+  // say) is one click instead of having to reopen the toolkit button first;
+  // it still closes normally via its own button, or by opening a different
+  // one. This takes priority over the plain deselect-and-close-everything
+  // click below — setTool already clears selection state itself, so
+  // there's nothing left for that branch to do here anyway.
+  const emptyCanvasWhileToolArmed = e.target.closest("#canvas-area") && !e.target.closest("#pitch-stage") && currentTool !== "select";
+  if (emptyCanvasWhileToolArmed) {
+    setTool("select", true);
+    return;
+  }
   // clicking/drawing on the pitch itself shouldn't collapse an open panel —
   // only clicking elsewhere in the app (outside the toolkit and the canvas)
   // should. Panels close via the rules in setTool/showPopoverForToken etc.
@@ -2720,12 +2734,6 @@ document.addEventListener("click", e => {
     // that opened it should clear too, not just the panel itself
     clearSelectionState();
     renderTokens(); renderShapes();
-  }
-  // clicking the empty space around the field (not the field itself) means
-  // the user's done with whatever tool was armed — jump back to Select so
-  // they don't have to go find that button
-  if (e.target.closest("#canvas-area") && !e.target.closest("#pitch-stage") && currentTool !== "select") {
-    setTool("select");
   }
 });
 
