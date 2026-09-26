@@ -2485,6 +2485,16 @@ function transposeXY(obj) {
   if (obj.points) obj.points.forEach(p => { const t = p.x; p.x = p.y; p.y = t; });
 }
 let fieldZoomLevel = 0; // 0-100, read by applyFieldZoom() — kept as a global so applySurface() can re-apply it against a new surface's own base width
+// the biggest the stage is ever allowed to grow to, in px, regardless of
+// which surface is active — narrower surfaces (like square-ish grids)
+// therefore scale up MORE relatively to reach this same absolute size.
+// This has to be big enough to support genuinely zooming into a small
+// corner of the field via the Zoom to Area tool (drag a tight rectangle,
+// get a tight crop) — the original 640*1.4 value only ever supported a
+// mild "make everything a bit bigger to read" level of zoom, which is
+// why deep zoom used to visibly hit a wall partway through a drag
+// regardless of how small a rectangle was actually drawn.
+const FIELD_ZOOM_ABSOLUTE_MAX = 640 * 8;
 // the field-percentage rectangle (x, y, w, h — all 0-100) a phase's saved
 // zoom/pan actually shows, derived purely from its stored viewZoom/
 // scrollFracX/scrollFracY and its own surface's base width — no live DOM
@@ -2494,7 +2504,7 @@ function phaseViewportRect(ph) {
   const zoom = ph.viewZoom || 0;
   if (zoom <= 0) return { x: 0, y: 0, w: 100, h: 100 };
   const baseWidth = (SURFACES[ph.surface] && SURFACES[ph.surface].maxWidth) || 640;
-  const ABSOLUTE_MAX = 640 * 1.4;
+  const ABSOLUTE_MAX = FIELD_ZOOM_ABSOLUTE_MAX; // see the shared constant's own comment for why this isn't still 640*1.4
   const t = zoom / 100;
   const scale = (baseWidth + (ABSOLUTE_MAX - baseWidth) * t) / baseWidth;
   const w = Math.min(100, 100 / scale);
@@ -4238,7 +4248,7 @@ function applyFieldZoom() {
   // MORE relatively than a full-width one, matching how zoom felt
   // before it became surface-aware, instead of only ever scaling 40%
   // up from its own smaller starting point
-  const ABSOLUTE_MAX = 640 * 1.4;
+  const ABSOLUTE_MAX = FIELD_ZOOM_ABSOLUTE_MAX; // see the shared constant's own comment for why this isn't still 640*1.4
   const t = fieldZoomLevel / 100;
   stage.style.maxWidth = (baseWidth + (ABSOLUTE_MAX - baseWidth) * t) + "px";
 }
@@ -4255,7 +4265,7 @@ function applyFieldZoom() {
 function fieldScaleFactor() {
   if (fieldZoomLevel <= 0) return 1;
   const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
-  const ABSOLUTE_MAX = 640 * 1.4;
+  const ABSOLUTE_MAX = FIELD_ZOOM_ABSOLUTE_MAX; // see the shared constant's own comment for why this isn't still 640*1.4
   const t = fieldZoomLevel / 100;
   return (baseWidth + (ABSOLUTE_MAX - baseWidth) * t) / baseWidth;
 }
@@ -4753,15 +4763,15 @@ function startZoomDrag(startP) {
 // and design tools generally.
 function finishZoomDrag(x1, y1, x2, y2) {
   setTool("select"); // one drag, one zoom, then back to normal — no separate toggle-off step needed
-  const MIN_SIZE = 15; // a hard floor so an almost-accidental tiny drag can't zoom in absurdly far
+  const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
+  const ABSOLUTE_MAX = FIELD_ZOOM_ABSOLUTE_MAX; // see the shared constant's own comment for why this isn't still 640*1.4
+  const MIN_SIZE = 100 / (ABSOLUTE_MAX / baseWidth); // matches the actual max zoom available for THIS surface, rather than an arbitrary floor that used to cut zoom short well before the real limit
   let size = Math.max(x2 - x1, y2 - y1, MIN_SIZE);
   size = Math.min(100, size);
   const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
   const vx = Math.max(0, Math.min(100 - size, cx - size / 2));
   const vy = Math.max(0, Math.min(100 - size, cy - size / 2));
 
-  const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
-  const ABSOLUTE_MAX = 640 * 1.4;
   const scale = 100 / size;
   const t = (scale * baseWidth - baseWidth) / (ABSOLUTE_MAX - baseWidth);
   fieldZoomLevel = Math.max(0, Math.min(100, t * 100));
