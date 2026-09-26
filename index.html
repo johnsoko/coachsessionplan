@@ -1591,14 +1591,10 @@
                 </div>
               </div>
               <span class="tp-label">Arrow Endpoint</span>
-              <div class="tp-toggle-row" id="arrow-end-toggle">
-                <button data-arrowend="1" class="active">Arrow</button>
-                <button data-arrowend="0">None</button>
-              </div>
-              <span class="tp-label">Arrow Start</span>
-              <div class="tp-toggle-row" id="arrow-start-toggle">
-                <button data-arrowstart="1">Arrow</button>
-                <button data-arrowstart="0" class="active">None</button>
+              <div class="tp-toggle-row" id="arrow-heads-toggle">
+                <button data-arrowheads="none">None</button>
+                <button data-arrowheads="single" class="active">Single</button>
+                <button data-arrowheads="double">Double</button>
               </div>
               <div style="height:1px;background:var(--line);margin:6px 2px;"></div>
               <span class="tp-label" style="margin-top:0;">Color</span>
@@ -3612,6 +3608,11 @@ function syncArrowPopover() {
   const curved = (s && (s.style === "run" || s.style === "pass")) ? !!s.curved : drawDefaults.curved;
   const arrowEnd = s ? (s.arrowEnd !== false) : drawDefaults.arrowEnd;
   const arrowStart = s ? (s.arrowStart === true) : drawDefaults.arrowStart;
+  // there's no dedicated button for "head at the start only" (see
+  // setArrowHeads) — a legacy arrow saved that way still displays as
+  // Single here, the closest of the three actual options to what it
+  // looks like (one arrowhead, not zero or two)
+  const headsMode = arrowStart && arrowEnd ? "double" : (arrowStart || arrowEnd ? "single" : "none");
   document.querySelectorAll("#arrow-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
   // older saved arrows may have an arbitrary width from before this was
   // simplified to three presets — match to the closest preset for
@@ -3621,8 +3622,7 @@ function syncArrowPopover() {
   document.querySelectorAll("#arrow-size-toggle button").forEach(b => b.classList.toggle("active", parseFloat(b.dataset.width) === closestWidth));
   document.querySelectorAll("#arrow-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o.dataset.style === kind));
   document.querySelectorAll("#arrow-curve-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.curved === "1") === curved));
-  document.querySelectorAll("#arrow-end-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.arrowend === "1") === arrowEnd));
-  document.querySelectorAll("#arrow-start-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.arrowstart === "1") === arrowStart));
+  document.querySelectorAll("#arrow-heads-toggle button").forEach(b => b.classList.toggle("active", b.dataset.arrowheads === headsMode));
 }
 function setArrowCurved(curved) {
   pushHistory();
@@ -3637,30 +3637,25 @@ function setArrowCurved(curved) {
   drawDefaults.curved = curved;
   syncArrowPopover();
 }
-// whether the line ends in an arrowhead at all — independent of its
-// solid/dashed/zigzag pattern (arrowStyle/s.style) and of curved above;
-// applies immediately to whatever's selected, the same as those two
-function setArrowEnd(hasArrow) {
+// how many ends of the line get an arrowhead — "none", "single" (the
+// traditional default, at the end point only), or "double" (both ends).
+// Independent of the line's solid/dashed/zigzag pattern (arrowStyle/
+// s.style) and of curved above; applies immediately to whatever's
+// selected, the same as those two. There's no dedicated "arrowhead at
+// the start only" option — s.arrowStart/s.arrowEnd underneath can still
+// represent that (and older saved arrows may), but exposing it as its
+// own button here tested as more confusing than it was worth
+function setArrowHeads(mode) {
   pushHistory();
+  const arrowEnd = mode !== "none";
+  const arrowStart = mode === "double";
   const matched = selectedShapesOfKindAnyTool(ARROW_KINDS);
   if (matched.length) {
-    matched.forEach(s => { s.arrowEnd = hasArrow; });
+    matched.forEach(s => { s.arrowEnd = arrowEnd; s.arrowStart = arrowStart; });
     renderShapes();
   }
-  drawDefaults.arrowEnd = hasArrow;
-  syncArrowPopover();
-}
-// same as setArrowEnd above, but for the start point — the two are
-// independent so an arrow can have a head at either end, both (double-
-// headed), or neither
-function setArrowStart(hasArrow) {
-  pushHistory();
-  const matched = selectedShapesOfKindAnyTool(ARROW_KINDS);
-  if (matched.length) {
-    matched.forEach(s => { s.arrowStart = hasArrow; });
-    renderShapes();
-  }
-  drawDefaults.arrowStart = hasArrow;
+  drawDefaults.arrowEnd = arrowEnd;
+  drawDefaults.arrowStart = arrowStart;
   syncArrowPopover();
 }
 function setArrowColor(color) {
@@ -3925,11 +3920,8 @@ function initArrowPopover() {
   document.querySelectorAll("#arrow-curve-toggle button").forEach(btn => {
     btn.addEventListener("click", () => setArrowCurved(btn.dataset.curved === "1"));
   });
-  document.querySelectorAll("#arrow-end-toggle button").forEach(btn => {
-    btn.addEventListener("click", () => setArrowEnd(btn.dataset.arrowend === "1"));
-  });
-  document.querySelectorAll("#arrow-start-toggle button").forEach(btn => {
-    btn.addEventListener("click", () => setArrowStart(btn.dataset.arrowstart === "1"));
+  document.querySelectorAll("#arrow-heads-toggle button").forEach(btn => {
+    btn.addEventListener("click", () => setArrowHeads(btn.dataset.arrowheads));
   });
   syncArrowPopover();
 }
