@@ -87,13 +87,6 @@
   .btn-danger:hover { background: rgba(179,69,44,0.24); }
 
   .dd-wrap { position: relative; }
-  .save-split { display: flex; align-items: stretch; }
-  .save-split .btn-primary { border-radius: 7px 0 0 7px; }
-  .save-caret {
-    background: var(--bib); color: #201200; border: none; border-left: 1px solid rgba(0,0,0,0.15);
-    border-radius: 0 7px 7px 0; padding: 0 9px; display: flex; align-items: center;
-  }
-  .save-caret:hover { background: var(--bib-deep); }
 
   .dropdown-menu {
     position: absolute; top: calc(100% + 6px); right: 0; z-index: 70;
@@ -1466,28 +1459,11 @@
         </div>
       </div>
 
-      <div class="dd-wrap save-split" id="save-menu-wrap">
+      <div class="dd-wrap" id="save-menu-wrap">
         <button class="btn btn-primary" id="save-btn">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 2h7L11.5 4.5v7.5h-9v-10z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" fill="none"/><rect x="4.5" y="2" width="4" height="3" fill="currentColor"/></svg>
           Save
         </button>
-        <button class="save-caret" id="save-caret">
-          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2.5 4l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <div class="dropdown-menu" id="save-menu" style="right:0;">
-          <div class="dropdown-item" id="quick-save-item">
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2.5 2h7L12.5 4.5v8.5h-10v-11z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
-            Quick Save
-          </div>
-          <div class="dropdown-item" data-toast="Sign in to edit name & tags">
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M9.5 2.5l3 3-7 7-3.5.8.8-3.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
-            Edit Name &amp; Tags
-          </div>
-          <div class="dropdown-item" data-toast="Sign in to save a copy">
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="4" width="7" height="8" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 4V2.8a1 1 0 0 1 1-1H12a1 1 0 0 1 1 1V10a1 1 0 0 1-1 1h-1.5" stroke="currentColor" stroke-width="1.2"/></svg>
-            Save as
-          </div>
-        </div>
       </div>
 
       <button class="icon-btn" id="help-btn" title="Tutorials">
@@ -7212,7 +7188,6 @@ function toggleMenu(id, e) {
   if (!isOpen) menu.classList.add("open");
 }
 document.getElementById("more-btn").addEventListener("click", e => toggleMenu("more-menu", e));
-document.getElementById("save-caret").addEventListener("click", e => toggleMenu("save-menu", e));
 document.addEventListener("click", e => {
   if (!e.target.closest(".dd-wrap") && !e.target.closest("#output-settings-overlay")) document.querySelectorAll(".dropdown-menu").forEach(m => m.classList.remove("open"));
 });
@@ -7223,10 +7198,6 @@ document.querySelectorAll(".dropdown-item[data-toast]").forEach(item => {
   });
 });
 document.getElementById("save-btn").addEventListener("click", saveDrill);
-document.getElementById("quick-save-item").addEventListener("click", () => {
-  document.getElementById("save-menu").classList.remove("open");
-  saveDrill();
-});
 document.getElementById("help-btn").addEventListener("click", () => toast("Tutorials coming soon"));
 document.getElementById("settings-btn").addEventListener("click", () => toast("Settings coming soon"));
 // delegated (not a one-time querySelectorAll) so this also covers
