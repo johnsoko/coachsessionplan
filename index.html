@@ -3596,13 +3596,11 @@ function setEquipmentSize(size) {
 }
 
 function syncArrowPopover() {
-  // width, kind, and arrowEnd now apply immediately to whatever's
-  // selected, just like curved (see setArrowCurved's comment) — so their
-  // display reads from that same ungated source, unlike color below,
-  // which still only sets the default for the next new line
-  const gated = activeShapesOfKind(ARROW_KINDS)[0];
+  // width, kind, arrowEnd, and now color all apply immediately to
+  // whatever's selected (see setArrowCurved's comment for why) — so
+  // their display reads from the same ungated source
   const s = selectedShapesOfKindAnyTool(ARROW_KINDS)[0];
-  const color = gated ? (gated.color || drawDefaults.color) : drawDefaults.color;
+  const color = s ? (s.color || drawDefaults.color) : drawDefaults.color;
   const width = s ? (s.width || drawDefaults.width) : drawDefaults.width;
   const kind  = s ? s.style : arrowStyle;
   const curved = (s && (s.style === "run" || s.style === "pass")) ? !!s.curved : drawDefaults.curved;
@@ -3660,7 +3658,7 @@ function setArrowHeads(mode) {
 }
 function setArrowColor(color) {
   pushHistory();
-  const matched = activeShapesOfKind(ARROW_KINDS);
+  const matched = selectedShapesOfKindAnyTool(ARROW_KINDS);
   if (matched.length) { matched.forEach(s => s.color = color); renderShapes(); }
   drawDefaults.color = color;
   syncArrowPopover();
@@ -3673,15 +3671,15 @@ function setArrowWidth(width) {
 }
 
 function syncShapePopover() {
-  // width, fill, and dashed now apply immediately to whatever's
-  // selected, just like arrows' width/style (see setArrowWidth's
-  // comment) — so their display reads from that same ungated source,
-  // unlike color/kind below, which still only set the default for the
-  // next new shape
+  // width, fill, dashed, and now color all apply immediately to
+  // whatever's selected, just like arrows' width/style (see
+  // setArrowWidth's comment) — so their display reads from that same
+  // ungated source, unlike kind below, which still only sets the
+  // default for the next new shape
   const gated = activeShapesOfKind(SHAPE_KINDS)[0];
   const s = selectedShapesOfKindAnyTool(SHAPE_KINDS)[0];
   const kind  = gated ? gated.style : shapeKind;
-  const color = gated ? (gated.color || shapeDefaults.color) : shapeDefaults.color;
+  const color = s ? (s.color || shapeDefaults.color) : shapeDefaults.color;
   const fill  = s ? !!s.fill : shapeDefaults.fill;
   const width = s ? (s.width || shapeDefaults.width) : shapeSizeMemory[kind];
   const dashed = s ? !!s.dashed : shapeDefaults.dashed;
@@ -3698,7 +3696,7 @@ function syncShapePopover() {
 }
 function setShapeColor(color) {
   pushHistory();
-  const matched = activeShapesOfKind(SHAPE_KINDS);
+  const matched = selectedShapesOfKindAnyTool(SHAPE_KINDS);
   if (matched.length) { matched.forEach(s => s.color = color); renderShapes(); }
   shapeDefaults.color = color;
   syncShapePopover();
