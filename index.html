@@ -282,11 +282,6 @@
     position: absolute; border: 1.5px dashed var(--bib); background: rgba(226,137,43,0.12);
     pointer-events: none; z-index: 22;
   }
-  #zoom-drag-box {
-    position: absolute; border: 2px solid #FFD400; background: rgba(255,212,0,0.12);
-    box-shadow: 0 0 0 1px rgba(0,0,0,0.4);
-    pointer-events: none; z-index: 22;
-  }
   .hint-pill {
     position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
     background: var(--ink); color: var(--paper-card); font-size: 12px; font-weight: 500;
@@ -1576,16 +1571,12 @@
         </button>
         <div class="tk-zoom-row" title="Zoom the field">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.3" stroke="currentColor" stroke-width="1.3"/><path d="M9.2 9.2L12 12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-          <input type="range" id="field-zoom-slider" min="0" max="100" step="10" value="0">
+          <input type="range" id="field-zoom-slider" min="0" max="100" step="1" value="0">
           <span id="field-zoom-val">0%</span>
           <button id="field-zoom-reset-btn" class="tk-zoom-reset-btn" title="Reset zoom — back to the full field">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5A4.5 4.5 0 1 1 3.3 9.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" fill="none"/><path d="M2 3.5v3h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
           </button>
         </div>
-        <button class="tk-btn" data-tool="zoom" id="zoom-tool" style="width:100%;" title="Drag a rectangle on the field to zoom into it">
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="8" cy="8" r="5" stroke="currentColor" stroke-width="1.4"/><path d="M12 12l3.5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M8 5.8v4.4M5.8 8h4.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-          Zoom to Area
-        </button>
 
         <div class="tk-section-label" id="tk-sec-actions">Add Actions</div>
         <div class="tk-stack">
@@ -2488,108 +2479,34 @@ let fieldZoomLevel = 0; // 0-100, read by applyFieldZoom() — kept as a global 
 // the biggest the stage is ever allowed to grow to, in px, regardless of
 // which surface is active — narrower surfaces (like square-ish grids)
 // therefore scale up MORE relatively to reach this same absolute size.
-// This has to be big enough to support genuinely zooming into a small
-// corner of the field via the Zoom to Area tool (drag a tight rectangle,
-// get a tight crop) — the original 640*1.4 value only ever supported a
-// mild "make everything a bit bigger to read" level of zoom, which is
-// why deep zoom used to visibly hit a wall partway through a drag
-// regardless of how small a rectangle was actually drawn.
-const FIELD_ZOOM_ABSOLUTE_MAX = 640 * 8;
-// a phase's saved viewport is stored directly as this rectangle
-// (viewX/viewY/viewSize, all field-percentage, 0-100) rather than
-// derived from a zoom level + scroll fraction — that indirect
-// derivation assumed canvas-inner's viewport always exactly matched the
-// field's own natural size, which doesn't reliably hold (window width,
-// panel padding, etc.), and was the real source of the zoomed view not
-// landing exactly centered on what was dragged. Storing the rectangle
-// itself removes that assumption entirely: it's simply what phaseThumbHTML
-// crops the preview to, with no live DOM needed for that; the small
-// discrepancy this fixes is exactly what "the zoom isn't quite accurate"
-// was describing.
-function phaseViewportRect(ph) {
-  const size = ph.viewSize;
-  if (!size || size >= 100) return { x: 0, y: 0, w: 100, h: 100 };
-  return { x: ph.viewX || 0, y: ph.viewY || 0, w: size, h: size };
-}
-// measures the field-percentage rectangle actually visible right now,
-// straight from the real, current DOM — the one source of truth both
-// saveViewportToActivePhase (below) and the pan-sync scroll listener use,
-// so whatever the editor is actually showing is exactly what gets saved
-function currentVisibleFieldRect() {
-  const inner = document.getElementById("canvas-inner");
-  if (!inner || !stage.offsetWidth || !stage.offsetHeight) return { x: 0, y: 0, w: 100, h: 100 };
-  return {
-    x: (inner.scrollLeft / stage.offsetWidth) * 100,
-    y: (inner.scrollTop / stage.offsetHeight) * 100,
-    w: (inner.clientWidth / stage.offsetWidth) * 100,
-    h: (inner.clientHeight / stage.offsetHeight) * 100
-  };
-}
-// pulls whatever's actually currently visible into the active phase, so
-// panning — with or without also zooming — is part of what gets saved,
-// not just the zoom amount
-function saveViewportToActivePhase() {
+// This used to go much higher (640*8) to support genuinely zooming into
+// a small corner of the field via the since-removed Zoom to Area tool.
+// Without that, stretching the same 0-100 slider range across such a
+// wide span made every step feel like a big, uneven jump rather than a
+// smooth, gradual increase — back to the original, gentler "make
+// everything a bit bigger to read" range fixes that.
+const FIELD_ZOOM_ABSOLUTE_MAX = 640 * 1.4;
+// a phase's own zoom amount — just the slider's own 0-100 value, nothing
+// else — so each activity remembers its own "make it a bit bigger" level
+function saveZoomToActivePhase() {
   const ph = phases.find(p => p.id === activePhaseId);
-  if (!ph) return;
-  const rect = currentVisibleFieldRect();
-  ph.viewX = rect.x; ph.viewY = rect.y;
-  ph.viewSize = Math.max(rect.w, rect.h); // equal in practice (fixed aspect ratio) — max just guards a stray sub-pixel mismatch
-  // the phase-list thumbnail (and anywhere else phaseThumbHTML renders
-  // this phase) needs to pick up the new crop right away — otherwise the
-  // live field and its own preview visibly disagree until something else
-  // happens to trigger a re-render, which undermines "what I see here is
-  // what the preview shows" being reliably true
-  renderPhaseList();
+  if (ph) ph.viewZoom = fieldZoomLevel;
 }
-// the one real zoom primitive everything else (drag-to-area, the
-// slider, restoring a saved phase) goes through: resizes the stage so
-// exactly `size`% of the field is visible, then — using the stage and
-// viewport's actual, post-resize pixel measurements, not an assumption
-// about how big canvas-inner "should" be — scrolls so field point
-// (cx%, cy%) lands dead center in that viewport. That last part is what
-// makes wherever you zoom into the true center of the view, not just
-// somewhere inside it.
-function centerFieldViewport(cx, cy, size) {
-  const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
-  const ABSOLUTE_MAX = FIELD_ZOOM_ABSOLUTE_MAX; // see the shared constant's own comment for why this isn't still 640*1.4
-  const minSize = 100 / (ABSOLUTE_MAX / baseWidth);
-  size = Math.max(minSize, Math.min(100, size));
-  const scale = 100 / size;
-  const t = (scale * baseWidth - baseWidth) / (ABSOLUTE_MAX - baseWidth);
-  fieldZoomLevel = Math.max(0, Math.min(100, t * 100));
-  document.getElementById("field-zoom-slider").value = Math.round(fieldZoomLevel);
-  applyFieldZoom();
-  const inner = document.getElementById("canvas-inner");
-  if (!inner) return;
-  // the stage only reaches its new, zoomed size after layout has actually
-  // run — reading offsetWidth/clientWidth in the same tick as the CSS
-  // width change above (inside applyFieldZoom) still returns the OLD
-  // size, so this has to wait one frame
-  requestAnimationFrame(() => {
-    const stageW = stage.offsetWidth, stageH = stage.offsetHeight;
-    const maxScrollX = inner.scrollWidth - inner.clientWidth;
-    const maxScrollY = inner.scrollHeight - inner.clientHeight;
-    inner.scrollLeft = Math.max(0, Math.min(maxScrollX, (cx / 100) * stageW - inner.clientWidth / 2));
-    inner.scrollTop = Math.max(0, Math.min(maxScrollY, (cy / 100) * stageH - inner.clientHeight / 2));
-    saveViewportToActivePhase();
-  });
-}
-// restores a phase's saved viewport onto the actual stage — called after
-// applySurface() has already sized the stage for THIS phase's surface
+// restores a phase's saved zoom level onto the actual stage — called
+// after applySurface() has already sized the stage for THIS phase's
+// surface
 function restoreViewportFromPhase(ph) {
-  const rect = phaseViewportRect(ph);
-  if (rect.w >= 100) { resetFieldViewport(); return; }
-  centerFieldViewport(rect.x + rect.w / 2, rect.y + rect.h / 2, rect.w);
+  fieldZoomLevel = ph.viewZoom || 0;
+  document.getElementById("field-zoom-slider").value = fieldZoomLevel;
+  applyFieldZoom();
 }
-// resets the active phase back to showing the full, unzoomed field —
-// used by the Reset button and by double-click/double-tap on empty field
+// resets the active phase back to the field's normal, unzoomed size —
+// used by the Reset button
 function resetFieldViewport() {
   fieldZoomLevel = 0;
   document.getElementById("field-zoom-slider").value = 0;
   applyFieldZoom();
-  const inner = document.getElementById("canvas-inner");
-  if (inner) { inner.scrollLeft = 0; inner.scrollTop = 0; }
-  saveViewportToActivePhase();
+  saveZoomToActivePhase();
 }
 function applySurface(name) {
   surface = name;
@@ -4219,20 +4136,9 @@ document.getElementById("field-zoom-slider").addEventListener("input", e => {
   // with zero changes needed, and .canvas-inner's overflow:auto lets the
   // user scroll/pan to reach parts of the field pushed outside the
   // visible area once it's larger than the panel
-  //
-  // the slider itself reads 0-100 (0 = the normal default field size at
-  // page load, 100 = as zoomed as Zoom to Area itself can ever go — see
-  // FIELD_ZOOM_ABSOLUTE_MAX) — zooms toward the middle of whatever's
-  // currently visible (via centerFieldViewport, the same primitive the
-  // Zoom to Area tool uses) rather than a fixed top-left corner, so
-  // nudging the slider feels like a deliberate "zoom toward a point"
-  // rather than an arbitrary resize
-  const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
-  const t = parseInt(e.target.value, 10) / 100;
-  const scale = (baseWidth + (FIELD_ZOOM_ABSOLUTE_MAX - baseWidth) * t) / baseWidth;
-  const targetSize = 100 / scale;
-  const current = currentVisibleFieldRect();
-  centerFieldViewport(current.x + current.w / 2, current.y + current.h / 2, targetSize);
+  fieldZoomLevel = parseInt(e.target.value, 10);
+  applyFieldZoom();
+  saveZoomToActivePhase();
 });
 function applyFieldZoom() {
   document.getElementById("field-zoom-val").textContent = fieldZoomLevel + "%";
@@ -4266,27 +4172,7 @@ function fieldScaleFactor() {
   return (baseWidth + (ABSOLUTE_MAX - baseWidth) * t) / baseWidth;
 }
 
-// panning by any other means (trackpad two-finger swipe, dragging the
-// scrollbar, arrow keys while the panel has focus) doesn't go through
-// centerFieldViewport at all, so it needs its own save — debounced since
-// 'scroll' fires continuously while it's happening
-let scrollSaveTimer = null;
-document.getElementById("canvas-inner").addEventListener("scroll", () => {
-  clearTimeout(scrollSaveTimer);
-  scrollSaveTimer = setTimeout(saveViewportToActivePhase, 200);
-});
-
 document.getElementById("field-zoom-reset-btn").addEventListener("click", resetFieldViewport);
-// double-click/double-tap empty field space resets zoom — but only when
-// the click isn't on a token or shape, since those already have their
-// own double-click behavior (opening the player edit modal, etc.) that
-// this must not interfere with
-document.getElementById("pitch-stage").addEventListener("dblclick", e => {
-  if (e.target.closest(".token") || e.target.closest("#objects-list")) return;
-  const clicked = shapesInHitTestOrder().find(s => hitTestShape(s, pctFromEvent(e).x, pctFromEvent(e).y));
-  if (clicked) return;
-  resetFieldViewport();
-});
 
 function px(xPct, yPct) { return { x: (xPct/100)*rectW, y: (yPct/100)*rectH }; }
 
@@ -4698,71 +4584,6 @@ function startMarqueeSelect(startP) {
   document.addEventListener("touchend", onUp);
   document.documentElement.addEventListener("mouseleave", onLeavePage);
 }
-// mirrors startMarqueeSelect above exactly, just for the Zoom tool's own
-// drag — a separate function (rather than branching inside
-// startMarqueeSelect) since what a completed drag means is completely
-// different: fitting a rectangle into view, not selecting what's inside it
-function startZoomDrag(startP) {
-  let moved = false;
-  let lastP = startP;
-  const box = document.createElement("div");
-  box.id = "zoom-drag-box";
-  document.getElementById("pitch-stage").appendChild(box);
-  function updateBoxVisual(curP) {
-    const x1 = Math.min(startP.x, curP.x), x2 = Math.max(startP.x, curP.x);
-    const y1 = Math.min(startP.y, curP.y), y2 = Math.max(startP.y, curP.y);
-    box.style.left = x1 + "%"; box.style.top = y1 + "%";
-    box.style.width = (x2 - x1) + "%"; box.style.height = (y2 - y1) + "%";
-  }
-  function onMove(ev) {
-    ev.preventDefault();
-    const p = pctFromEvent(ev);
-    lastP = p;
-    if (!moved && Math.hypot(p.x - startP.x, p.y - startP.y) > 0.6) moved = true;
-    if (moved) updateBoxVisual(p);
-  }
-  function cleanup() {
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
-    document.removeEventListener("touchmove", onMove);
-    document.removeEventListener("touchend", onUp);
-    document.documentElement.removeEventListener("mouseleave", onLeavePage);
-    box.remove();
-  }
-  function finish(p) {
-    cleanup();
-    // a plain click with no actual drag most likely means "changed my
-    // mind" rather than "zoom all the way into this exact point" — drop
-    // back to Select same as clicking empty space with any other tool
-    // armed does, rather than doing nothing and staying armed
-    if (!moved) { setTool("select"); return; }
-    const x1 = Math.min(startP.x, p.x), x2 = Math.max(startP.x, p.x);
-    const y1 = Math.min(startP.y, p.y), y2 = Math.max(startP.y, p.y);
-    finishZoomDrag(x1, y1, x2, y2);
-  }
-  function onUp(ev) {
-    finish(pctFromEvent(ev.changedTouches ? { touches: ev.changedTouches } : ev));
-  }
-  function onLeavePage() { finish(lastP); }
-  document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onUp);
-  document.addEventListener("touchmove", onMove, { passive: false });
-  document.addEventListener("touchend", onUp);
-  document.documentElement.addEventListener("mouseleave", onLeavePage);
-}
-// converts a dragged rectangle (field-percentage corners) into a zoom
-// centered on it — the longer side decides how much to zoom in (fitting
-// the whole dragged rectangle, not stretching to match it exactly, since
-// the visible area keeps the field's own fixed aspect ratio), and the
-// exact center of the drag becomes the exact center of the resulting
-// view via centerFieldViewport, which measures the real, resized stage
-// rather than assuming a size for it
-function finishZoomDrag(x1, y1, x2, y2) {
-  setTool("select"); // one drag, one zoom, then back to normal — no separate toggle-off step needed
-  const size = Math.max(x2 - x1, y2 - y1);
-  const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
-  centerFieldViewport(cx, cy, size);
-}
 function finishMarqueeSelect(x1, y1, x2, y2) {
   const inBox = (x, y) => x >= x1 && x <= x2 && y >= y1 && y <= y2;
   const tIds = tokens.filter(t => inBox(t.x, t.y)).map(t => t.id);
@@ -4966,11 +4787,6 @@ function onStageDown(e) {
     const t = addTextToken("", p.x, p.y);
     editingTextId = t.id;
     renderTokens();
-    return;
-  }
-  if (currentTool === "zoom") {
-    e.preventDefault();
-    startZoomDrag(p);
     return;
   }
   if (currentTool === "arrow" || currentTool === "shape") {
@@ -5221,10 +5037,8 @@ function newPhaseObj(contentSrc, surfaceSrc) {
     playingAreaWidth: contentSrc ? (contentSrc.playingAreaWidth || "") : "",
     activeSets: contentSrc ? (contentSrc.activeSets || "") : "",
     activeMinutes: contentSrc ? (contentSrc.activeMinutes || "") : "",
-    // per-activity field zoom/pan, stored as the visible rectangle
-    // directly (see phaseViewportRect) — viewSize 100 is the full,
-    // unzoomed field, matching every phase before this existed
-    viewX: 0, viewY: 0, viewSize: 100
+    // per-activity field zoom level (0-100, the slider's own value)
+    viewZoom: 0
   };
 }
 function saveActiveScene() {
@@ -5627,15 +5441,7 @@ function phaseThumbHTML(ph, opts) {
     return "";
   }).join("");
 
-  // a phase zoomed/panned via the field-zoom slider or the wheel/pinch
-  // gestures (see phaseViewportRect) shows that same cropped region here
-  // too, not just in the live editor — "save it zoomed into part of the
-  // field" should mean the preview reflects that crop, the same way the
-  // editor does
-  const viewport = phaseViewportRect(ph);
-  const croppedViewBox = viewport.w >= 100 && viewport.h >= 100 ? surf.viewBox
-    : `${vb[0] + (viewport.x/100)*vbW} ${vb[1] + (viewport.y/100)*vbH} ${(viewport.w/100)*vbW} ${(viewport.h/100)*vbH}`;
-  return `<svg viewBox="${croppedViewBox}" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%;display:block;">${STRIPES_DEFS}${fieldMarkup}${shapeMarkup}${tokenMarkup}</svg>`;
+  return `<svg viewBox="${surf.viewBox}" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%;display:block;">${STRIPES_DEFS}${fieldMarkup}${shapeMarkup}${tokenMarkup}</svg>`;
 }
 function renderPhaseList() {
   // belt-and-suspenders: renderPhaseList() runs on almost every state
@@ -6775,9 +6581,6 @@ function ensurePhaseDetailFields(ph) {
   if (ph.playingAreaWidth == null) ph.playingAreaWidth = "";
   if (ph.activeSets == null) ph.activeSets = "";
   if (ph.activeMinutes == null) ph.activeMinutes = "";
-  if (ph.viewSize == null) ph.viewSize = 100;
-  if (ph.viewX == null) ph.viewX = 0;
-  if (ph.viewY == null) ph.viewY = 0;
 }
 function renderPhaseDetailPanel() {
   const panel = document.getElementById("phase-detail-panel");
