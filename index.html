@@ -2495,37 +2495,45 @@ let fieldZoomLevel = 0; // 0-100, read by applyFieldZoom() — kept as a global 
 // why deep zoom used to visibly hit a wall partway through a drag
 // regardless of how small a rectangle was actually drawn.
 const FIELD_ZOOM_ABSOLUTE_MAX = 640 * 8;
-// the field-percentage rectangle (x, y, w, h — all 0-100) a phase's saved
-// zoom/pan actually shows, derived purely from its stored viewZoom/
-// scrollFracX/scrollFracY and its own surface's base width — no live DOM
-// needed, so this works for generating any phase's thumbnail crop, not
-// just whichever one happens to be open in the editor right now
+// a phase's saved viewport is stored directly as this rectangle
+// (viewX/viewY/viewSize, all field-percentage, 0-100) rather than
+// derived from a zoom level + scroll fraction — that indirect
+// derivation assumed canvas-inner's viewport always exactly matched the
+// field's own natural size, which doesn't reliably hold (window width,
+// panel padding, etc.), and was the real source of the zoomed view not
+// landing exactly centered on what was dragged. Storing the rectangle
+// itself removes that assumption entirely: it's simply what phaseThumbHTML
+// crops the preview to, with no live DOM needed for that; the small
+// discrepancy this fixes is exactly what "the zoom isn't quite accurate"
+// was describing.
 function phaseViewportRect(ph) {
-  const zoom = ph.viewZoom || 0;
-  if (zoom <= 0) return { x: 0, y: 0, w: 100, h: 100 };
-  const baseWidth = (SURFACES[ph.surface] && SURFACES[ph.surface].maxWidth) || 640;
-  const ABSOLUTE_MAX = FIELD_ZOOM_ABSOLUTE_MAX; // see the shared constant's own comment for why this isn't still 640*1.4
-  const t = zoom / 100;
-  const scale = (baseWidth + (ABSOLUTE_MAX - baseWidth) * t) / baseWidth;
-  const w = Math.min(100, 100 / scale);
-  const h = w; // the stage's own aspect-ratio is fixed, so it grows equally in both directions
-  const x = (ph.scrollFracX || 0) * (100 - w);
-  const y = (ph.scrollFracY || 0) * (100 - h);
-  return { x, y, w, h };
+  const size = ph.viewSize;
+  if (!size || size >= 100) return { x: 0, y: 0, w: 100, h: 100 };
+  return { x: ph.viewX || 0, y: ph.viewY || 0, w: size, h: size };
 }
-// pulls the live scroll position (as a 0-1 fraction of how far it COULD
-// scroll) into the active phase, so panning — with or without also
-// zooming — is part of what gets saved, not just the zoom amount
+// measures the field-percentage rectangle actually visible right now,
+// straight from the real, current DOM — the one source of truth both
+// saveViewportToActivePhase (below) and the pan-sync scroll listener use,
+// so whatever the editor is actually showing is exactly what gets saved
+function currentVisibleFieldRect() {
+  const inner = document.getElementById("canvas-inner");
+  if (!inner || !stage.offsetWidth || !stage.offsetHeight) return { x: 0, y: 0, w: 100, h: 100 };
+  return {
+    x: (inner.scrollLeft / stage.offsetWidth) * 100,
+    y: (inner.scrollTop / stage.offsetHeight) * 100,
+    w: (inner.clientWidth / stage.offsetWidth) * 100,
+    h: (inner.clientHeight / stage.offsetHeight) * 100
+  };
+}
+// pulls whatever's actually currently visible into the active phase, so
+// panning — with or without also zooming — is part of what gets saved,
+// not just the zoom amount
 function saveViewportToActivePhase() {
   const ph = phases.find(p => p.id === activePhaseId);
   if (!ph) return;
-  const inner = document.getElementById("canvas-inner");
-  if (!inner) return;
-  ph.viewZoom = fieldZoomLevel;
-  const maxScrollX = inner.scrollWidth - inner.clientWidth;
-  const maxScrollY = inner.scrollHeight - inner.clientHeight;
-  ph.scrollFracX = maxScrollX > 0 ? inner.scrollLeft / maxScrollX : 0;
-  ph.scrollFracY = maxScrollY > 0 ? inner.scrollTop / maxScrollY : 0;
+  const rect = currentVisibleFieldRect();
+  ph.viewX = rect.x; ph.viewY = rect.y;
+  ph.viewSize = Math.max(rect.w, rect.h); // equal in practice (fixed aspect ratio) — max just guards a stray sub-pixel mismatch
   // the phase-list thumbnail (and anywhere else phaseThumbHTML renders
   // this phase) needs to pick up the new crop right away — otherwise the
   // live field and its own preview visibly disagree until something else
@@ -2533,50 +2541,45 @@ function saveViewportToActivePhase() {
   // what the preview shows" being reliably true
   renderPhaseList();
 }
-// restores a phase's saved zoom/pan onto the actual stage — called after
-// applySurface() has already sized the stage for THIS phase's surface,
-// since the scrollable range (and so the scroll fractions' meaning)
-// depends on that
-function restoreViewportFromPhase(ph) {
-  fieldZoomLevel = ph.viewZoom || 0;
-  document.getElementById("field-zoom-slider").value = fieldZoomLevel;
+// the one real zoom primitive everything else (drag-to-area, the
+// slider, restoring a saved phase) goes through: resizes the stage so
+// exactly `size`% of the field is visible, then — using the stage and
+// viewport's actual, post-resize pixel measurements, not an assumption
+// about how big canvas-inner "should" be — scrolls so field point
+// (cx%, cy%) lands dead center in that viewport. That last part is what
+// makes wherever you zoom into the true center of the view, not just
+// somewhere inside it.
+function centerFieldViewport(cx, cy, size) {
+  const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
+  const ABSOLUTE_MAX = FIELD_ZOOM_ABSOLUTE_MAX; // see the shared constant's own comment for why this isn't still 640*1.4
+  const minSize = 100 / (ABSOLUTE_MAX / baseWidth);
+  size = Math.max(minSize, Math.min(100, size));
+  const scale = 100 / size;
+  const t = (scale * baseWidth - baseWidth) / (ABSOLUTE_MAX - baseWidth);
+  fieldZoomLevel = Math.max(0, Math.min(100, t * 100));
+  document.getElementById("field-zoom-slider").value = Math.round(fieldZoomLevel);
   applyFieldZoom();
   const inner = document.getElementById("canvas-inner");
   if (!inner) return;
   // the stage only reaches its new, zoomed size after layout has actually
-  // run — reading scrollWidth/clientWidth in the same tick as the CSS
+  // run — reading offsetWidth/clientWidth in the same tick as the CSS
   // width change above (inside applyFieldZoom) still returns the OLD
-  // size, so restoring the scroll position has to wait one frame
+  // size, so this has to wait one frame
   requestAnimationFrame(() => {
+    const stageW = stage.offsetWidth, stageH = stage.offsetHeight;
     const maxScrollX = inner.scrollWidth - inner.clientWidth;
     const maxScrollY = inner.scrollHeight - inner.clientHeight;
-    inner.scrollLeft = (ph.scrollFracX || 0) * maxScrollX;
-    inner.scrollTop = (ph.scrollFracY || 0) * maxScrollY;
+    inner.scrollLeft = Math.max(0, Math.min(maxScrollX, (cx / 100) * stageW - inner.clientWidth / 2));
+    inner.scrollTop = Math.max(0, Math.min(maxScrollY, (cy / 100) * stageH - inner.clientHeight / 2));
+    saveViewportToActivePhase();
   });
 }
-// changes fieldZoomLevel by deltaZoom while keeping the field point under
-// (clientX, clientY) visually fixed on screen — the standard "zoom
-// toward cursor/pinch-center" trick maps and PDF viewers use: capture
-// what field point is under that screen position and where on screen it
-// currently sits, resize, then scroll so that same field point lands
-// back at that same screen position
-function zoomFieldToward(clientX, clientY, deltaZoom) {
-  const inner = document.getElementById("canvas-inner");
-  if (!inner) return;
-  const newZoom = Math.max(0, Math.min(100, fieldZoomLevel + deltaZoom));
-  if (newZoom === fieldZoomLevel) return;
-  const cursorPct = pctFromEvent({ clientX, clientY });
-  const innerRect = inner.getBoundingClientRect();
-  const screenX = clientX - innerRect.left, screenY = clientY - innerRect.top;
-  fieldZoomLevel = newZoom;
-  document.getElementById("field-zoom-slider").value = fieldZoomLevel;
-  applyFieldZoom();
-  const stageW = stage.offsetWidth, stageH = stage.offsetHeight;
-  const maxScrollX = inner.scrollWidth - inner.clientWidth;
-  const maxScrollY = inner.scrollHeight - inner.clientHeight;
-  inner.scrollLeft = Math.max(0, Math.min(maxScrollX, (cursorPct.x / 100) * stageW - screenX));
-  inner.scrollTop = Math.max(0, Math.min(maxScrollY, (cursorPct.y / 100) * stageH - screenY));
-  saveViewportToActivePhase();
+// restores a phase's saved viewport onto the actual stage — called after
+// applySurface() has already sized the stage for THIS phase's surface
+function restoreViewportFromPhase(ph) {
+  const rect = phaseViewportRect(ph);
+  if (rect.w >= 100) { resetFieldViewport(); return; }
+  centerFieldViewport(rect.x + rect.w / 2, rect.y + rect.h / 2, rect.w);
 }
 // resets the active phase back to showing the full, unzoomed field —
 // used by the Reset button and by double-click/double-tap on empty field
@@ -4218,25 +4221,18 @@ document.getElementById("field-zoom-slider").addEventListener("input", e => {
   // visible area once it's larger than the panel
   //
   // the slider itself reads 0-100 (0 = the normal default field size at
-  // page load, 100 = as large as is actually useful — beyond that the
-  // field exceeds a typical screen's available width without adding
-  // any real benefit) — mapped internally to a 100%-140% scale applied
-  // on top of whatever THIS surface's own base max-width actually is —
-  // several surfaces (like square-ish grids) use a narrower base than
-  // the common 640px, so scaling from a hardcoded 640 was wrong for
-  // those and never actually returned to the true page-load size at 0%
-  //
-  // zooms toward the middle of whatever's currently visible (not a fixed
-  // top-left corner, which is where a plain max-width change would
-  // otherwise anchor) so nudging the slider feels like the same "zoom
-  // toward a point" as the wheel/pinch gestures do, just centered rather
-  // than wherever the cursor happens to be
-  const inner = document.getElementById("canvas-inner");
-  const innerRect = inner.getBoundingClientRect();
-  const centerX = innerRect.left + innerRect.width / 2;
-  const centerY = innerRect.top + innerRect.height / 2;
-  const target = parseInt(e.target.value, 10);
-  zoomFieldToward(centerX, centerY, target - fieldZoomLevel);
+  // page load, 100 = as zoomed as Zoom to Area itself can ever go — see
+  // FIELD_ZOOM_ABSOLUTE_MAX) — zooms toward the middle of whatever's
+  // currently visible (via centerFieldViewport, the same primitive the
+  // Zoom to Area tool uses) rather than a fixed top-left corner, so
+  // nudging the slider feels like a deliberate "zoom toward a point"
+  // rather than an arbitrary resize
+  const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
+  const t = parseInt(e.target.value, 10) / 100;
+  const scale = (baseWidth + (FIELD_ZOOM_ABSOLUTE_MAX - baseWidth) * t) / baseWidth;
+  const targetSize = 100 / scale;
+  const current = currentVisibleFieldRect();
+  centerFieldViewport(current.x + current.w / 2, current.y + current.h / 2, targetSize);
 });
 function applyFieldZoom() {
   document.getElementById("field-zoom-val").textContent = fieldZoomLevel + "%";
@@ -4272,7 +4268,7 @@ function fieldScaleFactor() {
 
 // panning by any other means (trackpad two-finger swipe, dragging the
 // scrollbar, arrow keys while the panel has focus) doesn't go through
-// zoomFieldToward at all, so it needs its own save — debounced since
+// centerFieldViewport at all, so it needs its own save — debounced since
 // 'scroll' fires continuously while it's happening
 let scrollSaveTimer = null;
 document.getElementById("canvas-inner").addEventListener("scroll", () => {
@@ -4754,40 +4750,18 @@ function startZoomDrag(startP) {
   document.addEventListener("touchend", onUp);
   document.documentElement.addEventListener("mouseleave", onLeavePage);
 }
-// converts a dragged rectangle (field-percentage corners) into the
-// equivalent viewZoom + scroll fractions, inverting phaseViewportRect's
-// own formula, then applies and saves it. Zooms to FIT the whole
-// dragged rectangle (using its longer side) rather than stretching to
-// match it exactly, since the visible area has to keep the field's own
-// fixed aspect ratio — matching how "zoom to selection" works in maps
-// and design tools generally.
+// converts a dragged rectangle (field-percentage corners) into a zoom
+// centered on it — the longer side decides how much to zoom in (fitting
+// the whole dragged rectangle, not stretching to match it exactly, since
+// the visible area keeps the field's own fixed aspect ratio), and the
+// exact center of the drag becomes the exact center of the resulting
+// view via centerFieldViewport, which measures the real, resized stage
+// rather than assuming a size for it
 function finishZoomDrag(x1, y1, x2, y2) {
   setTool("select"); // one drag, one zoom, then back to normal — no separate toggle-off step needed
-  const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
-  const ABSOLUTE_MAX = FIELD_ZOOM_ABSOLUTE_MAX; // see the shared constant's own comment for why this isn't still 640*1.4
-  const MIN_SIZE = 100 / (ABSOLUTE_MAX / baseWidth); // matches the actual max zoom available for THIS surface, rather than an arbitrary floor that used to cut zoom short well before the real limit
-  let size = Math.max(x2 - x1, y2 - y1, MIN_SIZE);
-  size = Math.min(100, size);
+  const size = Math.max(x2 - x1, y2 - y1);
   const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
-  const vx = Math.max(0, Math.min(100 - size, cx - size / 2));
-  const vy = Math.max(0, Math.min(100 - size, cy - size / 2));
-
-  const scale = 100 / size;
-  const t = (scale * baseWidth - baseWidth) / (ABSOLUTE_MAX - baseWidth);
-  fieldZoomLevel = Math.max(0, Math.min(100, t * 100));
-  document.getElementById("field-zoom-slider").value = Math.round(fieldZoomLevel);
-  applyFieldZoom();
-
-  const scrollFracX = size < 100 ? vx / (100 - size) : 0;
-  const scrollFracY = size < 100 ? vy / (100 - size) : 0;
-  const inner = document.getElementById("canvas-inner");
-  requestAnimationFrame(() => {
-    const maxScrollX = inner.scrollWidth - inner.clientWidth;
-    const maxScrollY = inner.scrollHeight - inner.clientHeight;
-    inner.scrollLeft = scrollFracX * maxScrollX;
-    inner.scrollTop = scrollFracY * maxScrollY;
-    saveViewportToActivePhase();
-  });
+  centerFieldViewport(cx, cy, size);
 }
 function finishMarqueeSelect(x1, y1, x2, y2) {
   const inBox = (x, y) => x >= x1 && x <= x2 && y >= y1 && y <= y2;
@@ -5247,10 +5221,10 @@ function newPhaseObj(contentSrc, surfaceSrc) {
     playingAreaWidth: contentSrc ? (contentSrc.playingAreaWidth || "") : "",
     activeSets: contentSrc ? (contentSrc.activeSets || "") : "",
     activeMinutes: contentSrc ? (contentSrc.activeMinutes || "") : "",
-    // per-activity field zoom/pan (see applyPhaseViewport/wheel & pinch
-    // handlers) — 0 zoom + 0,0 scroll fraction is the full, unzoomed
-    // field, matching every phase before this existed
-    viewZoom: 0, scrollFracX: 0, scrollFracY: 0
+    // per-activity field zoom/pan, stored as the visible rectangle
+    // directly (see phaseViewportRect) — viewSize 100 is the full,
+    // unzoomed field, matching every phase before this existed
+    viewX: 0, viewY: 0, viewSize: 100
   };
 }
 function saveActiveScene() {
@@ -6801,9 +6775,9 @@ function ensurePhaseDetailFields(ph) {
   if (ph.playingAreaWidth == null) ph.playingAreaWidth = "";
   if (ph.activeSets == null) ph.activeSets = "";
   if (ph.activeMinutes == null) ph.activeMinutes = "";
-  if (ph.viewZoom == null) ph.viewZoom = 0;
-  if (ph.scrollFracX == null) ph.scrollFracX = 0;
-  if (ph.scrollFracY == null) ph.scrollFracY = 0;
+  if (ph.viewSize == null) ph.viewSize = 100;
+  if (ph.viewX == null) ph.viewX = 0;
+  if (ph.viewY == null) ph.viewY = 0;
 }
 function renderPhaseDetailPanel() {
   const panel = document.getElementById("phase-detail-panel");
