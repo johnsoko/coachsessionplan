@@ -231,17 +231,18 @@
     background-size: 22px 22px; display: flex; align-items: center; justify-content: center; padding: 24px;
   }
   .canvas-inner {
-    /* aspect-ratio is set dynamically in JS (applySurface) to match the
-       active surface's own ratio — combined with max-width/max-height:100%
-       here, the box always keeps exactly that shape while fitting inside
-       whatever space canvas-inner-wrap actually has (the same "shrink to
-       fit, keep proportions" behavior object-fit:contain gives an image).
-       This is what makes the visible viewport's own shape always match
-       the field's shape, at every zoom level — without it, a wheel/drag
-       zoom could show tightly-cropped content on one axis while still
+    /* exact pixel width/height are set by resizeCanvasInnerToFieldShape()
+       in JS, matching the active surface's own ratio — this box always
+       keeps exactly that shape while fitting inside whatever space
+       canvas-inner-wrap actually has (the same "shrink to fit, keep
+       proportions" behavior object-fit:contain gives an image). This is
+       what makes the visible viewport's own shape always match the
+       field's shape, at every zoom level — without it, a wheel/drag zoom
+       could show tightly-cropped content on one axis while still
        revealing extra field on the other, because the two boxes' shapes
-       simply didn't agree */
-    max-width: 100%; max-height: 100%; position: relative; overflow: auto;
+       simply didn't agree. The rules below are just a starting fallback
+       before that JS has run once. */
+    max-width: 100%; max-height: 100%; width: 100%; position: relative; overflow: auto;
   }
   #pitch-stage {
     position: relative; width: 100%; max-width: 640px; margin: auto;
@@ -2611,18 +2612,13 @@ function applySurface(name) {
   const s = SURFACES[name];
   const stageEl = document.getElementById("pitch-stage");
   stageEl.style.aspectRatio = s.ratio;
-  // canvas-inner's own box has to keep this exact same shape (see its
-  // own CSS comment for why) — without this, it was left free to take
-  // whatever shape the surrounding page layout happened to give it,
-  // which is the root cause behind zooming in only ever cropping
-  // tightly on one axis while still showing extra field on the other.
-  // Matching its max-width to the stage's own (rather than a flat 100%)
-  // also means the two start out exactly the same size at zoom 0, not
-  // just the same shape — min() keeps it from overflowing a narrow
-  // screen the way a bare fixed px value could.
-  const innerEl = document.getElementById("canvas-inner");
-  innerEl.style.aspectRatio = s.ratio;
-  innerEl.style.maxWidth = `min(${s.maxWidth || 640}px, 100%)`;
+  // canvas-inner's own box has to keep this exact same shape (see
+  // resizeCanvasInnerToFieldShape's own comment for why) — without this,
+  // it was left free to take whatever shape the surrounding page layout
+  // happened to give it, which is the root cause behind zooming in only
+  // ever cropping tightly on one axis while still showing extra field on
+  // the other
+  resizeCanvasInnerToFieldShape();
   // square-ish surfaces (like 4 Grid) would otherwise stretch as tall as
   // they are wide at the usual 640px cap, which is often taller than the
   // canvas area and forces a vertical scrollbar — cap those narrower so
@@ -4235,6 +4231,38 @@ function resizeCanvas() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   renderShapes();
 }
+// canvas-inner's own box has to always be exactly the field's shape (see
+// its CSS comment for why zooming needs this) — computed here as
+// explicit pixel width/height instead of relying on the CSS aspect-ratio
+// property alone, since that property interacting with a flex parent and
+// its own overflow:auto turned out not to render reliably everywhere;
+// plain, well-supported width/height in px sidesteps that entirely. Runs
+// whenever the wrapper's own available space changes (window resize,
+// sidebar opening, etc.) and whenever applySurface switches to a
+// different surface (a different ratio/maxWidth).
+function resizeCanvasInnerToFieldShape() {
+  const wrap = document.getElementById("canvas-inner-wrap");
+  const inner = document.getElementById("canvas-inner");
+  if (!wrap || !inner) return;
+  const s = SURFACES[surface];
+  if (!s) return;
+  const parts = s.ratio.split("/").map(v => parseFloat(v));
+  const ratio = parts[0] / parts[1];
+  const wrapRect = wrap.getBoundingClientRect();
+  const PAD = 24; // matches .canvas-inner-wrap's own CSS padding, one side
+  const availW = Math.max(1, wrapRect.width - PAD * 2);
+  const availH = Math.max(1, wrapRect.height - PAD * 2);
+  const capW = Math.min(s.maxWidth || 640, availW);
+  // fit within the available space while keeping the field's own ratio —
+  // the same "shrink to fit, preserve proportions" behavior object-fit:
+  // contain gives an image
+  let w = Math.min(capW, availH * ratio);
+  let h = w / ratio;
+  inner.style.width = w + "px";
+  inner.style.height = h + "px";
+}
+window.addEventListener("resize", resizeCanvasInnerToFieldShape);
+new ResizeObserver(resizeCanvasInnerToFieldShape).observe(document.getElementById("canvas-inner-wrap"));
 window.addEventListener("resize", resizeCanvas);
 new ResizeObserver(resizeCanvas).observe(stage);
 document.getElementById("field-zoom-slider").addEventListener("input", e => {
