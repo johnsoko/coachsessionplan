@@ -5032,7 +5032,7 @@ function newPhaseObj(contentSrc, surfaceSrc) {
     dimensions: contentSrc ? (contentSrc.dimensions || "") : "",
     load: contentSrc ? (contentSrc.load || "") : "",
     loadColor: contentSrc ? (contentSrc.loadColor || DEFAULT_LOAD_COLOR) : DEFAULT_LOAD_COLOR,
-    infoBlocks: contentSrc && contentSrc.infoBlocks ? contentSrc.infoBlocks.map(b => ({...b, id: nextId++})) : defaultInfoBlocks(),
+    infoBlocks: contentSrc && contentSrc.infoBlocks ? contentSrc.infoBlocks.map(b => ({...b, id: nextId++, lines: Array.isArray(b.lines) ? [...b.lines] : b.lines})) : defaultInfoBlocks(),
     playingAreaLength: contentSrc ? (contentSrc.playingAreaLength || "") : "",
     playingAreaWidth: contentSrc ? (contentSrc.playingAreaWidth || "") : "",
     activeSets: contentSrc ? (contentSrc.activeSets || "") : "",
@@ -5162,7 +5162,20 @@ function mirrorCurrentPhase() {
     });
     return clone;
   });
-  const ph = { id: phaseNextId++, surface: current.surface, scenes: newScenes, activeSceneId: newScenes[Math.max(0, current.scenes.findIndex(s=>s.id===current.activeSceneId))].id, noteBlocks: [""], title: current.title || "", duration: current.duration || "", dimensions: current.dimensions || "" };
+  const ph = {
+    id: phaseNextId++, surface: current.surface, scenes: newScenes,
+    activeSceneId: newScenes[Math.max(0, current.scenes.findIndex(s=>s.id===current.activeSceneId))].id,
+    noteBlocks: [""], title: current.title || "", duration: current.duration || "", dimensions: current.dimensions || "",
+    load: current.load || "", loadColor: current.loadColor || DEFAULT_LOAD_COLOR,
+    // same deep-copy as newPhaseObj's own infoBlocks handling — a plain
+    // {...b} would leave the new blocks' `lines` arrays pointing at the
+    // SAME array instances as the original phase's blocks, so editing
+    // the mirrored phase's notes would silently edit the original's too
+    infoBlocks: current.infoBlocks ? current.infoBlocks.map(b => ({...b, id: nextId++, lines: Array.isArray(b.lines) ? [...b.lines] : b.lines})) : defaultInfoBlocks(),
+    playingAreaLength: current.playingAreaLength || "", playingAreaWidth: current.playingAreaWidth || "",
+    activeSets: current.activeSets || "", activeMinutes: current.activeMinutes || "",
+    viewZoom: 0
+  };
   const idx = phases.findIndex(p => p.id === activePhaseId);
   phases.splice(idx + 1, 0, ph);
   loadPhase(ph.id);
