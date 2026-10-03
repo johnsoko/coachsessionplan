@@ -2889,6 +2889,14 @@ document.addEventListener("click", e => {
   // only clicking elsewhere in the app (outside the toolkit and the canvas)
   // should. Panels close via the rules in setTool/showPopoverForToken etc.
   if (!e.target.closest(".tk-btn") && !e.target.closest(".arrow-popover") && !e.target.closest(".team-popover") && !e.target.closest("#pitch-stage") && !e.target.closest("#objects-list")) {
+    // a marquee drag that STARTED on the field but ended past its edge
+    // (dragging out toward the margin before releasing) fires its own
+    // mouseup/finish logic first, then this native click right after —
+    // with the click's own target outside #pitch-stage, this branch
+    // would otherwise immediately clear the very selection the marquee
+    // just made. marqueeJustSelected is set for exactly this one click
+    // and no longer, so an unrelated later click still clears normally.
+    if (marqueeJustSelected) { marqueeJustSelected = false; return; }
     // this popover is closing because the click landed somewhere that
     // isn't the field, the toolkit, or the objects list — nothing left
     // for a selection to be "for", so the highlighted token(s)/shape(s)
@@ -4835,11 +4843,24 @@ function startMarqueeSelect(startP) {
   document.addEventListener("touchend", onUp);
   document.documentElement.addEventListener("mouseleave", onLeavePage);
 }
+// set true for exactly the one native click that follows a marquee
+// drag's own mouseup when that drag ended past the field's edge — see
+// the document click listener's own comment for why this is needed
+let marqueeJustSelected = false;
 function finishMarqueeSelect(x1, y1, x2, y2) {
   const inBox = (x, y) => x >= x1 && x <= x2 && y >= y1 && y <= y2;
   const tIds = tokens.filter(t => inBox(t.x, t.y)).map(t => t.id);
   const sIds = shapes.filter(s => shapeEndpoints(s).some(pt => inBox(pt.x, pt.y))).map(s => s.id);
   if (tIds.length + sIds.length === 0) return;
+  marqueeJustSelected = true;
+  // a click doesn't always follow — e.g. the mouse-left-the-page fallback
+  // path has no native click at all — so this expires on its own either
+  // way. The native click that DOES follow a real mouseup fires
+  // synchronously, immediately after it (not on any kind of delay), so
+  // even a short window here comfortably outlasts that without risking
+  // a race against it — while still being far shorter than any later,
+  // genuinely separate click a person would actually make
+  setTimeout(() => { marqueeJustSelected = false; }, 50);
   if (tIds.length + sIds.length === 1) {
     if (tIds.length) { selectedTokenId = tIds[0]; renderTokens(); showPopoverForToken(tokens.find(tk => tk.id === tIds[0])); }
     else { selectedShapeId = sIds[0]; renderShapes(); showArrowPopoverForSelection(); }
