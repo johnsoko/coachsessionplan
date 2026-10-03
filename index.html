@@ -301,6 +301,15 @@
   }
   .tk-section-label:first-child { margin-top: 0; }
   .tk-stack { display: flex; flex-direction: column; gap: 6px; }
+  .tk-field-row { display: flex; align-items: stretch; gap: 6px; }
+  .tk-hv-toggle { display: flex; flex-shrink: 0; border: 1px solid var(--line-md); border-radius: 7px; overflow: hidden; }
+  .tk-hv-toggle button {
+    width: 28px; border: none; background: var(--paper-card); color: var(--ink-faint);
+    font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .tk-hv-toggle button + button { border-left: 1px solid var(--line-md); }
+  .tk-hv-toggle button.active { background: var(--pitch); color: var(--paper-card); }
+  .tk-hv-toggle button:hover:not(.active) { background: var(--paper-raised); }
   .tk-btn {
     display: flex; align-items: center; gap: 11px; border: none; background: var(--paper-raised);
     color: var(--ink-soft); font-size: 13.5px; font-weight: 600; padding: 10px 12px; border-radius: 9px;
@@ -2442,12 +2451,8 @@ const STRIPES_DEFS = `<defs><pattern id="stripes" width="92" height="420" patter
 
 // order matches the previous static button list
 const SURFACE_LIST = [
-  { key: "full", label: "Full - H" },
-  { key: "fullV", label: "Full - V" },
-  { key: "half", label: "Half - R" },
-  { key: "halfL", label: "Half - L" },
-  { key: "halfT", label: "Half - T" },
-  { key: "halfB", label: "Half - B" },
+  { key: "full", label: "Full" },
+  { key: "half", label: "Half" },
   { key: "square", label: "Square" },
   { key: "rectangle", label: "Rectangle" },
   { key: "twogrid", label: "2 Zone" },
@@ -2458,14 +2463,59 @@ const SURFACE_LIST = [
   { key: "sixgrid", label: "6 Grid" },
   { key: "blank", label: "Blank" }
 ];
+// Full and Half each used to be 2 and 4 separate list entries (one per
+// orientation/mirror). Collapsed down to one entry each with its own
+// Horizontal/Vertical toggle instead — h/v here are the actual concrete
+// SURFACES keys that entry switches between. halfL and halfB (the
+// mirrored left/bottom-facing variants) are no longer reachable from
+// this list at all; their surface definitions are untouched so any
+// phase saved with one from before still renders exactly as before.
+const ORIENTATION_PAIRS = {
+  full: { h: "full", v: "fullV" },
+  half: { h: "halfT", v: "half" }
+};
 // lists every surface as a single scrollable panel now that Field has its
 // own toolkit popover, rather than paging four at a time above the canvas
 function renderFieldPopover() {
   const container = document.getElementById("field-popover");
-  container.innerHTML = SURFACE_LIST
-    .map(s => `<button class="tk-btn" data-surface="${s.key}" style="width:100%;">${s.label}</button>`)
-    .join("");
+  container.innerHTML = SURFACE_LIST.map(s => {
+    const pair = ORIENTATION_PAIRS[s.key];
+    if (!pair) return `<button class="tk-btn" data-surface="${s.key}" style="width:100%;">${s.label}</button>`;
+    // the family itself is one selectable row, with its own small H/V
+    // toggle alongside it — picking the family (when it's not already
+    // active) applies whichever orientation is currently showing on the
+    // toggle, same as clicking a plain single-surface button above
+    return `<div class="tk-field-row">
+      <button class="tk-btn" data-surface-family="${s.key}" style="flex:1;">${s.label}</button>
+      <div class="tk-hv-toggle" data-family="${s.key}">
+        <button data-orientation="h" title="Horizontal">H</button>
+        <button data-orientation="v" title="Vertical">V</button>
+      </div>
+    </div>`;
+  }).join("");
   container.querySelectorAll("button[data-surface]").forEach(b => b.classList.toggle("active", b.dataset.surface === surface));
+  Object.keys(ORIENTATION_PAIRS).forEach(familyKey => {
+    const pair = ORIENTATION_PAIRS[familyKey];
+    const isActiveFamily = surface === pair.h || surface === pair.v;
+    const row = container.querySelector(`.tk-field-row [data-surface-family="${familyKey}"]`);
+    if (row) row.classList.toggle("active", isActiveFamily);
+    // the toggle shows which orientation is live when this family is the
+    // active surface; otherwise it just shows H as the default it would
+    // apply if picked, without implying anything is already selected
+    const shownOrientation = isActiveFamily ? (surface === pair.v ? "v" : "h") : "h";
+    container.querySelectorAll(`.tk-hv-toggle[data-family="${familyKey}"] button`).forEach(b => {
+      b.classList.toggle("active", isActiveFamily && b.dataset.orientation === shownOrientation);
+    });
+  });
+}
+// resolves a family ("full"/"half") + orientation ("h"/"v") to the
+// concrete SURFACES key, then runs it through the exact same
+// apply-and-transpose path as picking a plain surface button does
+function selectFieldOrientation(familyKey, orientation) {
+  const pair = ORIENTATION_PAIRS[familyKey];
+  if (!pair) return;
+  const newSurface = orientation === "v" ? pair.v : pair.h;
+  applySurfaceSelection(newSurface);
 }
 // swaps x/y for a token or shape — used when switching between a
 // horizontal and vertical surface so existing placements rotate with it
@@ -2779,10 +2829,10 @@ document.addEventListener("click", e => {
   }
 });
 
-document.getElementById("field-popover").addEventListener("click", e => {
-  const btn = e.target.closest("button[data-surface]");
-  if (!btn) return;
-  const newSurface = btn.dataset.surface;
+// shared by every way of picking a surface — a plain single-surface
+// button, or the Full/Half family row and its H/V toggle — so they all
+// go through the exact same apply-and-transpose behavior
+function applySurfaceSelection(newSurface) {
   const wasVertical = VERTICAL_SURFACES.includes(surface);
   const willBeVertical = VERTICAL_SURFACES.includes(newSurface);
   if (wasVertical !== willBeVertical) {
@@ -2802,6 +2852,27 @@ document.getElementById("field-popover").addEventListener("click", e => {
   renderTokens(); renderShapes();
   saveActivePhase();
   renderPhaseThumbActive();
+}
+document.getElementById("field-popover").addEventListener("click", e => {
+  const hvBtn = e.target.closest(".tk-hv-toggle button");
+  if (hvBtn) {
+    const familyKey = hvBtn.closest(".tk-hv-toggle").dataset.family;
+    selectFieldOrientation(familyKey, hvBtn.dataset.orientation);
+    return;
+  }
+  const familyBtn = e.target.closest("button[data-surface-family]");
+  if (familyBtn) {
+    // picking the family row itself applies whichever orientation its
+    // toggle is currently showing (H by default, or whatever's already
+    // active for that family) — same as clicking a single-surface button
+    const familyKey = familyBtn.dataset.surfaceFamily;
+    const activeHv = document.querySelector(`.tk-hv-toggle[data-family="${familyKey}"] button.active`);
+    selectFieldOrientation(familyKey, activeHv ? activeHv.dataset.orientation : "h");
+    return;
+  }
+  const btn = e.target.closest("button[data-surface]");
+  if (!btn) return;
+  applySurfaceSelection(btn.dataset.surface);
 });
 
 /* ─────────────────────────────────────────────────────────
