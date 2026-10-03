@@ -2518,6 +2518,16 @@ function transposeXY(obj) {
   if (obj.x2 !== undefined && obj.y2 !== undefined) { const t = obj.x2; obj.x2 = obj.y2; obj.y2 = t; }
   if (obj.cx != null && obj.cy != null) { const t = obj.cx; obj.cx = obj.cy; obj.cy = t; }
   if (obj.points) obj.points.forEach(p => { const t = p.x; p.x = p.y; p.y = t; });
+  // directional equipment (goals, ladders, poles) and text both carry
+  // their own separate rotation angle — swapping x/y moves WHERE they
+  // sit, but does nothing to WHICH WAY they're facing, which is why
+  // equipment kept pointing in its old direction after a flip even
+  // though its position correctly ended up in the right spot. x/y here
+  // is a diagonal reflection (across y=x), not a plain 90° spin, and
+  // working through how CSS's own rotate() combines with that reflection
+  // (verified numerically, not just algebraically) gives 270°-θ, not the
+  // more obvious-looking 90°-θ
+  if (obj.rotation != null) obj.rotation = ((270 - obj.rotation) % 360 + 360) % 360;
 }
 let fieldZoomLevel = 0; // 0-100, read by applyFieldZoom() — kept as a global so applySurface() can re-apply it against a new surface's own base width
 // the biggest the stage is ever allowed to grow to, in px, regardless of
@@ -2568,6 +2578,14 @@ function flippedViewBox(viewBox) {
 // hand-made pairs), or because the active phase has generically flipped
 // whatever plain surface is selected
 function isFieldVertical(ph) {
+  // Half's own dedicated "vertical" key is literally named "half" (its
+  // horizontal counterpart is "halfT") — a naming quirk that VERTICAL_
+  // SURFACES below doesn't follow (it's keyed to a different, existing
+  // convention tied to how each field's own coordinates were authored,
+  // not to this toggle), so it has to be checked explicitly here rather
+  // than folded into that array
+  const pair = Object.values(ORIENTATION_PAIRS).find(p => p.v === surface || p.h === surface);
+  if (pair) return surface === pair.v;
   if (VERTICAL_SURFACES.includes(surface)) return true;
   return !!(ph && ph.fieldFlipped);
 }
@@ -2590,9 +2608,17 @@ function applySurface(name) {
   // the whole field stays visible without scrolling. Flipped, the CAP
   // applies to the now-shorter dimension (what was maxWidth becomes the
   // height cap instead), so the field still fits without scrolling.
+  // "none" (not ""/clearing the inline style) is required here — the
+  // CSS class itself has its own hardcoded max-width: 640px, so merely
+  // clearing the inline override would fall back to THAT instead of
+  // actually removing the constraint, leaving a 640px width cap still
+  // fighting the new height cap and the swapped aspect-ratio. That
+  // three-way conflict was rendering the field at the wrong size,
+  // throwing off every token/equipment icon's apparent size relative to
+  // it even though their own underlying (correct) position was untouched.
   const baseMax = (s.maxWidth || 640) + "px";
-  if (genericFlip) { stageEl.style.maxWidth = ""; stageEl.style.maxHeight = baseMax; }
-  else { stageEl.style.maxWidth = baseMax; stageEl.style.maxHeight = ""; }
+  if (genericFlip) { stageEl.style.maxWidth = "none"; stageEl.style.maxHeight = baseMax; }
+  else { stageEl.style.maxWidth = baseMax; stageEl.style.maxHeight = "none"; }
   if (fieldZoomLevel > 0 && typeof applyFieldZoom === "function") applyFieldZoom();
   const svg = document.getElementById("pitch-svg");
   svg.setAttribute("viewBox", viewBox);
@@ -2862,7 +2888,14 @@ document.addEventListener("click", e => {
 // surface change (the list, or the orientation toggle)
 function applySurfaceSelection(newSurface, newFieldFlipped) {
   const ph = phases.find(p => p.id === activePhaseId);
-  const wasVertical = isFieldVertical(ph);
+  // deliberately NOT isFieldVertical() here — this decides whether
+  // tokens/shapes get transposed, which has to keep matching the
+  // original, already-tested VERTICAL_SURFACES-only convention exactly
+  // (switching to/from "half" specifically has never triggered a
+  // transpose, unlike halfT/halfB/fullV, and that shouldn't change just
+  // because the toggle now also treats "half" as the vertical option
+  // for DISPLAY purposes — those are two separate questions)
+  const wasVertical = VERTICAL_SURFACES.includes(surface) || !!(!DEDICATED_ORIENTATION_KEYS.has(surface) && ph && ph.fieldFlipped);
   const willBeVertical = VERTICAL_SURFACES.includes(newSurface) || !!(!DEDICATED_ORIENTATION_KEYS.has(newSurface) && newFieldFlipped);
   if (wasVertical !== willBeVertical) {
     // orientation is actually changing — rotate every scene's tokens and
