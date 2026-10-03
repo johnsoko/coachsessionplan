@@ -2668,6 +2668,7 @@ function clearSelectionState() {
 }
 function undo() {
   if (!undoStack.length) return;
+  commitOrDiscardTextEdit(); // tokens is about to be swapped out entirely — an empty text box mid-edit has no business surviving that
   redoStack.push(snapshot());
   const prev = undoStack.pop();
   tokens = prev.tokens; shapes = prev.shapes;
@@ -2677,6 +2678,7 @@ function undo() {
 }
 function redo() {
   if (!redoStack.length) return;
+  commitOrDiscardTextEdit();
   undoStack.push(snapshot());
   const next = redoStack.pop();
   tokens = next.tokens; shapes = next.shapes;
@@ -2783,6 +2785,7 @@ function updateDrawHint(tool) {
   else hint.style.display = "none";
 }
 function setTool(tool, keepPanelOpen) {
+  commitOrDiscardTextEdit(); // switching tools while an empty text box is still focused shouldn't leave it behind uncommitted
   currentTool = tool;
   if (!keepPanelOpen) closeAllPopovers();
   refreshToolButtonStates();
@@ -3052,6 +3055,35 @@ function addEquipmentToken(kind, x, y) {
   tokens.push(t);
   renderTokens();
   return t;
+}
+// commits or discards whatever's currently typed into a text token, and
+// always clears editingTextId — called from the text element's own blur
+// handler, and defensively from every other place that could end editing
+// without a blur ever actually firing first (switching tools, phases, or
+// scenes while a text box is still focused: the DOM node gets torn down
+// by the following re-render, and removing a still-focused element
+// doesn't reliably fire its blur first in every browser). Pass the new
+// content directly where it's already in hand (blur's own event); left
+// out, it's read straight from the live DOM node instead, which still
+// exists at every one of these call sites since they all run BEFORE the
+// re-render that would remove it.
+function commitOrDiscardTextEdit(newContentRaw) {
+  if (!editingTextId) return;
+  const t = tokens.find(tk => tk.id === editingTextId);
+  if (!t) { editingTextId = null; return; }
+  if (newContentRaw === undefined) {
+    const el = document.querySelector(`[data-token-id="${editingTextId}"]`);
+    newContentRaw = el ? el.textContent : (t.content || "");
+  }
+  const newContent = (newContentRaw || "").trim();
+  if (newContent === "") {
+    if (t.content !== "") pushHistory();
+    tokens = tokens.filter(tk => tk.id !== t.id);
+  } else if (newContent !== t.content) {
+    pushHistory();
+    t.content = newContent;
+  }
+  editingTextId = null;
 }
 function addTextToken(content, x, y) {
   const t = { id: nextId++, type: "text", x, y, content, color: textDefaults.color, size: textDefaults.size, bgColor: textDefaults.bgColor, rotation: 0 };
@@ -3426,15 +3458,7 @@ function renderTokens() {
           if (ev.key === "Enter" || ev.key === "Escape") { ev.preventDefault(); el.blur(); }
         });
         el.addEventListener("blur", () => {
-          const newContent = el.innerText.trim();
-          if (newContent === "") {
-            if (t.content !== "") pushHistory();
-            tokens = tokens.filter(tk => tk.id !== t.id);
-          } else if (newContent !== t.content) {
-            pushHistory();
-            t.content = newContent;
-          }
-          editingTextId = null;
+          commitOrDiscardTextEdit(el.innerText);
           renderTokens(); renderPhaseThumbActive();
         });
       } else {
@@ -5329,6 +5353,10 @@ function saveActivePhase() {
   if (ph) ph.surface = surface;
 }
 function loadScene(sceneId) {
+  // must run before saveActiveScene() below, which snapshots `tokens` as
+  // it stands right now — any still-empty text box needs to be dropped
+  // from that snapshot too, not just from whatever scene loads next
+  commitOrDiscardTextEdit();
   saveActiveScene();
   const ph = phases.find(p => p.id === activePhaseId);
   if (!ph) return;
@@ -5399,6 +5427,9 @@ function deleteScene(sceneId) {
   else { renderSceneTimeline(); renderPhaseThumbActive(); }
 }
 function loadPhase(id) {
+  // see loadScene's own comment — must run before saveActivePhase (which
+  // snapshots `tokens` via saveActiveScene) picks up a still-empty text box
+  commitOrDiscardTextEdit();
   saveActivePhase();
   activePhaseId = id;
   const ph = phases.find(p => p.id === id);
