@@ -2617,8 +2617,22 @@ function applySurface(name) {
   // throwing off every token/equipment icon's apparent size relative to
   // it even though their own underlying (correct) position was untouched.
   const baseMax = (s.maxWidth || 640) + "px";
-  if (genericFlip) { stageEl.style.maxWidth = "none"; stageEl.style.maxHeight = baseMax; }
-  else { stageEl.style.maxWidth = baseMax; stageEl.style.maxHeight = "none"; }
+  if (genericFlip) {
+    // #pitch-stage's own CSS class also has width:100% hardcoded — left
+    // in place, that still competes with max-height+aspect-ratio for
+    // which one actually governs the final size, and which one wins can
+    // depend on exactly how wide the surrounding panel happens to be.
+    // Pinning width to auto here removes that ambiguity outright: with
+    // no competing width of its own, the browser has only one way left
+    // to resolve the size — derive it from the height cap and the ratio.
+    stageEl.style.width = "auto";
+    stageEl.style.maxWidth = "none";
+    stageEl.style.maxHeight = baseMax;
+  } else {
+    stageEl.style.width = "";
+    stageEl.style.maxWidth = baseMax;
+    stageEl.style.maxHeight = "none";
+  }
   if (fieldZoomLevel > 0 && typeof applyFieldZoom === "function") applyFieldZoom();
   const svg = document.getElementById("pitch-svg");
   svg.setAttribute("viewBox", viewBox);
