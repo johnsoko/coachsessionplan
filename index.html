@@ -2332,34 +2332,25 @@ document.addEventListener("click", e => {
   if (e.target.closest && e.target.closest(".tp-swatch-row")) setTimeout(saveColorPrefs, 0);
 }, true);
 
-const colorRowRegistry = [];
-function paintCustomChip(chip) {
-  if (colorPrefs.lastCustom) {
-    chip.style.background = colorPrefs.lastCustom; chip.dataset.color = colorPrefs.lastCustom;
-    chip.classList.add("has-color"); chip.title = "Custom color";
-  } else {
-    // no data-color at all when empty (an empty-string one would read as
-    // matching the text-background row's "None" and light up as active)
-    chip.style.background = ""; delete chip.dataset.color;
-    chip.classList.remove("has-color"); chip.title = "Pick any color";
-  }
-}
-function refreshColorRows() {
-  colorRowRegistry.forEach(({ row, chip, onPick }) => {
-    const prev = row.querySelector(".tp-swatch.active");
-    const prevColor = prev ? prev.dataset.color : null;
-    row.querySelectorAll("[data-saved]").forEach(el => el.remove());
-    paintCustomChip(chip);
-    if (colorPrefs.saved.length) {
-      const sep = document.createElement("span"); sep.className = "tp-color-sep"; sep.dataset.saved = "1"; row.appendChild(sep);
-      colorPrefs.saved.forEach(c => {
-        const sw = document.createElement("div");
-        sw.className = "tp-swatch"; sw.style.background = c; sw.dataset.color = c; sw.dataset.saved = "1"; sw.title = "Saved color";
-        sw.addEventListener("click", () => onPick(c));
-        row.appendChild(sw);
-      });
+// the chip at the end of each color row stands for "the color in use
+// here": it shows the current color of whatever that panel controls, and
+// opens the picker (where the saved colors live) when clicked. Called from
+// every panel's own sync, so it always matches what's actually selected.
+function paintRowCurrent(rowOrSelector, color) {
+  const rows = typeof rowOrSelector === "string" ? document.querySelectorAll(rowOrSelector) : [rowOrSelector];
+  rows.forEach(row => {
+    const chip = row && row.querySelector(".tp-swatch-custom");
+    if (!chip) return;
+    const c = normHex(color);
+    if (c) {
+      chip.style.background = c; chip.dataset.color = c;
+      chip.classList.add("has-color", "active"); chip.title = "Change color";
+    } else {
+      // no color (e.g. text background "None"): back to the plain "+" chip.
+      // No data-color at all — an empty string would read as matching "None"
+      chip.style.background = ""; delete chip.dataset.color;
+      chip.classList.remove("has-color", "active"); chip.title = "Pick any color";
     }
-    if (prevColor) row.querySelectorAll(".tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === prevColor));
   });
 }
 function setupColorRow(row, onPick) {
@@ -2368,16 +2359,18 @@ function setupColorRow(row, onPick) {
   if (row.children.length) { const sep = document.createElement("span"); sep.className = "tp-color-sep"; row.appendChild(sep); }
   const chip = document.createElement("div");
   chip.className = "tp-swatch tp-swatch-custom";
+  chip.title = "Pick any color";
   chip.addEventListener("click", e => {
     e.stopPropagation();
-    const active = row.querySelector(".tp-swatch.active");
-    const start = colorPrefs.lastCustom || (active && normHex(active.dataset.color)) || "#3B82F6";
+    // start the picker on the color already in use here; the last custom
+    // color is only the fallback when nothing is set (e.g. no background)
+    const start = normHex(chip.dataset.color) || colorPrefs.lastCustom || "#3B82F6";
     openColorPicker(chip, start, onPick);
   });
   row.appendChild(chip);
-  colorRowRegistry.push({ row, chip, onPick });
-  refreshColorRows();
 }
+// saved swatches changed — only the picker shows them now
+function refreshColorRows() {}
 
 const colorPicker = { el: null, h: 0, s: 100, v: 100, onApply: null, opener: null };
 function cpHex() { return hsvToHex(colorPicker.h, colorPicker.s, colorPicker.v); }
@@ -2484,7 +2477,12 @@ function buildColorPicker() {
     if (el.contains(e.target) || (colorPicker.opener && colorPicker.opener.contains(e.target))) return;
     closeColorPicker();
   }, true);
-  document.addEventListener("keydown", e => { if (e.key === "Escape" && el.classList.contains("open")) closeColorPicker(); });
+  // capture phase + stopPropagation: Escape while the picker is open should
+  // only close it, not also reach the app's own Escape shortcut (which
+  // deselects whatever is selected — the very thing being recolored)
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && el.classList.contains("open")) { e.stopPropagation(); closeColorPicker(); }
+  }, true);
   window.addEventListener("resize", () => closeColorPicker());
 }
 function closeColorPicker() {
@@ -4075,6 +4073,7 @@ function syncTeamPopover(team) {
   const badgeHidden = t ? !!t.badgeHidden : teamDefaults[team].badgeHidden;
   const showNames = teamDefaults[team].showNames;
   document.querySelectorAll(`.tp-swatch-row[data-team="${team}"] .tp-swatch`).forEach(s => s.classList.toggle("active", s.dataset.color === color));
+  paintRowCurrent(`.tp-swatch-row[data-team="${team}"]`, color);
   const sizeInput = document.querySelector(`.tp-size[data-team="${team}"]`);
   sizeInput.value = size;
   document.querySelector(`.tp-size-val[data-team="${team}"]`).textContent = size + "px";
@@ -4170,6 +4169,7 @@ function syncEquipmentPopover() {
   const size  = t ? t.size  : equipmentSizeMemory[kind];
   document.querySelectorAll("#equipment-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o.dataset.kind === kind));
   document.querySelectorAll("#equipment-swatch-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === color));
+  paintRowCurrent("#equipment-swatch-row", color);
   document.getElementById("equipment-size").value = size;
   document.getElementById("equipment-size-val").textContent = size + "px";
 }
@@ -4212,6 +4212,7 @@ function syncArrowPopover() {
   // looks like (one arrowhead, not zero or two)
   const headsMode = arrowStart && arrowEnd ? "double" : (arrowStart || arrowEnd ? "single" : "none");
   document.querySelectorAll("#arrow-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
+  paintRowCurrent("#arrow-swatch-row", color);
   // older saved arrows may have an arbitrary width from before this was
   // simplified to three presets — match to the closest preset for
   // display rather than requiring an exact match
@@ -4284,6 +4285,7 @@ function syncShapePopover() {
   const width = s ? (s.width || shapeDefaults.width) : shapeSizeMemory[kind];
   const dashed = s ? !!s.dashed : shapeDefaults.dashed;
   document.querySelectorAll("#shape-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
+  paintRowCurrent("#shape-swatch-row", color);
   // older saved shapes may have an arbitrary width from before this was
   // simplified to three presets — match to the closest preset for
   // display rather than requiring an exact match
@@ -4330,7 +4332,9 @@ function syncTextPopover() {
   const bgColor = t ? (t.bgColor || "") : textDefaults.bgColor;
   const size  = t ? t.size  : textDefaults.size;
   document.querySelectorAll("#text-swatch-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === color));
+  paintRowCurrent("#text-swatch-row", color);
   document.querySelectorAll("#text-bg-swatch-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === bgColor));
+  paintRowCurrent("#text-bg-swatch-row", bgColor);
   document.getElementById("text-size").value = size;
   document.getElementById("text-size-val").textContent = size + "px";
 }
@@ -4363,6 +4367,7 @@ function syncBallPopover() {
   const color = t ? t.color : ballDefaults.color;
   const size  = t ? t.size  : ballDefaults.size;
   document.querySelectorAll("#ball-swatch-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === color));
+  paintRowCurrent("#ball-swatch-row", color);
   document.getElementById("ball-size").value = size;
   document.getElementById("ball-size-val").textContent = size + "px";
 }
@@ -8122,6 +8127,7 @@ function openNameModal(id) {
   input.value = t.name || "";
   document.getElementById("name-modal-number").value = t.num != null ? t.num : "";
   document.querySelectorAll("#name-modal-color-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === t.color));
+  paintRowCurrent("#name-modal-color-row", t.color);
   const textColor = t.badgeTextColor || textColorFor(t.color);
   document.querySelectorAll("#name-modal-textcolor-row .tp-swatch").forEach(s => s.classList.toggle("active", s.dataset.color === textColor));
   const highlighted = !!t.highlighted;
@@ -8229,7 +8235,7 @@ document.querySelectorAll("#name-modal-highlight-toggle button").forEach(btn => 
   });
 });
 setupColorRow(document.getElementById("name-modal-color-row"), c => {
-  document.querySelectorAll("#name-modal-color-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === c));
+  paintRowCurrent("#name-modal-color-row", c);
 });
 // badge text really only ever needs to be light or dark for contrast —
 // this mirrors the same two values textColorFor() already auto-picks
