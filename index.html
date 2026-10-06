@@ -385,6 +385,36 @@
   .tp-swatch { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15); }
   .tp-swatch.active { border-color: var(--bib); }
   .tp-swatch-none { background: var(--paper-card); display: flex; align-items: center; justify-content: center; }
+  .tp-swatch-custom { position: relative; background: conic-gradient(#F33, #FC3, #3C3, #3CF, #36F, #C3F, #F33); }
+  .tp-swatch-custom::before { content: "+"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 13px/1 sans-serif; color: #fff; text-shadow: 0 0 2px rgba(0,0,0,0.65); }
+  .tp-swatch-custom.has-color::before { content: none; }
+  .tp-swatch-custom.has-color::after { content: ""; position: absolute; right: -4px; bottom: -4px; width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--paper-card); background: conic-gradient(#F33, #FC3, #3C3, #3CF, #36F, #C3F, #F33); }
+  .tp-color-sep { width: 1px; align-self: stretch; background: var(--line-md); margin: 0 2px; }
+  .color-picker-pop {
+    position: fixed; z-index: 400; width: 224px; padding: 10px; display: none;
+    background: var(--paper-card); border: 1px solid var(--line-md); border-radius: 12px;
+    box-shadow: 0 14px 34px -10px rgba(27,33,28,0.4);
+  }
+  .color-picker-pop.open { display: block; }
+  .cp-sv { position: relative; height: 128px; border-radius: 8px; cursor: crosshair; touch-action: none;
+    background: linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, var(--cp-hue, #f00)); }
+  .cp-sv-thumb { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.45), 0 1px 4px rgba(0,0,0,0.4); pointer-events: none; }
+  input.cp-hue { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 12px; margin: 10px 0; padding: 0; border-radius: 6px; border: none;
+    background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+  input.cp-hue::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.45), 0 1px 4px rgba(0,0,0,0.4); cursor: pointer; }
+  input.cp-hue::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.45); cursor: pointer; }
+  .cp-row { display: flex; align-items: center; gap: 8px; }
+  .cp-preview { width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18); }
+  input.cp-hex { flex: 1; min-width: 0; height: 30px; padding: 0 8px; border: 1px solid var(--line-md); border-radius: 7px; background: #fff; font: 600 13px/1 monospace; text-transform: uppercase; color: var(--ink); }
+  button.cp-save { height: 30px; padding: 0 10px; border: none; border-radius: 7px; background: var(--pitch); color: var(--paper-card); font-size: 12px; font-weight: 600; cursor: pointer; }
+  button.cp-save:disabled { opacity: 0.45; cursor: default; }
+  .cp-saved-head { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--ink-soft); margin: 10px 2px 6px; }
+  .cp-saved { display: flex; gap: 6px; }
+  .cp-slot { position: relative; width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; border: 1.5px dashed var(--line-md); }
+  .cp-slot.filled { border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18); cursor: pointer; }
+  .cp-slot.filled.active { border-color: var(--bib); }
+  .cp-slot .cp-x { position: absolute; top: -5px; right: -5px; width: 13px; height: 13px; border-radius: 50%; border: none; padding: 0;
+    background: var(--ink); color: var(--paper-card); font: 700 9px/13px sans-serif; text-align: center; cursor: pointer; }
   .tp-size-row { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
   .tp-qty-row { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
   .tp-qty-row input[type="number"] { width: 64px; flex-shrink: 0; text-align: center; }
@@ -2225,6 +2255,248 @@ const shapeDefaults = { color: "#F7F8F3", width: 2.4, fill: false, dashed: false
 let shapeSizeMemory = { circle: 2.4, square: 2.4, triangle: 2.4 };
 const textDefaults  = { color: "#F7F8F3", size: 18, bgColor: "" };
 const ballDefaults  = { color: "#F7F8F3", size: 18 };
+
+/* ─────────────────────────────────────────────────────────
+   COLOR PICKER — every color row gets a "+" chip that opens one
+   shared picker (any color), plus up to 6 saved swatches. Saved
+   swatches, the last custom color, and the last-used tool colors all
+   persist in this browser until changed.
+───────────────────────────────────────────────────────── */
+const COLOR_PREFS_KEY = "csp_color_prefs_v1";
+const MAX_SAVED_COLORS = 6;
+let colorPrefs = { saved: [], lastCustom: "" };
+function normHex(v) {
+  if (typeof v !== "string") return "";
+  let h = v.trim().replace(/^#/, "");
+  if (/^[0-9a-fA-F]{3}$/.test(h)) h = h.split("").map(c => c + c).join("");
+  return /^[0-9a-fA-F]{6}$/.test(h) ? "#" + h.toUpperCase() : "";
+}
+function hsvToHex(h, s, v) {
+  s /= 100; v /= 100;
+  const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  const hx = x => Math.round(x * 255).toString(16).padStart(2, "0");
+  return ("#" + hx(f(5)) + hx(f(3)) + hx(f(1))).toUpperCase();
+}
+function hexToHsv(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d) {
+    if (max === r) h = ((g - b) / d) % 6; else if (max === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return { h, s: max ? (d / max) * 100 : 0, v: max * 100 };
+}
+function loadColorPrefs() {
+  try {
+    const raw = localStorage.getItem(COLOR_PREFS_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    colorPrefs.saved = (Array.isArray(d.saved) ? d.saved : []).map(normHex).filter(Boolean).slice(0, MAX_SAVED_COLORS);
+    colorPrefs.lastCustom = normHex(d.lastCustom);
+    const df = d.defaults || {};
+    const put = (obj, key, val) => { const h = normHex(val); if (h) obj[key] = h; };
+    put(drawDefaults, "color", df.arrow); put(shapeDefaults, "color", df.shape);
+    put(textDefaults, "color", df.text);
+    if (df.textBg === "") textDefaults.bgColor = ""; else put(textDefaults, "bgColor", df.textBg);
+    put(ballDefaults, "color", df.ball); put(equipmentDefaults, "color", df.equipment);
+    put(teamDefaults.light, "color", df.teamLight); put(teamDefaults.dark, "color", df.teamDark);
+  } catch (e) { /* storage unavailable or corrupt — just start from the built-in defaults */ }
+}
+function saveColorPrefs() {
+  try {
+    localStorage.setItem(COLOR_PREFS_KEY, JSON.stringify({
+      saved: colorPrefs.saved, lastCustom: colorPrefs.lastCustom,
+      defaults: {
+        arrow: drawDefaults.color, shape: shapeDefaults.color, text: textDefaults.color, textBg: textDefaults.bgColor,
+        ball: ballDefaults.color, equipment: equipmentDefaults.color,
+        teamLight: teamDefaults.light.color, teamDark: teamDefaults.dark.color
+      }
+    }));
+  } catch (e) { /* storage unavailable — colors still work for this session */ }
+}
+loadColorPrefs();
+// any click inside a color row may have just changed a tool's default
+// color; capture phase runs before the swatch's own handler (and before
+// popovers stop propagation), so the save waits a tick for it to finish
+document.addEventListener("click", e => {
+  if (e.target.closest && e.target.closest(".tp-swatch-row")) setTimeout(saveColorPrefs, 0);
+}, true);
+
+const colorRowRegistry = [];
+function paintCustomChip(chip) {
+  if (colorPrefs.lastCustom) {
+    chip.style.background = colorPrefs.lastCustom; chip.dataset.color = colorPrefs.lastCustom;
+    chip.classList.add("has-color"); chip.title = "Custom color";
+  } else {
+    // no data-color at all when empty (an empty-string one would read as
+    // matching the text-background row's "None" and light up as active)
+    chip.style.background = ""; delete chip.dataset.color;
+    chip.classList.remove("has-color"); chip.title = "Pick any color";
+  }
+}
+function refreshColorRows() {
+  colorRowRegistry.forEach(({ row, chip, onPick }) => {
+    const prev = row.querySelector(".tp-swatch.active");
+    const prevColor = prev ? prev.dataset.color : null;
+    row.querySelectorAll("[data-saved]").forEach(el => el.remove());
+    paintCustomChip(chip);
+    if (colorPrefs.saved.length) {
+      const sep = document.createElement("span"); sep.className = "tp-color-sep"; sep.dataset.saved = "1"; row.appendChild(sep);
+      colorPrefs.saved.forEach(c => {
+        const sw = document.createElement("div");
+        sw.className = "tp-swatch"; sw.style.background = c; sw.dataset.color = c; sw.dataset.saved = "1"; sw.title = "Saved color";
+        sw.addEventListener("click", () => onPick(c));
+        row.appendChild(sw);
+      });
+    }
+    if (prevColor) row.querySelectorAll(".tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === prevColor));
+  });
+}
+function setupColorRow(row, onPick) {
+  const sep = document.createElement("span"); sep.className = "tp-color-sep"; row.appendChild(sep);
+  const chip = document.createElement("div");
+  chip.className = "tp-swatch tp-swatch-custom";
+  chip.addEventListener("click", e => {
+    e.stopPropagation();
+    const active = row.querySelector(".tp-swatch.active");
+    const start = colorPrefs.lastCustom || (active && normHex(active.dataset.color)) || "#3B82F6";
+    openColorPicker(chip, start, onPick);
+  });
+  row.appendChild(chip);
+  colorRowRegistry.push({ row, chip, onPick });
+  refreshColorRows();
+}
+
+const colorPicker = { el: null, h: 0, s: 100, v: 100, onApply: null, opener: null };
+function cpHex() { return hsvToHex(colorPicker.h, colorPicker.s, colorPicker.v); }
+function cpRender(skipHexInput) {
+  const el = colorPicker.el, hex = cpHex();
+  el.style.setProperty("--cp-hue", hsvToHex(colorPicker.h, 100, 100));
+  const thumb = el.querySelector(".cp-sv-thumb");
+  thumb.style.left = colorPicker.s + "%"; thumb.style.top = (100 - colorPicker.v) + "%";
+  el.querySelector(".cp-hue").value = Math.round(colorPicker.h);
+  el.querySelector(".cp-preview").style.background = hex;
+  if (!skipHexInput) el.querySelector(".cp-hex").value = hex;
+  const saved = colorPrefs.saved, already = saved.includes(hex);
+  const btn = el.querySelector(".cp-save");
+  btn.disabled = already || saved.length >= MAX_SAVED_COLORS;
+  btn.textContent = already ? "Saved" : "Save";
+  btn.title = already ? "This color is already saved" : (saved.length >= MAX_SAVED_COLORS ? "Remove a saved color first" : "Save this color");
+  el.querySelector(".cp-saved-count").textContent = saved.length + "/" + MAX_SAVED_COLORS;
+  const slots = el.querySelector(".cp-saved"); slots.innerHTML = "";
+  for (let i = 0; i < MAX_SAVED_COLORS; i++) {
+    const slot = document.createElement("div");
+    const c = saved[i];
+    if (c) {
+      slot.className = "cp-slot filled" + (c === hex ? " active" : "");
+      slot.style.background = c; slot.dataset.color = c; slot.title = c;
+      const x = document.createElement("button"); x.className = "cp-x"; x.type = "button"; x.textContent = "\u00d7"; x.title = "Remove";
+      x.dataset.remove = c; slot.appendChild(x);
+    } else slot.className = "cp-slot";
+    slots.appendChild(slot);
+  }
+}
+function cpCommit() {
+  const hex = cpHex();
+  colorPrefs.lastCustom = hex;
+  if (colorPicker.onApply) colorPicker.onApply(hex);
+  saveColorPrefs();
+  refreshColorRows();
+  cpRender(true);
+}
+function cpSetFromHex(hex, commit, skipHexInput) {
+  const h = normHex(hex); if (!h) return false;
+  const hsv = hexToHsv(h);
+  // keep the current hue when picking a gray/white/black, whose own hue is meaningless (0)
+  colorPicker.h = hsv.s === 0 || hsv.v === 0 ? colorPicker.h : hsv.h;
+  colorPicker.s = hsv.s; colorPicker.v = hsv.v;
+  cpRender(skipHexInput);
+  if (commit) cpCommit();
+  return true;
+}
+function buildColorPicker() {
+  if (colorPicker.el) return;
+  const el = document.createElement("div");
+  el.id = "color-picker-pop"; el.className = "color-picker-pop";
+  el.innerHTML = `
+    <div class="cp-sv"><div class="cp-sv-thumb"></div></div>
+    <input type="range" class="cp-hue" min="0" max="360" step="1" value="0" aria-label="Hue">
+    <div class="cp-row">
+      <div class="cp-preview"></div>
+      <input type="text" class="cp-hex" maxlength="7" spellcheck="false" aria-label="Hex color">
+      <button type="button" class="cp-save">Save</button>
+    </div>
+    <div class="cp-saved-head"><span>Saved colors</span><span class="cp-saved-count"></span></div>
+    <div class="cp-saved"></div>`;
+  document.body.appendChild(el);
+  colorPicker.el = el;
+  // the document-level click handler clears the field selection for any
+  // click outside the toolkit/field — clicking inside the picker isn't that
+  el.addEventListener("click", e => e.stopPropagation());
+  const sv = el.querySelector(".cp-sv");
+  let dragging = false;
+  const svFrom = e => {
+    const r = sv.getBoundingClientRect();
+    colorPicker.s = Math.min(100, Math.max(0, ((e.clientX - r.left) / (r.width || 1)) * 100));
+    colorPicker.v = Math.min(100, Math.max(0, 100 - ((e.clientY - r.top) / (r.height || 1)) * 100));
+    cpRender();
+  };
+  sv.addEventListener("pointerdown", e => { dragging = true; try { sv.setPointerCapture(e.pointerId); } catch (_) {} svFrom(e); e.preventDefault(); });
+  sv.addEventListener("pointermove", e => { if (dragging) svFrom(e); });
+  const endDrag = () => { if (dragging) { dragging = false; cpCommit(); } };
+  sv.addEventListener("pointerup", endDrag);
+  sv.addEventListener("pointercancel", endDrag);
+  const hue = el.querySelector(".cp-hue");
+  hue.addEventListener("input", () => { colorPicker.h = parseInt(hue.value, 10); cpRender(); });
+  hue.addEventListener("change", cpCommit);
+  const hex = el.querySelector(".cp-hex");
+  // live preview only once a full 6-digit value is typed — rewriting the
+  // field itself mid-typing would fight the person's own keystrokes
+  hex.addEventListener("input", () => { if (/^#?[0-9a-fA-F]{6}$/.test(hex.value.trim())) cpSetFromHex(hex.value, false, true); });
+  hex.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); if (cpSetFromHex(hex.value, true)) hex.blur(); } e.stopPropagation(); });
+  hex.addEventListener("change", () => { if (!cpSetFromHex(hex.value, true)) cpRender(); });
+  el.querySelector(".cp-save").addEventListener("click", () => {
+    const h = cpHex();
+    if (colorPrefs.saved.includes(h) || colorPrefs.saved.length >= MAX_SAVED_COLORS) return;
+    colorPrefs.saved.push(h);
+    saveColorPrefs(); refreshColorRows(); cpRender(true);
+  });
+  el.querySelector(".cp-saved").addEventListener("click", e => {
+    const rm = e.target.closest("[data-remove]");
+    if (rm) { colorPrefs.saved = colorPrefs.saved.filter(c => c !== rm.dataset.remove); saveColorPrefs(); refreshColorRows(); cpRender(true); return; }
+    const slot = e.target.closest(".cp-slot.filled");
+    if (slot) cpSetFromHex(slot.dataset.color, true);
+  });
+  document.addEventListener("pointerdown", e => {
+    if (!el.classList.contains("open")) return;
+    if (el.contains(e.target) || (colorPicker.opener && colorPicker.opener.contains(e.target))) return;
+    closeColorPicker();
+  }, true);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && el.classList.contains("open")) closeColorPicker(); });
+  window.addEventListener("resize", () => closeColorPicker());
+}
+function closeColorPicker() {
+  if (!colorPicker.el) return;
+  colorPicker.el.classList.remove("open"); colorPicker.opener = null; colorPicker.onApply = null;
+}
+function openColorPicker(opener, startHex, onApply) {
+  buildColorPicker();
+  const el = colorPicker.el;
+  if (el.classList.contains("open") && colorPicker.opener === opener) { closeColorPicker(); return; }
+  colorPicker.opener = opener; colorPicker.onApply = onApply;
+  const hsv = hexToHsv(normHex(startHex) || "#3B82F6");
+  colorPicker.h = hsv.h; colorPicker.s = hsv.s; colorPicker.v = hsv.v;
+  cpRender();
+  el.classList.add("open");
+  const r = opener.getBoundingClientRect();
+  const w = el.offsetWidth || 224, h = el.offsetHeight || 260, m = 8;
+  let left = Math.min(Math.max(m, r.left), Math.max(m, window.innerWidth - w - m));
+  let top = r.bottom + 8;
+  if (top + h > window.innerHeight - m) top = Math.max(m, r.top - h - 8);
+  el.style.left = left + "px"; el.style.top = top + "px";
+}
 const SHAPE_KINDS = ["circle", "square", "triangle"];
 const ARROW_KINDS = ["run", "pass", "dribble"];
 function textColorFor(hex) {
@@ -4107,6 +4379,7 @@ function initTeamPopovers() {
       s.addEventListener("click", () => setTeamColor(team, c));
       row.appendChild(s);
     });
+    setupColorRow(row, c => setTeamColor(team, c));
     const sizeInput = document.querySelector(`.tp-size[data-team="${team}"]`);
     sizeInput.addEventListener("input", e => setTeamSize(team, parseInt(e.target.value, 10)));
     sizeInput.addEventListener("change", () => pushHistory());
@@ -4188,6 +4461,7 @@ function initEquipmentPopover() {
     s.addEventListener("click", () => setEquipmentColor(c));
     row.appendChild(s);
   });
+  setupColorRow(row, c => setEquipmentColor(c));
   const sizeInput = document.getElementById("equipment-size");
   sizeInput.addEventListener("input", e => setEquipmentSize(parseInt(e.target.value, 10)));
   sizeInput.addEventListener("change", () => pushHistory());
@@ -4208,6 +4482,7 @@ function initArrowPopover() {
     s.addEventListener("click", () => setArrowColor(c));
     row.appendChild(s);
   });
+  setupColorRow(row, c => setArrowColor(c));
   document.querySelectorAll("#arrow-size-toggle button").forEach(btn => {
     btn.addEventListener("click", () => {
       pushHistory();
@@ -4260,6 +4535,7 @@ function initShapePopover() {
     s.addEventListener("click", () => setShapeColor(c));
     row.appendChild(s);
   });
+  setupColorRow(row, c => setShapeColor(c));
   document.querySelectorAll("#shape-size-toggle button").forEach(btn => {
     btn.addEventListener("click", () => {
       pushHistory();
@@ -4290,6 +4566,7 @@ function initTextPopover() {
     s.addEventListener("click", () => setTextColor(c));
     row.appendChild(s);
   });
+  setupColorRow(row, c => setTextColor(c));
   const bgRow = document.getElementById("text-bg-swatch-row");
   // the "None" swatch is already in the HTML (it needs its own
   // crossed-out look, not a plain color fill) — just wire up its click
@@ -4300,6 +4577,7 @@ function initTextPopover() {
     s.addEventListener("click", () => setTextBgColor(c));
     bgRow.appendChild(s);
   });
+  setupColorRow(bgRow, c => setTextBgColor(c));
   const sizeInput = document.getElementById("text-size");
   sizeInput.addEventListener("input", e => setTextSize(parseInt(e.target.value, 10)));
   sizeInput.addEventListener("change", () => pushHistory());
@@ -4313,6 +4591,7 @@ function initBallPopover() {
     s.addEventListener("click", () => setBallColor(c));
     row.appendChild(s);
   });
+  setupColorRow(row, c => setBallColor(c));
   const sizeInput = document.getElementById("ball-size");
   sizeInput.addEventListener("input", e => setBallSize(parseInt(e.target.value, 10)));
   sizeInput.addEventListener("change", () => pushHistory());
@@ -7988,6 +8267,9 @@ PLAYER_COLORS.forEach(c => {
     document.querySelectorAll("#name-modal-color-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw === s));
   });
   document.getElementById("name-modal-color-row").appendChild(s);
+});
+setupColorRow(document.getElementById("name-modal-color-row"), c => {
+  document.querySelectorAll("#name-modal-color-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === c));
 });
 // badge text really only ever needs to be light or dark for contrast —
 // this mirrors the same two values textColorFor() already auto-picks
