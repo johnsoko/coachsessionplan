@@ -2530,6 +2530,16 @@ function transposeXY(obj) {
   if (obj.rotation != null) obj.rotation = ((270 - obj.rotation) % 360 + 360) % 360;
 }
 let fieldZoomLevel = 0; // 0-100, read by applyFieldZoom() — kept as a global so applySurface() can re-apply it against a new surface's own base width
+// the stage's un-zoomed sizing (what applySurface decided for this
+// surface/orientation) — kept so applyFieldZoom can always start from it,
+// measure the field's true natural width at 0%, and scale from there
+let stageBaseSizing = { width: "", maxWidth: "640px", maxHeight: "none" };
+// how much bigger the field is than its natural (0%) size right now —
+// measured from the field's real rendered width, not predicted from a
+// formula, so everything drawn on it (players, equipment, ball, text,
+// line widths) scales in exact lockstep with the field itself
+let fieldScaleCurrent = 1;
+let fieldZoomPending = false; // zoom was requested while the field was hidden (no width to measure yet)
 // the biggest the stage is ever allowed to grow to, in px, regardless of
 // which surface is active — narrower surfaces (like square-ish grids)
 // therefore scale up MORE relatively to reach this same absolute size.
@@ -2625,15 +2635,13 @@ function applySurface(name) {
     // Pinning width to auto here removes that ambiguity outright: with
     // no competing width of its own, the browser has only one way left
     // to resolve the size — derive it from the height cap and the ratio.
-    stageEl.style.width = "auto";
-    stageEl.style.maxWidth = "none";
-    stageEl.style.maxHeight = baseMax;
+    stageBaseSizing = { width: "auto", maxWidth: "none", maxHeight: baseMax };
   } else {
-    stageEl.style.width = "";
-    stageEl.style.maxWidth = baseMax;
-    stageEl.style.maxHeight = "none";
+    stageBaseSizing = { width: "", maxWidth: baseMax, maxHeight: "none" };
   }
-  if (fieldZoomLevel > 0 && typeof applyFieldZoom === "function") applyFieldZoom();
+  // applyFieldZoom starts from these base values and layers the zoom on
+  // top, so it has to run even at 0% to put the base sizing in place
+  applyFieldZoom();
   const svg = document.getElementById("pitch-svg");
   svg.setAttribute("viewBox", viewBox);
   // the matrix here is a plain x/y swap (transpose), not a true rotation
@@ -4408,8 +4416,14 @@ function resizeCanvas() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   renderShapes();
 }
-window.addEventListener("resize", resizeCanvas);
-new ResizeObserver(resizeCanvas).observe(stage);
+window.addEventListener("resize", () => {
+  if (fieldZoomLevel > 0) { applyFieldZoom(); renderTokens(); }
+  resizeCanvas();
+});
+new ResizeObserver(() => {
+  if (fieldZoomPending && stage.getBoundingClientRect().width) { applyFieldZoom(); renderTokens(); }
+  resizeCanvas();
+}).observe(stage);
 document.getElementById("field-zoom-slider").addEventListener("input", e => {
   // overriding max-width (rather than a CSS transform: scale) means the
   // element's actual layout size changes, which the ResizeObserver above
@@ -4421,38 +4435,50 @@ document.getElementById("field-zoom-slider").addEventListener("input", e => {
   // visible area once it's larger than the panel
   fieldZoomLevel = parseInt(e.target.value, 10);
   applyFieldZoom();
+  // tokens and shapes are sized from the zoom, so they have to be redrawn
+  // on every step of the drag — waiting for the field's ResizeObserver
+  // only redraws shapes, which is what made tokens jump-cut to their new
+  // size afterwards instead of growing smoothly with the field
+  resizeCanvas();
+  renderTokens();
   saveZoomToActivePhase();
 });
 function applyFieldZoom() {
   document.getElementById("field-zoom-val").textContent = fieldZoomLevel + "%";
-  const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
-  // 0% always matches THIS surface's own true page-load size, but 100%
-  // reaches the same generous absolute size (896px = the standard
-  // 640px base scaled 140%) regardless of which surface it is — a
-  // narrower surface (vertical/half fields etc.) therefore scales up
-  // MORE relatively than a full-width one, matching how zoom felt
-  // before it became surface-aware, instead of only ever scaling 40%
-  // up from its own smaller starting point
-  const ABSOLUTE_MAX = FIELD_ZOOM_ABSOLUTE_MAX; // see the shared constant's own comment for why this isn't still 640*1.4
-  const t = fieldZoomLevel / 100;
-  stage.style.maxWidth = (baseWidth + (ABSOLUTE_MAX - baseWidth) * t) + "px";
+  const stageEl = document.getElementById("pitch-stage");
+  stageEl.style.width = stageBaseSizing.width;
+  stageEl.style.maxWidth = stageBaseSizing.maxWidth;
+  stageEl.style.maxHeight = stageBaseSizing.maxHeight;
+  stageEl.style.flexShrink = "";
+  fieldScaleCurrent = 1;
+  fieldZoomPending = false;
+  if (fieldZoomLevel <= 0) return;
+  // the field's own natural width at 0% — this is what the slider scales
+  // FROM, so 0% always matches the unzoomed field exactly, even when the
+  // surrounding panel is narrower than the surface's usual max width
+  const naturalW = stageEl.getBoundingClientRect().width;
+  if (!naturalW) { fieldZoomPending = true; return; }
+  // one shared ceiling for every surface (100% = 1.4x its own natural
+  // size) — a narrow surface like Half used to be allowed to reach the
+  // same absolute pixel width as a full-width one, which meant up to
+  // ~2.7x and made the same slider position feel wildly different
+  // from one field to the next
+  const maxScale = FIELD_ZOOM_ABSOLUTE_MAX / 640;
+  const scale = 1 + (maxScale - 1) * (fieldZoomLevel / 100);
+  // an explicit pixel width (not just a bigger max-width) so the field
+  // really does grow past the panel's own width and scroll, instead of
+  // quietly stopping at 100% of it; flex-shrink:0 stops the flex
+  // container squeezing it back down
+  stageEl.style.width = (naturalW * scale) + "px";
+  stageEl.style.maxWidth = "none";
+  stageEl.style.maxHeight = "none";
+  stageEl.style.flexShrink = "0";
+  fieldScaleCurrent = scale;
 }
-// how much bigger the field currently is than its own natural (zoom=0)
-// size, purely due to the zoom slider — everything drawn on top of the
-// field (player/equipment/ball/text size, rotation-handle offsets,
-// arrow and shape line widths) is set in fixed CSS/canvas pixels, so
-// without this they'd stay a constant size while the field visibly
-// grows around them, making them look smaller and smaller as zoom
-// increases. Deliberately keyed off fieldZoomLevel rather than the
-// stage's actual rendered width, so ordinary responsive shrinking on a
-// narrow screen (zoom still at 0%) is untouched — this only kicks in
-// once the person has actually moved the slider.
+// everything drawn on top of the field is set in fixed CSS/canvas pixels,
+// so it's multiplied by this to grow and shrink in step with the field
 function fieldScaleFactor() {
-  if (fieldZoomLevel <= 0) return 1;
-  const baseWidth = (SURFACES[surface] && SURFACES[surface].maxWidth) || 640;
-  const ABSOLUTE_MAX = FIELD_ZOOM_ABSOLUTE_MAX; // see the shared constant's own comment for why this isn't still 640*1.4
-  const t = fieldZoomLevel / 100;
-  return (baseWidth + (ABSOLUTE_MAX - baseWidth) * t) / baseWidth;
+  return fieldScaleCurrent;
 }
 
 document.getElementById("field-zoom-reset-btn").addEventListener("click", resetFieldViewport);
