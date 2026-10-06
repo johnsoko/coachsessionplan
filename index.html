@@ -2264,7 +2264,11 @@ const ballDefaults  = { color: "#F7F8F3", size: 18 };
 ───────────────────────────────────────────────────────── */
 const COLOR_PREFS_KEY = "csp_color_prefs_v1";
 const MAX_SAVED_COLORS = 6;
-let colorPrefs = { saved: [], lastCustom: "" };
+// the colors the old fixed swatch rows used to offer most — everyone
+// starts with these in their saved slots (they can replace any of them),
+// since the fixed rows are gone and an empty row would be a step back
+const STARTER_SAVED_COLORS = ["#F7F8F3", "#1B211C", "#DE2D2D", "#0000FF", "#FFDC00", "#1DEB1D"];
+let colorPrefs = { saved: [...STARTER_SAVED_COLORS], lastCustom: "", seeded: true };
 function normHex(v) {
   if (typeof v !== "string") return "";
   let h = v.trim().replace(/^#/, "");
@@ -2293,7 +2297,11 @@ function loadColorPrefs() {
     const raw = localStorage.getItem(COLOR_PREFS_KEY);
     if (!raw) return;
     const d = JSON.parse(raw);
-    colorPrefs.saved = (Array.isArray(d.saved) ? d.saved : []).map(normHex).filter(Boolean).slice(0, MAX_SAVED_COLORS);
+    const stored = (Array.isArray(d.saved) ? d.saved : []).map(normHex).filter(Boolean).slice(0, MAX_SAVED_COLORS);
+    // prefs written before the starter set existed (seeded flag missing)
+    // with nothing saved yet get the starters too; once seeded, an empty
+    // list is the person's own choice and stays empty
+    colorPrefs.saved = (!d.seeded && !stored.length) ? [...STARTER_SAVED_COLORS] : stored;
     colorPrefs.lastCustom = normHex(d.lastCustom);
     const df = d.defaults || {};
     const put = (obj, key, val) => { const h = normHex(val); if (h) obj[key] = h; };
@@ -2307,7 +2315,7 @@ function loadColorPrefs() {
 function saveColorPrefs() {
   try {
     localStorage.setItem(COLOR_PREFS_KEY, JSON.stringify({
-      saved: colorPrefs.saved, lastCustom: colorPrefs.lastCustom,
+      saved: colorPrefs.saved, lastCustom: colorPrefs.lastCustom, seeded: true,
       defaults: {
         arrow: drawDefaults.color, shape: shapeDefaults.color, text: textDefaults.color, textBg: textDefaults.bgColor,
         ball: ballDefaults.color, equipment: equipmentDefaults.color,
@@ -2355,7 +2363,9 @@ function refreshColorRows() {
   });
 }
 function setupColorRow(row, onPick) {
-  const sep = document.createElement("span"); sep.className = "tp-color-sep"; row.appendChild(sep);
+  // a divider only makes sense after something that came before it (the
+  // text-background row's "None" swatch) — otherwise the chip leads the row
+  if (row.children.length) { const sep = document.createElement("span"); sep.className = "tp-color-sep"; row.appendChild(sep); }
   const chip = document.createElement("div");
   chip.className = "tp-swatch tp-swatch-custom";
   chip.addEventListener("click", e => {
@@ -4373,12 +4383,6 @@ function setBallSize(size) {
 function initTeamPopovers() {
   ["light"].forEach(team => {
     const row = document.querySelector(`.tp-swatch-row[data-team="${team}"]`);
-    PLAYER_COLORS.forEach(c => {
-      const s = document.createElement("div");
-      s.className = "tp-swatch"; s.style.background = c; s.dataset.color = c;
-      s.addEventListener("click", () => setTeamColor(team, c));
-      row.appendChild(s);
-    });
     setupColorRow(row, c => setTeamColor(team, c));
     const sizeInput = document.querySelector(`.tp-size[data-team="${team}"]`);
     sizeInput.addEventListener("input", e => setTeamSize(team, parseInt(e.target.value, 10)));
@@ -4455,12 +4459,6 @@ function initTeamPopovers() {
 }
 function initEquipmentPopover() {
   const row = document.getElementById("equipment-swatch-row");
-  PLAYER_COLORS.forEach(c => {
-    const s = document.createElement("div");
-    s.className = "tp-swatch"; s.style.background = c; s.dataset.color = c;
-    s.addEventListener("click", () => setEquipmentColor(c));
-    row.appendChild(s);
-  });
   setupColorRow(row, c => setEquipmentColor(c));
   const sizeInput = document.getElementById("equipment-size");
   sizeInput.addEventListener("input", e => setEquipmentSize(parseInt(e.target.value, 10)));
@@ -4476,12 +4474,6 @@ function initEquipmentPopover() {
 }
 function initArrowPopover() {
   const row = document.getElementById("arrow-swatch-row");
-  PLAYER_COLORS.forEach(c => {
-    const s = document.createElement("div");
-    s.className = "tp-swatch"; s.style.background = c; s.dataset.color = c;
-    s.addEventListener("click", () => setArrowColor(c));
-    row.appendChild(s);
-  });
   setupColorRow(row, c => setArrowColor(c));
   document.querySelectorAll("#arrow-size-toggle button").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -4529,12 +4521,6 @@ function initArrowPopover() {
 }
 function initShapePopover() {
   const row = document.getElementById("shape-swatch-row");
-  PLAYER_COLORS.forEach(c => {
-    const s = document.createElement("div");
-    s.className = "tp-swatch"; s.style.background = c; s.dataset.color = c;
-    s.addEventListener("click", () => setShapeColor(c));
-    row.appendChild(s);
-  });
   setupColorRow(row, c => setShapeColor(c));
   document.querySelectorAll("#shape-size-toggle button").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -4560,23 +4546,11 @@ function initShapePopover() {
 }
 function initTextPopover() {
   const row = document.getElementById("text-swatch-row");
-  PLAYER_COLORS.forEach(c => {
-    const s = document.createElement("div");
-    s.className = "tp-swatch"; s.style.background = c; s.dataset.color = c;
-    s.addEventListener("click", () => setTextColor(c));
-    row.appendChild(s);
-  });
   setupColorRow(row, c => setTextColor(c));
   const bgRow = document.getElementById("text-bg-swatch-row");
   // the "None" swatch is already in the HTML (it needs its own
   // crossed-out look, not a plain color fill) — just wire up its click
   bgRow.querySelector(".tp-swatch-none").addEventListener("click", () => setTextBgColor(""));
-  PLAYER_COLORS.forEach(c => {
-    const s = document.createElement("div");
-    s.className = "tp-swatch"; s.style.background = c; s.dataset.color = c;
-    s.addEventListener("click", () => setTextBgColor(c));
-    bgRow.appendChild(s);
-  });
   setupColorRow(bgRow, c => setTextBgColor(c));
   const sizeInput = document.getElementById("text-size");
   sizeInput.addEventListener("input", e => setTextSize(parseInt(e.target.value, 10)));
@@ -4585,12 +4559,6 @@ function initTextPopover() {
 }
 function initBallPopover() {
   const row = document.getElementById("ball-swatch-row");
-  PLAYER_COLORS.forEach(c => {
-    const s = document.createElement("div");
-    s.className = "tp-swatch"; s.style.background = c; s.dataset.color = c;
-    s.addEventListener("click", () => setBallColor(c));
-    row.appendChild(s);
-  });
   setupColorRow(row, c => setBallColor(c));
   const sizeInput = document.getElementById("ball-size");
   sizeInput.addEventListener("input", e => setBallSize(parseInt(e.target.value, 10)));
@@ -8259,14 +8227,6 @@ document.querySelectorAll("#name-modal-highlight-toggle button").forEach(btn => 
   btn.addEventListener("click", () => {
     document.querySelectorAll("#name-modal-highlight-toggle button").forEach(b => b.classList.toggle("active", b === btn));
   });
-});
-PLAYER_COLORS.forEach(c => {
-  const s = document.createElement("div");
-  s.className = "tp-swatch"; s.style.background = c; s.dataset.color = c;
-  s.addEventListener("click", () => {
-    document.querySelectorAll("#name-modal-color-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw === s));
-  });
-  document.getElementById("name-modal-color-row").appendChild(s);
 });
 setupColorRow(document.getElementById("name-modal-color-row"), c => {
   document.querySelectorAll("#name-modal-color-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === c));
