@@ -2338,6 +2338,103 @@ document.addEventListener("click", e => {
   if (e.target.closest && e.target.closest(".tp-swatch-row")) setTimeout(saveColorPrefs, 0);
 }, true);
 
+/* ─────────────────────────────────────────────────────────
+   USER PREFERENCES — whatever someone last used in the Create, Plan
+   and Output tabs comes back the next time they open the app: tool
+   settings (line style, widths, fills, sizes, label modes…), the last
+   field and orientation, which panels/tabs were open, formation
+   options, the practice start time, and every Output setting. Stored in
+   this browser only. (Colors have their own store, above.) Anything
+   already saved inside a plan keeps using the plan's own values — these
+   only decide what a NEW plan or object starts with.
+───────────────────────────────────────────────────────── */
+const USER_PREFS_KEY = "csp_user_prefs_v1";
+let userPrefs = {};
+try { userPrefs = JSON.parse(localStorage.getItem(USER_PREFS_KEY)) || {}; } catch (e) { userPrefs = {}; }
+if (!userPrefs || typeof userPrefs !== "object") userPrefs = {};
+const prefNum = (v, min, max) => (typeof v === "number" && isFinite(v)) ? Math.min(max, Math.max(min, v)) : undefined;
+const prefBool = v => typeof v === "boolean" ? v : undefined;
+const setIf = (obj, key, val) => { if (val !== undefined) obj[key] = val; };
+// the pieces tracked by explicit events rather than read off live state
+// (field choice, open panels, start time, output settings) — kept as
+// "what the person last chose", separate from whatever plan is loaded
+let prefField = (userPrefs.field && typeof userPrefs.field.surface === "string") ? { surface: userPrefs.field.surface, flipped: !!userPrefs.field.flipped } : null;
+let prefLeftTab = typeof userPrefs.leftTab === "string" ? userPrefs.leftTab : null;
+let prefRightPanel = typeof userPrefs.rightPanel === "string" ? userPrefs.rightPanel : null;
+let prefStartTime = /^\d{2}:\d{2}$/.test(userPrefs.startTime || "") ? userPrefs.startTime : null;
+let prefOutput = (userPrefs.output && typeof userPrefs.output === "object") ? userPrefs.output : null;
+function noteFieldPref(surf, flipped) { prefField = { surface: surf, flipped: !!flipped }; scheduleUserPrefsSave(); }
+
+// applied now, before any popover is built, so every control starts
+// from the remembered value instead of the built-in default
+(function applyEarlyUserPrefs() {
+  const c = userPrefs.create; if (!c || typeof c !== "object") return;
+  if (["run", "pass", "dribble"].includes(c.arrowStyle)) arrowStyle = c.arrowStyle;
+  if (["circle", "square", "triangle"].includes(c.shapeKind)) shapeKind = c.shapeKind;
+  if (EQUIPMENT_KINDS.includes(c.equipmentKind)) equipmentKind = c.equipmentKind;
+  const d = c.draw || {};
+  setIf(drawDefaults, "width", prefNum(d.width, 0.5, 12)); setIf(drawDefaults, "curved", prefBool(d.curved));
+  setIf(drawDefaults, "arrowEnd", prefBool(d.arrowEnd)); setIf(drawDefaults, "arrowStart", prefBool(d.arrowStart));
+  const sh = c.shape || {};
+  setIf(shapeDefaults, "width", prefNum(sh.width, 0.5, 12)); setIf(shapeDefaults, "fill", prefBool(sh.fill)); setIf(shapeDefaults, "dashed", prefBool(sh.dashed));
+  Object.keys(shapeSizeMemory).forEach(k => setIf(shapeSizeMemory, k, prefNum((sh.sizes || {})[k], 0.5, 12)));
+  const eq = c.equipment || {};
+  setIf(equipmentDefaults, "size", prefNum(eq.size, 6, 70));
+  EQUIPMENT_KINDS.forEach(k => setIf(equipmentSizeMemory, k, prefNum((eq.sizes || {})[k], 6, 70)));
+  setIf(ballDefaults, "size", prefNum((c.ball || {}).size, 6, 50));
+  setIf(textDefaults, "size", prefNum((c.text || {}).size, 6, 60));
+  ["light", "dark"].forEach(team => {
+    const t = (c.team || {})[team]; if (!t) return;
+    setIf(teamDefaults[team], "size", prefNum(t.size, 8, 50));
+    if (["number", "position", "name"].includes(t.labelMode)) teamDefaults[team].labelMode = t.labelMode;
+    setIf(teamDefaults[team], "badgeHidden", prefBool(t.badgeHidden)); setIf(teamDefaults[team], "showNames", prefBool(t.showNames));
+  });
+})();
+
+function collectUserPrefs() {
+  const team = k => ({ size: teamDefaults[k].size, labelMode: teamDefaults[k].labelMode, badgeHidden: teamDefaults[k].badgeHidden, showNames: teamDefaults[k].showNames });
+  const qty = parseInt(document.getElementById("player-qty-input").value, 10);
+  return {
+    v: 1,
+    create: {
+      arrowStyle, shapeKind, equipmentKind,
+      draw: { width: drawDefaults.width, curved: drawDefaults.curved, arrowEnd: drawDefaults.arrowEnd, arrowStart: drawDefaults.arrowStart },
+      shape: { width: shapeDefaults.width, fill: shapeDefaults.fill, dashed: shapeDefaults.dashed, sizes: { ...shapeSizeMemory } },
+      equipment: { size: equipmentDefaults.size, sizes: { ...equipmentSizeMemory } },
+      ball: { size: ballDefaults.size }, text: { size: textDefaults.size },
+      team: { light: team("light"), dark: team("dark") },
+      playerQty: isFinite(qty) ? qty : undefined,
+      formationTeam, formationSidesFlipped,
+      animateShowTitle: document.getElementById("animate-show-title").checked
+    },
+    field: prefField, leftTab: prefLeftTab, rightPanel: prefRightPanel, startTime: prefStartTime, output: prefOutput
+  };
+}
+let userPrefsTimer = null, userPrefsLastJson = "";
+function saveUserPrefsNow() {
+  clearTimeout(userPrefsTimer); userPrefsTimer = null;
+  try {
+    const json = JSON.stringify(collectUserPrefs());
+    if (json === userPrefsLastJson) return;
+    localStorage.setItem(USER_PREFS_KEY, json); userPrefsLastJson = json;
+  } catch (e) { /* storage unavailable — settings still work for this session */ }
+}
+function scheduleUserPrefsSave() { clearTimeout(userPrefsTimer); userPrefsTimer = setTimeout(saveUserPrefsNow, 250); }
+// any click/typing/slider move anywhere may have changed a setting;
+// capture phase runs before the control's own handler (and before
+// popovers stop propagation), so the save waits a moment for it, then
+// writes only if something actually differs from what's already stored
+["click", "input", "change"].forEach(type => document.addEventListener(type, e => {
+  const t = e.target;
+  if (type === "click" && t.closest) {
+    const lt = t.closest(".left-tab"); if (lt) prefLeftTab = lt.dataset.lefttab;
+    const rp = t.closest("#right-panel-toggle button[data-panel]"); if (rp) prefRightPanel = rp.dataset.panel;
+  }
+  scheduleUserPrefsSave();
+}, true));
+window.addEventListener("pagehide", saveUserPrefsNow);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveUserPrefsNow(); });
+
 // the chip at the end of each color row stands for "the color in use
 // here": it shows the current color of whatever that panel controls, and
 // opens the picker (where the saved colors live) when clicked. Called from
@@ -3229,6 +3326,7 @@ function applySurfaceSelection(newSurface, newFieldFlipped) {
     }
   }
   if (ph) ph.fieldFlipped = !!newFieldFlipped;
+  noteFieldPref(newSurface, newFieldFlipped);
   applySurface(newSurface);
   renderTokens(); renderShapes();
   saveActivePhase();
@@ -6184,6 +6282,31 @@ let outputSettings = {
   fieldColor: "#2E6B3F",
   scale: 100
 };
+const OUTPUT_SETTINGS_DEFAULTS = { ...outputSettings };
+// the Output settings menu's controls, brought in line with whatever
+// outputSettings currently holds — needed after loading remembered
+// preferences or a saved plan, since those only set the values
+function syncOutputSettingsUI() {
+  document.querySelectorAll("#output-layout-grid button").forEach(b => b.classList.toggle("active", b.dataset.layout === outputSettings.layout));
+  document.getElementById("opt-show-anim").checked = !!outputSettings.showAnimationButton;
+  document.getElementById("opt-show-titles").checked = !!outputSettings.showPhaseTitles;
+  document.getElementById("opt-show-phase-notes").checked = !!outputSettings.showPhaseNotes;
+  document.getElementById("opt-show-videos").checked = !!outputSettings.showVideos;
+  document.querySelectorAll("#output-color-row button").forEach(b => b.classList.toggle("active", b.dataset.color === outputSettings.fieldColor));
+  document.getElementById("opt-scale").value = outputSettings.scale;
+  document.getElementById("opt-scale-val").textContent = outputSettings.scale + "%";
+}
+// a fresh plan starts from the last-used Output settings (or the
+// built-in defaults) — never from whatever plan happened to be open before
+function resetOutputSettingsToPrefs() {
+  Object.assign(outputSettings, OUTPUT_SETTINGS_DEFAULTS);
+  const o = prefOutput || {};
+  if (["large", "small", "rows"].includes(o.layout)) outputSettings.layout = o.layout;
+  ["showAnimationButton", "showPhaseTitles", "showPhaseNotes", "showVideos"].forEach(k => setIf(outputSettings, k, prefBool(o[k])));
+  if (typeof o.fieldColor === "string" && /^#[0-9a-fA-F]{6}$/.test(o.fieldColor)) outputSettings.fieldColor = o.fieldColor.toUpperCase();
+  setIf(outputSettings, "scale", prefNum(o.scale, 50, 200));
+  syncOutputSettingsUI();
+}
 function renderAnimateOutputPhaseLists() {
   // this still keeps the small phase-list preview used inside the
   // Draw/Animate views' own left panel + Notes page working; Output's
@@ -8687,7 +8810,7 @@ function loadAppState(data) {
   phases.forEach(migrateLegacyNoteBlocks);
   phases.forEach(migrateLegacyObjective);
   migrateLegacySessionDescription(data);
-  if (data.outputSettings) Object.assign(outputSettings, data.outputSettings);
+  if (data.outputSettings) { Object.assign(outputSettings, data.outputSettings); syncOutputSettingsUI(); }
   if (Array.isArray(data.sessionClips)) sessionClips = data.sessionClips;
   document.getElementById("practice-date-input").value = data.practiceDate || "";
   document.getElementById("practice-starttime-input").value = data.practiceStartTime || "09:00";
@@ -9088,7 +9211,8 @@ function seedFreshDrill() {
   document.getElementById("notes-title-input").value = "";
   document.getElementById("practice-date-input").value = "";
   document.getElementById("practice-duration-input").value = "";
-  document.getElementById("practice-starttime-input").value = "09:00";
+  document.getElementById("practice-starttime-input").value = prefStartTime || "09:00";
+  resetOutputSettingsToPrefs();
   // clear any category tags left over from a previous plan
   document.querySelectorAll("#tag-field .chip").forEach(chip => chip.remove());
   if (typeof updateAddTagVisibility === "function") updateAddTagVisibility();
@@ -9099,6 +9223,13 @@ function seedFreshDrill() {
   firstPhase.scenes[0].tokens = tokens; firstPhase.scenes[0].shapes = shapes; firstPhase.surface = surface;
   phases = [firstPhase];
   activePhaseId = firstPhase.id;
+  // start on whichever field (and orientation) was used last
+  if (prefField && SURFACES[prefField.surface]) {
+    firstPhase.fieldFlipped = prefField.flipped;
+    applySurface(prefField.surface);
+    firstPhase.surface = surface;
+    renderTokens(); renderShapes();
+  }
   renderPhaseList();
   document.getElementById("output-date").textContent = "Last edited " + new Date().toLocaleDateString(undefined, { day: "2-digit", month: "long", year: "numeric" });
   switchMode("draw");
@@ -9929,6 +10060,44 @@ document.getElementById("unsaved-changes-modal-overlay").addEventListener("click
   if (e.target.id === "unsaved-changes-modal-overlay") document.getElementById("unsaved-changes-modal-overlay").classList.remove("open");
 });
 
+// remembered settings that need the rest of the app to exist first —
+// applied BEFORE a plan opened from the URL loads, so that plan's own
+// saved settings still win over these
+(function applyLateUserPrefs() {
+  const c = userPrefs.create || {};
+  const qty = prefNum(c.playerQty, 1, 22);
+  if (qty !== undefined) document.getElementById("player-qty-input").value = Math.round(qty);
+  if (["light", "dark"].includes(c.formationTeam)) {
+    formationTeam = c.formationTeam;
+    document.querySelectorAll("#formation-team-toggle button").forEach(b => b.classList.toggle("active", b.dataset.team === formationTeam));
+  }
+  if (typeof c.formationSidesFlipped === "boolean") {
+    formationSidesFlipped = c.formationSidesFlipped;
+    document.getElementById("formation-flip-sides").checked = formationSidesFlipped;
+  }
+  if (typeof c.animateShowTitle === "boolean") document.getElementById("animate-show-title").checked = c.animateShowTitle;
+  // Animate is a working mode (it re-arms tools and shows the timeline),
+  // not a setting — landing in it on launch would be surprising, so only
+  // the Toolkit / Details choice is restored
+  if (prefRightPanel === "toolkit" || prefRightPanel === "detail") {
+    const btn = document.querySelector(`#right-panel-toggle button[data-panel="${prefRightPanel}"]`);
+    if (btn && !btn.classList.contains("active")) btn.click();
+  }
+  if (prefLeftTab) {
+    const tab = document.querySelector(`.left-tab[data-lefttab="${prefLeftTab}"]`);
+    if (tab && !tab.classList.contains("active")) tab.click();
+  }
+  document.getElementById("practice-starttime-input").addEventListener("change", e => {
+    if (/^\d{2}:\d{2}$/.test(e.target.value)) prefStartTime = e.target.value;
+  });
+  if (prefStartTime) document.getElementById("practice-starttime-input").value = prefStartTime;
+  resetOutputSettingsToPrefs();
+  // whenever anything in the Output settings menu is used, that
+  // becomes the remembered set (not a loaded plan's own values)
+  ["click", "input", "change"].forEach(type => document.getElementById("output-settings-overlay").addEventListener(type, () => {
+    setTimeout(() => { prefOutput = { ...outputSettings }; scheduleUserPrefsSave(); }, 0);
+  }, true));
+})();
 loadDrillFromUrl();
 initClerkAuth();
 </script>
