@@ -8148,8 +8148,18 @@ updateAddTagVisibility();
 // "Finishing" already used elsewhere instead of risking a near-duplicate
 // tag (e.g. "finishing") that wouldn't group with it in the library filter
 let knownTagsLoaded = false;
+let knownTagsLoadedAt = 0;
+// the suggestion list is built from a cached copy of the whole library —
+// a copy that only ever got replaced when it was empty, so a tag deleted
+// and saved away kept being suggested (from drills as they WERE) for the
+// rest of the session. It's now thrown away whenever something that can
+// change tags happens (a save, a delete), and also simply expires after
+// a short while in case the library changed somewhere else (another tab
+// or device).
+const KNOWN_TAGS_MAX_AGE_MS = 30000;
+function invalidateKnownTags() { knownTagsLoaded = false; knownTagsLoadedAt = 0; }
 async function ensureKnownTagsLoaded() {
-  if (knownTagsLoaded && allLibraryDrills.length) return;
+  if (knownTagsLoaded && allLibraryDrills.length && Date.now() - knownTagsLoadedAt < KNOWN_TAGS_MAX_AGE_MS) return;
   try {
     const token = await getAuthToken();
     const headers = token ? { authorization: "Bearer " + token } : {};
@@ -8164,11 +8174,16 @@ async function ensureKnownTagsLoaded() {
       return { ...d, tags: Array.isArray(tags) ? tags : [], scenes: Array.isArray(scenes) ? scenes : [] };
     });
     knownTagsLoaded = true;
+    knownTagsLoadedAt = Date.now();
   } catch {}
 }
 function getKnownTags() {
+  // tags that exist only on the drill(s) being edited right now aren't
+  // "used elsewhere" — their saved copy still has whatever tags were there
+  // at the last save, including ones just removed here but not saved yet
+  const own = new Set([currentStandaloneDrillId, ...phases.map(p => p.libraryDrillId)].filter(Boolean));
   const set = new Set();
-  allLibraryDrills.forEach(d => d.tags.forEach(t => set.add(t)));
+  allLibraryDrills.forEach(d => { if (!own.has(d.id)) d.tags.forEach(t => set.add(t)); });
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 document.getElementById("plan-description-input").addEventListener("input", e => {
@@ -9048,6 +9063,7 @@ async function saveStandaloneDrill() {
     if (!res.ok) throw new Error("save failed");
     const json = await res.json();
     if (json.id) currentStandaloneDrillId = json.id;
+    invalidateKnownTags();
     toast("Drill saved");
     clearDraftSnapshot();
     markSavedSnapshot();
@@ -9089,6 +9105,7 @@ async function saveDrill() {
     if (!res.ok) throw new Error("save failed");
     const json = await res.json();
     currentDrillId = json.id;
+    invalidateKnownTags(); // the sync above may have created or changed library drills' tags
     history.replaceState(null, "", "?id=" + json.id);
     const shareUrl = location.origin + location.pathname + "?id=" + json.id;
     try { await navigator.clipboard.writeText(shareUrl); } catch {}
@@ -9832,6 +9849,7 @@ async function deleteLibraryDrill(id, title, onDone) {
     const res = await fetch(`/api/drill-library/${id}`, { method: "DELETE", headers });
     if (!res.ok) { toast("Could not remove that drill"); return; }
     toast("Removed from Drill Library");
+    invalidateKnownTags();
     if (onDone) onDone(); else renderLibraryGrid();
   } catch {
     toast("Could not remove that drill — check your connection");
