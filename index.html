@@ -850,8 +850,32 @@
   .full-animation-status { font-size: 13px; color: var(--ink-faint); }
   .import-phase-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .import-phase-header button { border: none; background: transparent; font-size: 22px; color: var(--ink-faint); }
-  .import-phase-toolbar { margin-bottom: 10px; }
-  .import-phase-tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .import-phase-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .import-phase-toolbar .field-input { flex: 1; min-width: 0; }
+  .import-tag-filter { position: relative; flex-shrink: 0; }
+  .import-tag-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 12px; white-space: nowrap; }
+  .import-tag-btn .import-tag-caret { transition: transform 0.15s; }
+  .import-tag-btn[aria-expanded="true"] .import-tag-caret { transform: rotate(180deg); }
+  .import-tag-btn.has-selection { background: var(--pitch-tint); color: var(--pitch-deep); border-color: var(--pitch); }
+  .import-tag-count { display: none; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--pitch); color: #F7F8F3; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+  .import-tag-btn.has-selection .import-tag-count { display: inline-block; }
+  .import-tag-pop {
+    display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 300px; max-width: 80vw;
+    background: var(--paper-card); border: 1px solid var(--line-md); border-radius: 10px; padding: 10px;
+    box-shadow: 0 16px 34px -12px rgba(27,33,28,0.4);
+  }
+  .import-tag-pop.open { display: block; }
+  .import-tag-pop .field-input { width: 100%; padding: 7px 9px; font-size: 13px; margin-bottom: 8px; }
+  .import-tag-list { display: flex; flex-wrap: wrap; gap: 5px; max-height: 176px; overflow-y: auto; padding: 1px; }
+  .import-tag-list .dash-filter-tag-chip { padding: 3px 8px; font-size: 12px; border-width: 1px; }
+  .import-tag-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .import-tag-clear { border: none; background: transparent; color: var(--ink-faint); font-size: 12px; font-weight: 600; padding: 2px 4px; cursor: pointer; }
+  .import-tag-clear:hover { color: var(--ink); text-decoration: underline; }
+  .import-phase-selected-tags { display: flex; flex-wrap: nowrap; gap: 5px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 2px; }
+  .import-phase-selected-tags:empty { display: none; }
+  .import-sel-chip { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; padding: 2px 4px 2px 8px; border-radius: 12px; background: var(--pitch-tint); color: var(--pitch-deep); font-size: 12px; font-weight: 600; }
+  .import-sel-chip button { border: none; background: transparent; color: inherit; font-size: 13px; line-height: 1; padding: 0 3px; cursor: pointer; opacity: 0.7; }
+  .import-sel-chip button:hover { opacity: 1; }
   .import-phase-table-header {
     display: grid; grid-template-columns: 1fr 1fr 130px; gap: 12px; padding: 0 10px 8px;
     font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint);
@@ -1341,8 +1365,23 @@
       </div>
       <div class="import-phase-toolbar">
         <input type="text" id="import-phase-search" class="field-input" placeholder="Search drill…">
+        <!-- tags live behind one button instead of a wall of chips -->
+        <div class="import-tag-filter" id="import-phase-tag-filter">
+          <button type="button" class="btn btn-ghost import-tag-btn" id="import-phase-tag-btn" aria-haspopup="true" aria-expanded="false">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 8.6V3a1 1 0 0 1 1-1h5.6a1 1 0 0 1 .7.3l5 5a1 1 0 0 1 0 1.4l-5.6 5.6a1 1 0 0 1-1.4 0l-5-5A1 1 0 0 1 2 8.6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="5.4" cy="5.4" r="1.1" fill="currentColor"/></svg>
+            Tags<span class="import-tag-count" id="import-phase-tag-count"></span>
+            <svg class="import-tag-caret" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="import-tag-pop" id="import-phase-tag-pop">
+            <input type="text" id="import-phase-tag-search" class="field-input" placeholder="Search tags…" autocomplete="off">
+            <div class="import-tag-list" id="import-phase-tag-row"></div>
+            <div class="import-tag-foot">
+              <button type="button" class="import-tag-clear" id="import-phase-tag-clear">Clear all</button>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="import-phase-tag-row" id="import-phase-tag-row"></div>
+      <div class="import-phase-selected-tags" id="import-phase-selected-tags"></div>
       <div class="import-phase-table-header">
         <span>Title</span><span>Tags</span><span>Last Edit</span>
       </div>
@@ -7704,6 +7743,8 @@ async function openImportPhaseModal() {
   document.getElementById("import-phase-modal-overlay").classList.add("open");
   document.getElementById("import-phase-search").value = "";
   importPhaseSelectedTags.clear();
+  setImportTagPopOpen(false);
+  document.getElementById("import-phase-tag-search").value = "";
   importPhasePage = 0;
   const rowsEl = document.getElementById("import-phase-rows");
   rowsEl.innerHTML = '<p class="dash-empty">Loading…</p>';
@@ -7732,22 +7773,66 @@ function closeImportPhaseModal() {
 function renderImportPhaseTagRow() {
   const counts = new Map();
   importPhaseDrills.forEach(d => d.tags.forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
+  const filterEl = document.getElementById("import-phase-tag-filter");
   const tagRow = document.getElementById("import-phase-tag-row");
-  const tags = Array.from(counts.keys()).sort();
-  if (!tags.length) { tagRow.innerHTML = ""; return; }
-  tagRow.innerHTML = tags.map(t =>
-    `<button class="dash-filter-tag-chip${importPhaseSelectedTags.has(t) ? " selected" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)} (${counts.get(t)})</button>`
-  ).join("");
+  const all = Array.from(counts.keys());
+  // no tags anywhere in the library: nothing to filter by, so no button either
+  filterEl.style.display = all.length ? "" : "none";
+  const q = (document.getElementById("import-phase-tag-search").value || "").trim().toLowerCase();
+  // most-used first, so the tags worth reaching for are at the top
+  const tags = all.filter(t => t.toLowerCase().includes(q)).sort((a, b) => (counts.get(b) - counts.get(a)) || a.localeCompare(b));
+  const keepScroll = tagRow.scrollTop;
+  tagRow.innerHTML = tags.length
+    ? tags.map(t => `<button type="button" class="dash-filter-tag-chip${importPhaseSelectedTags.has(t) ? " selected" : ""}" data-tag="${escapeHtml(t)}">${escapeHtml(t)} (${counts.get(t)})</button>`).join("")
+    : '<p class="dash-empty" style="padding:4px 2px;">No matching tags</p>';
+  tagRow.scrollTop = keepScroll;
   tagRow.querySelectorAll(".dash-filter-tag-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      const tag = chip.dataset.tag;
-      if (importPhaseSelectedTags.has(tag)) importPhaseSelectedTags.delete(tag); else importPhaseSelectedTags.add(tag);
-      importPhasePage = 0;
-      renderImportPhaseTagRow();
-      renderImportPhaseRows();
-    });
+    chip.addEventListener("click", () => toggleImportPhaseTag(chip.dataset.tag));
   });
+  // the button shows how many are active; the chosen tags themselves sit
+  // on one slim line under the toolbar (only when there are any), each
+  // removable without reopening the list
+  const n = importPhaseSelectedTags.size;
+  const btn = document.getElementById("import-phase-tag-btn");
+  btn.classList.toggle("has-selection", n > 0);
+  document.getElementById("import-phase-tag-count").textContent = n || "";
+  const selEl = document.getElementById("import-phase-selected-tags");
+  selEl.innerHTML = Array.from(importPhaseSelectedTags).map(t =>
+    `<span class="import-sel-chip">${escapeHtml(t)}<button type="button" data-tag="${escapeHtml(t)}" title="Remove filter" aria-label="Remove ${escapeHtml(t)}">&times;</button></span>`
+  ).join("");
+  selEl.querySelectorAll("button").forEach(b => b.addEventListener("click", () => toggleImportPhaseTag(b.dataset.tag)));
 }
+function toggleImportPhaseTag(tag) {
+  if (importPhaseSelectedTags.has(tag)) importPhaseSelectedTags.delete(tag); else importPhaseSelectedTags.add(tag);
+  importPhasePage = 0;
+  renderImportPhaseTagRow();
+  renderImportPhaseRows();
+}
+function setImportTagPopOpen(open) {
+  document.getElementById("import-phase-tag-pop").classList.toggle("open", open);
+  document.getElementById("import-phase-tag-btn").setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) { const si = document.getElementById("import-phase-tag-search"); si.value = ""; renderImportPhaseTagRow(); si.focus(); }
+}
+document.getElementById("import-phase-tag-btn").addEventListener("click", e => {
+  e.stopPropagation();
+  setImportTagPopOpen(!document.getElementById("import-phase-tag-pop").classList.contains("open"));
+});
+document.getElementById("import-phase-tag-search").addEventListener("input", renderImportPhaseTagRow);
+document.getElementById("import-phase-tag-clear").addEventListener("click", () => {
+  importPhaseSelectedTags.clear(); importPhasePage = 0; renderImportPhaseTagRow(); renderImportPhaseRows();
+});
+// pressing anywhere else in the window closes the tag list; Escape closes
+// just the list (not the whole import window) while it's open. This listens
+// on mousedown, not click: picking a tag redraws the chips, so by the time
+// the click bubbles up its target has been replaced and is no longer inside
+// the filter at all — which read as an outside click and slammed the list
+// shut after every single selection.
+document.getElementById("import-phase-modal-overlay").addEventListener("mousedown", e => {
+  if (!e.target.closest("#import-phase-tag-filter")) setImportTagPopOpen(false);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && document.getElementById("import-phase-tag-pop").classList.contains("open")) { e.stopPropagation(); setImportTagPopOpen(false); }
+}, true);
 function getFilteredImportPhaseDrills() {
   const search = (document.getElementById("import-phase-search").value || "").trim().toLowerCase();
   return importPhaseDrills.filter(d => {
