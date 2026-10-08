@@ -509,7 +509,13 @@
   .phase-note-card .phase-note-drill-title { font-weight: 600; font-size: 13px; text-align: center; }
   .phase-note-notes-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .phase-note-infoblocks { display: flex; flex-direction: column; gap: 8px; }
-  .phase-note-infoblock-label { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink-faint); margin-bottom: 3px; }
+  /* the title sits in the same kind of row as the lines under it: an
+     invisible copy of their add-button + grip space, then the text with
+     the same 4px padding the line text has — so it lines up with that
+     text however wide those controls end up, instead of a guessed indent */
+  .phase-note-infoblock-label { display: flex; align-items: baseline; gap: 3px; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink-faint); margin-bottom: 3px; }
+  .phase-note-infoblock-label .note-block-controls { visibility: hidden; padding-top: 0; height: 0; pointer-events: none; }
+  .phase-note-infoblock-label-text { padding: 0 4px; }
   .phase-note-infoblock-lines.note-blocks { border: none; background: transparent; padding: 0; min-height: 0; }
   .phase-note-infoblock-lines .note-block-text { font-size: 13.5px; line-height: 1.6; }
   .phase-clips-label { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); }
@@ -6998,7 +7004,13 @@ function renderPhaseNotes() {
         row.className = "phase-note-infoblock";
         const label = document.createElement("div");
         label.className = "phase-note-infoblock-label";
-        label.textContent = block.title || block.placeholder || "Block";
+        // hidden copy of a line row's controls (same markup, so the same
+        // width) holds the title's left edge in line with the text below
+        label.innerHTML = `<span class="note-block-controls" aria-hidden="true">
+          <span class="note-block-add">+</span>
+          <span class="note-block-grip"><span class="action-grip-dots"><span></span><span></span><span></span><span></span><span></span><span></span></span></span>
+        </span><span class="phase-note-infoblock-label-text"></span>`;
+        label.querySelector(".phase-note-infoblock-label-text").textContent = block.title || block.placeholder || "Block";
         const linesWrap = document.createElement("div");
         linesWrap.className = "phase-note-infoblock-lines note-blocks";
         renderNoteBlocks(block.lines, linesWrap);
