@@ -2941,6 +2941,21 @@ const ORIENTATION_PAIRS = {
 const DEDICATED_ORIENTATION_KEYS = new Set(
   Object.values(ORIENTATION_PAIRS).flatMap(p => [p.h, p.v])
 );
+// Whether a phase's field is drawn flipped by calculation (as opposed to
+// using a hand-made vertical key like fullV): true only for surfaces with
+// no vertical version of their own, once flipped
+function isGenericFlip(ph) { return !!(ph && ph.fieldFlipped) && !DEDICATED_ORIENTATION_KEYS.has(ph.surface); }
+// The Drill Library's list endpoint only hands back a drill's `surface`
+// string (not the rest of its data), so a calculated flip rides along in
+// that string itself — "square~v" — and is unpacked wherever a stored
+// surface is read. Dedicated keys (fullV, half…) already say it themselves.
+const FLIP_SUFFIX = "~v";
+function surfaceKeyOf(ph) { return isGenericFlip(ph) ? ph.surface + FLIP_SUFFIX : ph.surface; }
+function parseSurfaceKey(raw) {
+  const str = String(raw || "full");
+  const flipped = str.endsWith(FLIP_SUFFIX);
+  return { surface: flipped ? str.slice(0, -FLIP_SUFFIX.length) : str, flipped };
+}
 // lists every surface as a single scrollable panel now that Field has its
 // own toolkit popover, rather than paging four at a time above the canvas.
 // Every entry — Full and Half included — is just a plain button now;
@@ -6151,7 +6166,12 @@ function renderPhaseThumbActive() {
 function phaseThumbHTML(ph, opts) {
   opts = opts || {};
   const surf = SURFACES[ph.surface] || SURFACES.full;
-  const vb = surf.viewBox.split(" ").map(Number);
+  // a calculated flip swaps the field's shape and transposes its artwork —
+  // the same thing the editor does (tokens/shapes in the data are already
+  // transposed, so only the background needs to follow)
+  const flip = isGenericFlip(ph);
+  const viewBoxStr = flip ? flippedViewBox(surf.viewBox) : surf.viewBox;
+  const vb = viewBoxStr.split(" ").map(Number);
   const vbW = vb[2], vbH = vb[3];
   // thumbnails are the drill's "identity" everywhere they appear (phase
   // list, Notes, Output) — always Scene 1 specifically, never whichever
@@ -6172,7 +6192,8 @@ function phaseThumbHTML(ph, opts) {
   const REAL_W = 640;
   const scaleMult = (opts.scale || 100) / 100;
   const toVB = (px) => (px / REAL_W) * vbW * scaleMult;
-  const fieldMarkup = opts.fieldColor ? surf.markup.split("#2E6B3F").join(opts.fieldColor) : surf.markup;
+  const fieldArt = opts.fieldColor ? surf.markup.split("#2E6B3F").join(opts.fieldColor) : surf.markup;
+  const fieldMarkup = flip ? `<g transform="matrix(0,1,1,0,0,0)">${fieldArt}</g>` : fieldArt;
 
   // zone-marker shapes draw first/underneath here too, matching the
   // live canvas — otherwise a zone rectangle would show up covering any
@@ -6386,7 +6407,7 @@ function phaseThumbHTML(ph, opts) {
     return "";
   }).join("");
 
-  return `<svg viewBox="${surf.viewBox}" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%;display:block;">${STRIPES_DEFS}${fieldMarkup}${shapeMarkup}${tokenMarkup}</svg>`;
+  return `<svg viewBox="${viewBoxStr}" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%;display:block;">${STRIPES_DEFS}${fieldMarkup}${shapeMarkup}${tokenMarkup}</svg>`;
 }
 function renderPhaseList() {
   // belt-and-suspenders: renderPhaseList() runs on almost every state
@@ -6946,7 +6967,7 @@ async function playFullAnimationModal() {
 
   function setStageRatio(ph) {
     const surf = SURFACES[ph.surface] || SURFACES.full;
-    const vb = surf.viewBox.split(" ").map(Number);
+    const vb = (isGenericFlip(ph) ? flippedViewBox(surf.viewBox) : surf.viewBox).split(" ").map(Number);
     stage.style.aspectRatio = vb[2] + " / " + vb[3];
   }
   function wait(ms) {
@@ -8073,7 +8094,7 @@ function renderImportPhaseRows() {
       rowsEl.appendChild(row);
       // surface/scenes come straight from the list response now — no
       // per-row follow-up fetch needed
-      document.getElementById("import-phase-thumb-" + d.id).innerHTML = phaseThumbHTML({ surface: d.surface, scenes: d.scenes });
+      document.getElementById("import-phase-thumb-" + d.id).innerHTML = phaseThumbHTML({ surface: parseSurfaceKey(d.surface).surface, fieldFlipped: parseSurfaceKey(d.surface).flipped, scenes: d.scenes });
     });
   }
   const count = filtered.length;
@@ -8102,7 +8123,7 @@ async function importDrillIntoPhases(id, title) {
       shapes: (sc.shapes || []).map(s => ({ ...s, id: remapId(s.id) }))
     }));
     const newPhase = {
-      id: phaseNextId++, surface: data.surface || "full", scenes, activeSceneId: scenes[0].id,
+      id: phaseNextId++, surface: parseSurfaceKey(data.surface).surface, fieldFlipped: parseSurfaceKey(data.surface).flipped, scenes, activeSceneId: scenes[0].id,
       noteBlocks: [data.notes || ""], title: title || "", duration: "", dimensions: data.dimensions || "",
       libraryDrillId: id
     };
@@ -9305,7 +9326,7 @@ async function saveStandaloneDrill() {
       // phases array) keeps working unchanged for every drill, old or
       // new. The full multi-phase drill — everything actually needed to
       // reopen and keep editing it — lives in `phases` below.
-      surface: ph.surface, scenes: ph.scenes,
+      surface: surfaceKeyOf(ph), scenes: ph.scenes,
       notes: phaseInfoBlocksText(ph),
       description: planDescription,
       dimensions: ph.dimensions || "",
@@ -9406,7 +9427,7 @@ async function syncPhasesToLibrary() {
       // without this, the Library detail page has nothing but that flat
       // string to fall back to, which is what was collapsing every title
       // and every line into one jumbled sentence when viewed there
-      data: { surface: ph.surface, scenes: ph.scenes, notes, description, tags: getTags(), creatorName, clips: sessionClips, phases: [ph] }
+      data: { surface: surfaceKeyOf(ph), scenes: ph.scenes, notes, description, tags: getTags(), creatorName, clips: sessionClips, phases: [ph] }
     };
     try {
       if (ph.libraryDrillId) {
@@ -9948,7 +9969,7 @@ async function openStandaloneDrillEditorExisting(id) {
         sc.shapes.forEach(s => { if (s.id != null && s.id >= nextId) nextId = s.id + 1; });
       });
       const ph = {
-        id: phaseNextId++, surface: data.surface || "full", scenes, activeSceneId: scenes[0].id,
+        id: phaseNextId++, surface: parseSurfaceKey(data.surface).surface, fieldFlipped: parseSurfaceKey(data.surface).flipped, scenes, activeSceneId: scenes[0].id,
         noteBlocks: [data.notes || ""], title: data.title || "", duration: "", dimensions: data.dimensions || ""
       };
       repairPhaseSceneIdContinuity(ph); // in case this specific drill was saved with the id-mismatch corruption before the underlying bug was fixed
@@ -10080,7 +10101,7 @@ function applyLibraryFilters() {
     gridEl.appendChild(card);
     // surface/scenes now come straight from the list response — no more
     // per-card follow-up fetch needed to render the thumbnail
-    document.getElementById("lib-thumb-" + d.id).appendChild(createAnimatedThumb({ surface: d.surface, scenes: d.scenes }, "lib-card-thumb-inner"));
+    document.getElementById("lib-thumb-" + d.id).appendChild(createAnimatedThumb({ surface: parseSurfaceKey(d.surface).surface, fieldFlipped: parseSurfaceKey(d.surface).flipped, scenes: d.scenes }, "lib-card-thumb-inner"));
   });
 }
 // builds one set of back/page/forward controls into the given container —
@@ -10222,10 +10243,10 @@ async function openLibraryDrillDetail(id) {
       // exactly one phase (or a legacy drill with no phases array at all)
       // — same simple layout as before: one large preview near the top,
       // Notes as its own separate section underneath, no phase label
-      const ph = (Array.isArray(d.phases) && d.phases.length) ? d.phases[0] : { surface: d.surface, scenes: d.scenes, infoBlocks: d.notes ? [{ enabled: true, title: "", text: d.notes }] : [] };
+      const ph = (Array.isArray(d.phases) && d.phases.length) ? d.phases[0] : { surface: parseSurfaceKey(d.surface).surface, fieldFlipped: parseSurfaceKey(d.surface).flipped, scenes: d.scenes, infoBlocks: d.notes ? [{ enabled: true, title: "", text: d.notes }] : [] };
       const thumbWrap = document.createElement("div");
       thumbWrap.className = "lib-detail-thumb";
-      thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, scenes: ph.scenes }, "lib-detail-thumb-inner"));
+      thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, fieldFlipped: ph.fieldFlipped, scenes: ph.scenes }, "lib-detail-thumb-inner"));
       const notesLabel = document.createElement("div");
       notesLabel.className = "lib-detail-label";
       notesLabel.textContent = "Notes";
@@ -10252,7 +10273,7 @@ async function openLibraryDrillDetail(id) {
         block.appendChild(label);
         const thumbWrap = document.createElement("div");
         thumbWrap.className = "lib-detail-thumb";
-        thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, scenes: ph.scenes }, "lib-detail-thumb-inner"));
+        thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, fieldFlipped: ph.fieldFlipped, scenes: ph.scenes }, "lib-detail-thumb-inner"));
         block.appendChild(thumbWrap);
         const notesBlocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (Array.isArray(b.lines) ? b.lines : [b.text || ""]).some(l => (l || "").trim()));
         const notesLabel = document.createElement("div");
