@@ -392,7 +392,8 @@
   .tp-fmt-btn[aria-pressed="true"] { background: var(--pitch); border-color: var(--pitch); color: var(--paper-card); }
   /* a row of options sitting under its label, like every other panel */
   .tp-field-line { display: flex; align-items: center; gap: 8px; padding: 0 2px; }
-  .tp-field-line .tp-swatch-row { flex: 1; }
+  /* the colour chip takes only its own width, so the Fill eye sits right beside it */
+  .tp-field-line .tp-swatch-row { flex: 0 0 auto; }
   .tp-field-line .tp-toggle-row { flex: 1; padding: 0; }
   .tp-field-line .tp-toggle-row button { flex: 1; display: flex; align-items: center; justify-content: center; padding: 7px 0; }
   /* same convention as the badge-label eye: plain while the thing is
