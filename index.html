@@ -1850,6 +1850,7 @@
               <div class="tp-toggle-row" id="shape-dash-toggle">
                 <button data-dash="0" class="active">Solid</button>
                 <button data-dash="1">Dashed</button>
+                <button data-dash="none">None</button>
               </div>
             </div>
           </div>
@@ -2281,7 +2282,7 @@ const EQUIPMENT_DEFAULT_SIZES = { cone: 14, flatcone: 14, minigoal: 32, largegoa
 let equipmentSizeMemory = { ...EQUIPMENT_DEFAULT_SIZES };
 const EQUIPMENT_KINDS = ["cone", "flatcone", "minigoal", "largegoal", "dummy", "ladder", "pole"];
 const drawDefaults  = { color: "#F7F8F3", width: 2.6, curved: false, arrowEnd: true, arrowStart: false };
-const shapeDefaults = { color: "#F7F8F3", width: 2.4, fill: false, dashed: false };
+const shapeDefaults = { color: "#F7F8F3", width: 2.4, fill: false, dashed: false, noBorder: false };
 // same per-kind "last used" memory as equipment, applied to circle/
 // square/triangle so each shape kind remembers its own last width
 let shapeSizeMemory = { circle: 2.4, square: 2.4, triangle: 2.4 };
@@ -2402,7 +2403,9 @@ function noteFieldPref(surf, flipped) { prefField = { surface: surf, flipped: !!
   setIf(drawDefaults, "width", prefNum(d.width, 0.5, 12)); setIf(drawDefaults, "curved", prefBool(d.curved));
   setIf(drawDefaults, "arrowEnd", prefBool(d.arrowEnd)); setIf(drawDefaults, "arrowStart", prefBool(d.arrowStart));
   const sh = c.shape || {};
-  setIf(shapeDefaults, "width", prefNum(sh.width, 0.5, 12)); setIf(shapeDefaults, "fill", prefBool(sh.fill)); setIf(shapeDefaults, "dashed", prefBool(sh.dashed));
+  setIf(shapeDefaults, "width", prefNum(sh.width, 0.5, 12)); setIf(shapeDefaults, "fill", prefBool(sh.fill)); setIf(shapeDefaults, "dashed", prefBool(sh.dashed)); setIf(shapeDefaults, "noBorder", prefBool(sh.noBorder));
+  // no border AND no fill would draw nothing at all — never restore that
+  if (shapeDefaults.noBorder && !shapeDefaults.fill) shapeDefaults.fill = true;
   Object.keys(shapeSizeMemory).forEach(k => setIf(shapeSizeMemory, k, prefNum((sh.sizes || {})[k], 0.5, 12)));
   const eq = c.equipment || {};
   setIf(equipmentDefaults, "size", prefNum(eq.size, 6, 70));
@@ -2425,7 +2428,7 @@ function collectUserPrefs() {
     create: {
       arrowStyle, shapeKind, equipmentKind,
       draw: { width: drawDefaults.width, curved: drawDefaults.curved, arrowEnd: drawDefaults.arrowEnd, arrowStart: drawDefaults.arrowStart },
-      shape: { width: shapeDefaults.width, fill: shapeDefaults.fill, dashed: shapeDefaults.dashed, sizes: { ...shapeSizeMemory } },
+      shape: { width: shapeDefaults.width, fill: shapeDefaults.fill, dashed: shapeDefaults.dashed, noBorder: shapeDefaults.noBorder, sizes: { ...shapeSizeMemory } },
       equipment: { size: equipmentDefaults.size, sizes: { ...equipmentSizeMemory } },
       ball: { size: ballDefaults.size }, text: { size: textDefaults.size },
       team: { light: team("light"), dark: team("dark") },
@@ -4414,6 +4417,8 @@ function syncShapePopover() {
   const fill  = s ? !!s.fill : shapeDefaults.fill;
   const width = s ? (s.width || shapeDefaults.width) : shapeSizeMemory[kind];
   const dashed = s ? !!s.dashed : shapeDefaults.dashed;
+  const noBorder = s ? !!s.noBorder : shapeDefaults.noBorder;
+  const borderMode = noBorder ? "none" : (dashed ? "1" : "0");
   document.querySelectorAll("#shape-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
   paintRowCurrent("#shape-swatch-row", color);
   // older saved shapes may have an arbitrary width from before this was
@@ -4423,7 +4428,7 @@ function syncShapePopover() {
   const closestWidth = widthPresets.reduce((a, b) => Math.abs(b - width) < Math.abs(a - width) ? b : a);
   document.querySelectorAll("#shape-size-toggle button").forEach(b => b.classList.toggle("active", parseFloat(b.dataset.width) === closestWidth));
   document.querySelectorAll("#shape-fill-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.fill === "1") === fill));
-  document.querySelectorAll("#shape-dash-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.dash === "1") === dashed));
+  document.querySelectorAll("#shape-dash-toggle button").forEach(b => b.classList.toggle("active", b.dataset.dash === borderMode));
   document.querySelectorAll("#shape-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o.dataset.style === kind));
 }
 function setShapeColor(color) {
@@ -4443,15 +4448,27 @@ function setShapeWidth(width) {
 function setShapeFill(fill) {
   pushHistory();
   const matched = selectedShapesOfKindAnyTool(SHAPE_KINDS);
-  if (matched.length) { matched.forEach(s => s.fill = fill); renderShapes(); }
+  // an outline-only shape needs its outline: switching to "Outline" while
+  // the border is None would leave nothing drawn, so the border comes
+  // back (as Solid) with it
+  if (matched.length) { matched.forEach(s => { s.fill = fill; if (!fill) s.noBorder = false; }); renderShapes(); }
   shapeDefaults.fill = fill;
+  if (!fill) shapeDefaults.noBorder = false;
   syncShapePopover();
 }
-function setShapeDash(dashed) {
+// border = "solid" | "dashed" | "none". None needs the shape to be
+// filled (otherwise there'd be nothing left to see), so it turns Filled on
+function setShapeBorder(border) {
   pushHistory();
+  const none = border === "none", dashed = border === "dashed";
   const matched = selectedShapesOfKindAnyTool(SHAPE_KINDS);
-  if (matched.length) { matched.forEach(s => s.dashed = dashed); renderShapes(); }
-  shapeDefaults.dashed = dashed;
+  if (matched.length) {
+    matched.forEach(s => { s.noBorder = none; if (!none) s.dashed = dashed; if (none) s.fill = true; });
+    renderShapes();
+  }
+  shapeDefaults.noBorder = none;
+  if (!none) shapeDefaults.dashed = dashed;
+  if (none) shapeDefaults.fill = true;
   syncShapePopover();
 }
 
@@ -4667,7 +4684,7 @@ function initShapePopover() {
     btn.addEventListener("click", () => setShapeFill(btn.dataset.fill === "1"));
   });
   document.querySelectorAll("#shape-dash-toggle button").forEach(btn => {
-    btn.addEventListener("click", () => setShapeDash(btn.dataset.dash === "1"));
+    btn.addEventListener("click", () => setShapeBorder(btn.dataset.dash === "none" ? "none" : (btn.dataset.dash === "1" ? "dashed" : "solid")));
   });
   document.querySelectorAll("#shape-popover .arrow-opt").forEach(opt => {
     opt.addEventListener("click", e => {
@@ -4887,7 +4904,7 @@ function strokeSmooth(points) {
   ctx.lineTo(points[points.length-1].x, points[points.length-1].y);
   ctx.stroke();
 }
-function drawShapeGeometry(kind, p1, p2, fill, color) {
+function drawShapeGeometry(kind, p1, p2, fill, color, noBorder) {
   const rx = Math.min(p1.x, p2.x), ry = Math.min(p1.y, p2.y);
   const rw = Math.abs(p2.x - p1.x), rh = Math.abs(p2.y - p1.y);
   ctx.beginPath();
@@ -4900,7 +4917,7 @@ function drawShapeGeometry(kind, p1, p2, fill, color) {
     ctx.rect(rx, ry, rw, rh);
   }
   if (fill) { ctx.save(); ctx.globalAlpha = 0.22; ctx.fillStyle = color; ctx.fill(); ctx.restore(); }
-  ctx.stroke();
+  if (!noBorder) ctx.stroke();
 }
 function drawShape(s, highlight) {
   ctx.save();
@@ -4980,10 +4997,10 @@ function drawShape(s, highlight) {
       ctx.translate(cx, cy);
       ctx.rotate(s.rotation * Math.PI / 180);
       ctx.translate(-cx, -cy);
-      drawShapeGeometry(s.style, p1, p2, !!s.fill, color);
+      drawShapeGeometry(s.style, p1, p2, !!s.fill, color, !!s.noBorder);
       ctx.restore();
     } else {
-      drawShapeGeometry(s.style, p1, p2, !!s.fill, color);
+      drawShapeGeometry(s.style, p1, p2, !!s.fill, color, !!s.noBorder);
     }
     ctx.setLineDash([]);
   }
@@ -5567,7 +5584,7 @@ function onStageMove(e) {
     renderShapes();
     ctx.save();
     ctx.strokeStyle = shapeDefaults.color; ctx.lineWidth = shapeSizeMemory[shapeKind] * hf; ctx.setLineDash(shapeDefaults.dashed ? [6, 4] : []);
-    drawShapeGeometry(shapeKind, px(drawStart.x, drawStart.y), px(p.x, p.y), shapeDefaults.fill, shapeDefaults.color);
+    drawShapeGeometry(shapeKind, px(drawStart.x, drawStart.y), px(p.x, p.y), shapeDefaults.fill, shapeDefaults.color, shapeDefaults.noBorder);
     ctx.restore();
     return;
   }
@@ -5631,7 +5648,7 @@ function onStageUp(e) {
     // click" and auto-switched back to Select — right where the next
     // click would then land on the player instead of drawing.
     if (dist < 0.5) { noShapeCreated(); return; }
-    shape = { id: nextId++, style: shapeKind, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: shapeDefaults.color, width: shapeSizeMemory[shapeKind], fill: shapeDefaults.fill, dashed: shapeDefaults.dashed };
+    shape = { id: nextId++, style: shapeKind, x1: drawStart.x, y1: drawStart.y, x2: p.x, y2: p.y, color: shapeDefaults.color, width: shapeSizeMemory[shapeKind], fill: shapeDefaults.fill, dashed: shapeDefaults.dashed, noBorder: shapeDefaults.noBorder };
   } else {
     const dist = Math.hypot(p.x-drawStart.x, p.y-drawStart.y);
     if (dist < 0.5) { noShapeCreated(); return; }
@@ -6076,7 +6093,7 @@ function phaseThumbHTML(ph, opts) {
       const fill = s.fill ? `fill="${color}" fill-opacity="0.22"` : `fill="none"`;
       const rotAttr = s.rotation ? ` transform="rotate(${s.rotation} ${cx} ${cy})"` : "";
       const dashAttr = s.dashed ? ` stroke-dasharray="${toVB(6)},${toVB(4)}"` : "";
-      return `<ellipse cx="${cx}" cy="${cy}" rx="${rx||1}" ry="${ry||1}" ${fill} stroke="${color}" stroke-width="${width}"${dashAttr}${rotAttr}/>`;
+      return `<ellipse cx="${cx}" cy="${cy}" rx="${rx||1}" ry="${ry||1}" ${fill} ${s.noBorder ? ' stroke="none"' : ` stroke="${color}" stroke-width="${width}"${dashAttr}`}${rotAttr}/>`;
     }
     if (s.style === "square") {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
@@ -6085,7 +6102,7 @@ function phaseThumbHTML(ph, opts) {
       const fill = s.fill ? `fill="${color}" fill-opacity="0.22"` : `fill="none"`;
       const rotAttr = s.rotation ? ` transform="rotate(${s.rotation} ${x+w/2} ${y+h/2})"` : "";
       const dashAttr = s.dashed ? ` stroke-dasharray="${toVB(6)},${toVB(4)}"` : "";
-      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${fill} stroke="${color}" stroke-width="${width}"${dashAttr}${rotAttr}/>`;
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${fill} ${s.noBorder ? ' stroke="none"' : ` stroke="${color}" stroke-width="${width}"${dashAttr}`}${rotAttr}/>`;
     }
     if (s.style === "triangle") {
       const p1 = pxAt(es.x1, es.y1), p2 = pxAt(es.x2, es.y2);
@@ -6093,7 +6110,7 @@ function phaseThumbHTML(ph, opts) {
       const fill = s.fill ? `fill="${color}" fill-opacity="0.22"` : `fill="none"`;
       const rotAttr = s.rotation ? ` transform="rotate(${s.rotation} ${x+w/2} ${y+h/2})"` : "";
       const dashAttr = s.dashed ? ` stroke-dasharray="${toVB(6)},${toVB(4)}"` : "";
-      return `<polygon points="${x+w/2},${y} ${x+w},${y+h} ${x},${y+h}" ${fill} stroke="${color}" stroke-width="${width}"${dashAttr}${rotAttr}/>`;
+      return `<polygon points="${x+w/2},${y} ${x+w},${y+h} ${x},${y+h}" ${fill} ${s.noBorder ? ' stroke="none"' : ` stroke="${color}" stroke-width="${width}"${dashAttr}`}${rotAttr}/>`;
     }
     return "";
   }).join("");
