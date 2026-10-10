@@ -3971,6 +3971,14 @@ function renderTokens() {
       if (t.id === editingTextId) {
         isEditing = true;
         el.contentEditable = "true";
+        // a roomier frame while editing: it's the grab area for moving the
+        // box (see textEditGrabZone), and the text keeps its place because
+        // the box stays centred on its position
+        const f = fieldScaleFactor();
+        el.style.padding = Math.max(TEXT_FRAME_PX, t.bgColor ? 4 * f : 0) + "px " + Math.max(TEXT_FRAME_PX + 4, t.bgColor ? 6.4 * f : 0) + "px";
+        // the pointer says which it will be: a move arrow over the frame,
+        // the text cursor over the words
+        el.addEventListener("mousemove", ev => { el.style.cursor = textEditGrabZone(ev, el, t.rotation) === "move" ? "move" : "text"; });
         el.addEventListener("keydown", ev => {
           ev.stopPropagation();
           // Enter adds a new line like any text box; committing is
@@ -4102,22 +4110,40 @@ function startTokenRotate(ev, id) {
   document.addEventListener("touchmove", onMove, {passive:false});
   document.addEventListener("touchend", onUp);
 }
-// moving a text token while it's already being edited (contentEditable,
-// mid-typing) needs different handling than startTokenDrag above: that
-// one calls e.preventDefault() immediately on mousedown, which would
-// block the browser's own text-cursor placement a plain click needs —
-// so here, nothing is intercepted until real movement past the
-// threshold confirms this is actually a drag, not a click to position
-// the caret or select text. Once it IS a drag, the token's existing DOM
-// element is repositioned directly rather than going through
-// renderTokens() — that rebuilds the element from scratch, which would
-// drop focus and the caret (and fire the blur handler, prematurely
-// committing the edit) on every single frame of the drag.
+// While a text box is being edited, the same mouse gesture has to mean
+// two different things, as in any text box: dragging across the words
+// selects them, dragging the box's frame moves it. They're told apart by
+// WHERE the press lands — the thin frame around the text (the box's
+// padding, which edit mode makes a bit roomier for exactly this) moves
+// the box; anywhere inside the text area is left entirely to the browser
+// (caret, drag-to-select, double-click a word). The press point is
+// converted into the box's own un-rotated space first, so this holds for
+// a rotated text box too.
+const TEXT_FRAME_PX = 7;
+function textEditGrabZone(ev, el, rotationDeg) {
+  const cxy = ev.touches ? ev.touches[0] : ev;
+  const r = el.getBoundingClientRect();
+  const mx = r.left + r.width / 2, my = r.top + r.height / 2; // a rotated box keeps the same centre
+  const a = -(rotationDeg || 0) * Math.PI / 180;
+  const dx = cxy.clientX - mx, dy = cxy.clientY - my;
+  const lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
+  const hw = el.offsetWidth / 2, hh = el.offsetHeight / 2;
+  // never let the frame eat most of a very small box
+  const frame = Math.min(TEXT_FRAME_PX, hw * 0.4, hh * 0.4);
+  return (Math.abs(lx) > hw - frame || Math.abs(ly) > hh - frame) ? "move" : "text";
+}
+// Moves the box directly (its DOM element is repositioned in place rather
+// than through renderTokens()) — a re-render rebuilds the element, which
+// would drop focus and the caret and fire blur, committing the edit,
+// on every frame of the drag.
 function startTextEditDrag(e, id, el) {
   if (currentTool !== "select") return;
+  const tok = tokens.find(tk => tk.id === id);
+  if (textEditGrabZone(e, el, tok && tok.rotation) !== "move") return; // inside the text: leave it to the browser
+  e.preventDefault(); // keeps focus in the box and starts no text selection
   const startClientX = e.touches ? e.touches[0].clientX : e.clientX;
   const startClientY = e.touches ? e.touches[0].clientY : e.clientY;
-  const DRAG_THRESHOLD_PX = 4;
+  const DRAG_THRESHOLD_PX = 3;
   let dragging = false;
   let last = pctFromEvent(e);
   function onMove(ev) {
@@ -4126,11 +4152,6 @@ function startTextEditDrag(e, id, el) {
     if (!dragging) {
       if (Math.hypot(cx - startClientX, cy - startClientY) < DRAG_THRESHOLD_PX) return;
       dragging = true;
-      // a drag just started from inside the text itself — clear whatever
-      // the browser's default mousedown behavior already selected/placed
-      // the caret at, so it doesn't look like stray text got selected
-      const sel = window.getSelection();
-      if (sel) sel.removeAllRanges();
     }
     ev.preventDefault();
     const p = pctFromEvent(ev);
