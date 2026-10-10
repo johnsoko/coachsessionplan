@@ -385,6 +385,21 @@
   .tp-swatch { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15); }
   .tp-swatch.active { border-color: var(--bib); }
   .tp-disabled { opacity: 0.4; pointer-events: none; }
+  /* shape panel: one line per property — label, eye toggle, then its controls */
+  .tp-field-line { display: flex; align-items: center; gap: 8px; padding: 0 2px; margin-top: 8px; }
+  .tp-field-line .tp-label { margin: 0; width: 44px; flex-shrink: 0; }
+  .tp-field-line .tp-swatch-row { flex: 1; }
+  .tp-field-line .tp-toggle-row { flex: 1; padding: 0; }
+  .tp-field-line .tp-toggle-row button { flex: 1; display: flex; align-items: center; justify-content: center; padding: 7px 0; }
+  .tp-eye { width: 34px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line-md); border-radius: 8px; background: var(--paper-card); color: var(--ink-faint); cursor: pointer; padding: 0; }
+  .tp-eye[aria-pressed="true"] { background: var(--pitch); border-color: var(--pitch); color: var(--paper-card); }
+  .tp-eye .eye-off { display: none; }
+  .tp-eye[aria-pressed="false"] .eye-on { display: none; }
+  .tp-eye[aria-pressed="false"] .eye-off { display: block; }
+  .shape-dash-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 8px; }
+  .shape-dash-opt { display: flex; align-items: center; justify-content: center; padding: 8px 4px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+  .shape-dash-opt.selected { background: var(--pitch-tint); border-color: var(--pitch); }
+  .shape-dash-opt:hover:not(.selected) { background: var(--paper-raised); }
   .tp-swatch-none { background: var(--paper-card); display: flex; align-items: center; justify-content: center; }
   .tp-swatch-custom { position: relative; background: conic-gradient(#F33, #FC3, #3C3, #3CF, #36F, #C3F, #F33); }
   .tp-swatch-custom::before { content: "+"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 13px/1 sans-serif; color: #fff; text-shadow: 0 0 2px rgba(0,0,0,0.65); }
@@ -1834,24 +1849,23 @@
                 </div>
               </div>
               <div style="height:1px;background:var(--line);margin:6px 2px;"></div>
-              <span class="tp-label" style="margin-top:0;">Color</span>
-              <div class="tp-swatch-row" id="shape-swatch-row"></div>
-              <span class="tp-label">Fill</span>
-              <div class="tp-toggle-row" id="shape-fill-toggle">
-                <button data-fill="0" class="active">None</button>
-                <button data-fill="1">Filled</button>
+              <div class="tp-field-line">
+                <span class="tp-label">Fill</span>
+                <button type="button" class="tp-eye" id="shape-fill-eye" aria-pressed="false" title="Fill on / off"><svg class="eye-on" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M1.5 9S4.4 3.6 9 3.6 16.5 9 16.5 9 13.6 14.4 9 14.4 1.5 9 1.5 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2.3" fill="currentColor"/></svg><svg class="eye-off" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M1.5 9S4.4 3.6 9 3.6 16.5 9 16.5 9 13.6 14.4 9 14.4 1.5 9 1.5 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" opacity="0.55"/><path d="M3 15L15 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+                <div class="tp-swatch-row" id="shape-swatch-row"></div>
               </div>
-              <span class="tp-label">Border</span>
-              <div class="tp-toggle-row" id="shape-dash-toggle">
-                <button data-dash="0" class="active">Solid</button>
-                <button data-dash="1">Dashed</button>
-                <button data-dash="none">None</button>
+              <div class="tp-field-line">
+                <span class="tp-label">Stroke</span>
+                <button type="button" class="tp-eye" id="shape-stroke-eye" aria-pressed="true" title="Stroke on / off"><svg class="eye-on" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M1.5 9S4.4 3.6 9 3.6 16.5 9 16.5 9 13.6 14.4 9 14.4 1.5 9 1.5 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2.3" fill="currentColor"/></svg><svg class="eye-off" width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M1.5 9S4.4 3.6 9 3.6 16.5 9 16.5 9 13.6 14.4 9 14.4 1.5 9 1.5 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" opacity="0.55"/><path d="M3 15L15 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+                <div class="tp-toggle-row" id="shape-size-toggle">
+                  <button data-width="1.5" title="Thin"><svg width="26" height="14" viewBox="0 0 26 14"><path d="M2 7h22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+                  <button data-width="2.4" class="active" title="Medium"><svg width="26" height="14" viewBox="0 0 26 14"><path d="M2 7h22" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+                  <button data-width="4" title="Thick"><svg width="26" height="14" viewBox="0 0 26 14"><path d="M2 7h22" stroke="currentColor" stroke-width="4.4" stroke-linecap="round"/></svg></button>
+                </div>
               </div>
-              <span class="tp-label" id="shape-width-label">Border Width</span>
-              <div class="tp-toggle-row" id="shape-size-toggle">
-                <button data-width="1.5">Thin</button>
-                <button data-width="2.4" class="active">Medium</button>
-                <button data-width="4">Thick</button>
+              <div class="shape-dash-row" id="shape-dash-toggle">
+                <div class="shape-dash-opt selected" data-dash="0" title="Solid"><svg width="30" height="14" viewBox="0 0 30 14"><path d="M2 7L28 7" stroke="#1B211C" stroke-width="1.8"/></svg></div>
+                <div class="shape-dash-opt" data-dash="1" title="Dashed"><svg width="30" height="14" viewBox="0 0 30 14"><path d="M2 7L27 7" stroke="#1B211C" stroke-width="1.8" stroke-dasharray="2.4 2.6"/></svg></div>
               </div>
             </div>
           </div>
@@ -4419,7 +4433,6 @@ function syncShapePopover() {
   const width = s ? (s.width || shapeDefaults.width) : shapeSizeMemory[kind];
   const dashed = s ? !!s.dashed : shapeDefaults.dashed;
   const noBorder = s ? !!s.noBorder : shapeDefaults.noBorder;
-  const borderMode = noBorder ? "none" : (dashed ? "1" : "0");
   document.querySelectorAll("#shape-swatch-row .tp-swatch").forEach(sw => sw.classList.toggle("active", sw.dataset.color === color));
   paintRowCurrent("#shape-swatch-row", color);
   // older saved shapes may have an arbitrary width from before this was
@@ -4428,11 +4441,12 @@ function syncShapePopover() {
   const widthPresets = [1.5, 2.4, 4];
   const closestWidth = widthPresets.reduce((a, b) => Math.abs(b - width) < Math.abs(a - width) ? b : a);
   document.querySelectorAll("#shape-size-toggle button").forEach(b => b.classList.toggle("active", parseFloat(b.dataset.width) === closestWidth));
-  document.querySelectorAll("#shape-fill-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.fill === "1") === fill));
-  document.querySelectorAll("#shape-dash-toggle button").forEach(b => b.classList.toggle("active", b.dataset.dash === borderMode));
-  // the width only means something while there's a border to size
+  document.getElementById("shape-fill-eye").setAttribute("aria-pressed", fill ? "true" : "false");
+  document.getElementById("shape-stroke-eye").setAttribute("aria-pressed", noBorder ? "false" : "true");
+  document.querySelectorAll("#shape-dash-toggle .shape-dash-opt").forEach(o => o.classList.toggle("selected", (o.dataset.dash === "1") === dashed));
+  // width and solid/dashed only mean something while there's a stroke
   document.getElementById("shape-size-toggle").classList.toggle("tp-disabled", noBorder);
-  document.getElementById("shape-width-label").classList.toggle("tp-disabled", noBorder);
+  document.getElementById("shape-dash-toggle").classList.toggle("tp-disabled", noBorder);
   document.querySelectorAll("#shape-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o.dataset.style === kind));
 }
 function setShapeColor(color) {
@@ -4684,11 +4698,16 @@ function initShapePopover() {
       setShapeWidth(parseFloat(btn.dataset.width));
     });
   });
-  document.querySelectorAll("#shape-fill-toggle button").forEach(btn => {
-    btn.addEventListener("click", () => setShapeFill(btn.dataset.fill === "1"));
+  const fillEye = document.getElementById("shape-fill-eye"), strokeEye = document.getElementById("shape-stroke-eye");
+  fillEye.addEventListener("click", () => setShapeFill(fillEye.getAttribute("aria-pressed") !== "true"));
+  // turning the stroke back on restores whichever of solid/dashed it had
+  strokeEye.addEventListener("click", () => {
+    if (strokeEye.getAttribute("aria-pressed") === "true") { setShapeBorder("none"); return; }
+    const dashSel = document.querySelector("#shape-dash-toggle .shape-dash-opt.selected");
+    setShapeBorder(dashSel && dashSel.dataset.dash === "1" ? "dashed" : "solid");
   });
-  document.querySelectorAll("#shape-dash-toggle button").forEach(btn => {
-    btn.addEventListener("click", () => setShapeBorder(btn.dataset.dash === "none" ? "none" : (btn.dataset.dash === "1" ? "dashed" : "solid")));
+  document.querySelectorAll("#shape-dash-toggle .shape-dash-opt").forEach(opt => {
+    opt.addEventListener("click", () => setShapeBorder(opt.dataset.dash === "1" ? "dashed" : "solid"));
   });
   document.querySelectorAll("#shape-popover .arrow-opt").forEach(opt => {
     opt.addEventListener("click", e => {
