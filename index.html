@@ -265,7 +265,7 @@
   .token.eq-dummy     { border-radius: 7px 7px 3px 3px; box-shadow: none; }
   .token.eq-ladder    { border-radius: 2px; border-style: solid; box-shadow: none; }
   .token.eq-pole      { border-radius: 3px; box-shadow: none; }
-  .token.text  { width: auto; height: auto; border-radius: 0; box-shadow: none; background: none; font-family: var(--display); font-weight: 700; white-space: nowrap; padding: 2px 4px; }
+  .token.text  { width: auto; height: auto; border-radius: 0; box-shadow: none; background: none; font-family: var(--display); font-weight: 700; white-space: pre; text-align: center; padding: 2px 4px; }
   .token.text[contenteditable="true"] { outline: 1.5px dashed var(--bib); outline-offset: 3px; cursor: text; min-width: 26px; min-height: 1.2em; }
   .token.text[contenteditable="true"]:empty::before { content: "Type…"; opacity: 0.5; }
   .token.selected { outline: 2px solid var(--bib); outline-offset: 3px; }
@@ -3509,13 +3509,36 @@ function addEquipmentToken(kind, x, y) {
 // out, it's read straight from the live DOM node instead, which still
 // exists at every one of these call sites since they all run BEFORE the
 // re-render that would remove it.
+// the text in a text box being edited, with the line breaks Enter put in.
+// Browsers differ on what Enter produces in an editable element (a <div>
+// per line in Chrome, <br> or <div> elsewhere), so this reads innerText —
+// which turns all of those into "\n" — and only falls back to walking the
+// nodes by hand where innerText isn't implemented.
+function readTextEditValue(el) {
+  if (typeof el.innerText === "string") return el.innerText;
+  let out = "";
+  const walk = (node, isFirstBlock) => {
+    node.childNodes.forEach((n, i) => {
+      if (n.nodeType === 3) out += n.nodeValue;
+      else if (n.nodeName === "BR") out += "\n";
+      else if (n.nodeType === 1) {
+        const block = /^(DIV|P|LI)$/.test(n.nodeName);
+        if (block && out && !out.endsWith("\n")) out += "\n";
+        walk(n);
+        if (block && n.nextSibling && !out.endsWith("\n")) out += "\n";
+      }
+    });
+  };
+  walk(el);
+  return out;
+}
 function commitOrDiscardTextEdit(newContentRaw) {
   if (!editingTextId) return;
   const t = tokens.find(tk => tk.id === editingTextId);
   if (!t) { editingTextId = null; return; }
   if (newContentRaw === undefined) {
     const el = document.querySelector(`[data-token-id="${editingTextId}"]`);
-    newContentRaw = el ? el.textContent : (t.content || "");
+    newContentRaw = el ? readTextEditValue(el) : (t.content || "");
   }
   const newContent = (newContentRaw || "").trim();
   if (newContent === "") {
@@ -3897,10 +3920,12 @@ function renderTokens() {
         el.contentEditable = "true";
         el.addEventListener("keydown", ev => {
           ev.stopPropagation();
-          if (ev.key === "Enter" || ev.key === "Escape") { ev.preventDefault(); el.blur(); }
+          // Enter (and Shift+Enter) add a new line like any text box;
+          // committing is clicking away, or Escape
+          if (ev.key === "Escape") { ev.preventDefault(); el.blur(); }
         });
         el.addEventListener("blur", () => {
-          commitOrDiscardTextEdit(el.innerText);
+          commitOrDiscardTextEdit(readTextEditValue(el));
           renderTokens(); renderPhaseThumbActive();
         });
       } else {
@@ -6219,15 +6244,22 @@ function phaseThumbHTML(ph, opts) {
       // Condensed being a narrow font is why the ratio is on the low
       // side compared to a typical (~0.6) average-character-width rule
       // of thumb.
+      const lines = String(t.content || "").split("\n");
+      const lineH = fontSize * 1.2;
       const bgRect = t.bgColor
         ? (() => {
-            const textW = (t.content || "").length * fontSize * 0.52;
+            // widest line sets the width; each extra line adds one line height
+            const textW = Math.max(...lines.map(l => l.length)) * fontSize * 0.52;
             const padX = fontSize * 0.35, padY = fontSize * 0.28;
-            const w = textW + padX * 2, h = fontSize * 1.15 + padY * 2;
+            const w = textW + padX * 2, h = fontSize * 1.15 + lineH * (lines.length - 1) + padY * 2;
             return `<rect x="${(p.x - w/2).toFixed(1)}" y="${(p.y - h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${(fontSize*0.22).toFixed(1)}" fill="${t.bgColor}"${rotAttr}/>`;
           })()
         : "";
-      return bgRect + `<text x="${p.x}" y="${p.y + fontSize*0.36}" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="${fontSize}" fill="${c}" text-anchor="middle"${rotAttr}>${escapeHtml(t.content || "")}</text>`;
+      // the block of lines is centred on the token's position; every line
+      // is centred on the same x, matching the centred text in the live editor
+      const firstY = p.y + fontSize * 0.36 - (lines.length - 1) * lineH / 2;
+      const spans = lines.map((l, i) => `<tspan x="${p.x}" y="${(firstY + i * lineH).toFixed(2)}">${escapeHtml(l)}</tspan>`).join("");
+      return bgRect + `<text x="${p.x}" y="${firstY}" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="${fontSize}" fill="${c}" text-anchor="middle"${rotAttr}>${spans}</text>`;
     }
     return "";
   }).join("");
