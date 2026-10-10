@@ -384,6 +384,7 @@
   .tp-swatch-row { display: flex; gap: 6px; padding: 0 2px; flex-wrap: wrap; }
   .tp-swatch { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15); }
   .tp-swatch.active { border-color: var(--bib); }
+  .tp-disabled { opacity: 0.4; pointer-events: none; }
   .tp-swatch-none { background: var(--paper-card); display: flex; align-items: center; justify-content: center; }
   .tp-swatch-custom { position: relative; background: conic-gradient(#F33, #FC3, #3C3, #3CF, #36F, #C3F, #F33); }
   .tp-swatch-custom::before { content: "+"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 13px/1 sans-serif; color: #fff; text-shadow: 0 0 2px rgba(0,0,0,0.65); }
@@ -1835,15 +1836,9 @@
               <div style="height:1px;background:var(--line);margin:6px 2px;"></div>
               <span class="tp-label" style="margin-top:0;">Color</span>
               <div class="tp-swatch-row" id="shape-swatch-row"></div>
-              <span class="tp-label">Border Width</span>
-              <div class="tp-toggle-row" id="shape-size-toggle">
-                <button data-width="1.5">Thin</button>
-                <button data-width="2.4" class="active">Medium</button>
-                <button data-width="4">Thick</button>
-              </div>
-              <span class="tp-label">Style</span>
+              <span class="tp-label">Fill</span>
               <div class="tp-toggle-row" id="shape-fill-toggle">
-                <button data-fill="0" class="active">Outline</button>
+                <button data-fill="0" class="active">None</button>
                 <button data-fill="1">Filled</button>
               </div>
               <span class="tp-label">Border</span>
@@ -1851,6 +1846,12 @@
                 <button data-dash="0" class="active">Solid</button>
                 <button data-dash="1">Dashed</button>
                 <button data-dash="none">None</button>
+              </div>
+              <span class="tp-label" id="shape-width-label">Border Width</span>
+              <div class="tp-toggle-row" id="shape-size-toggle">
+                <button data-width="1.5">Thin</button>
+                <button data-width="2.4" class="active">Medium</button>
+                <button data-width="4">Thick</button>
               </div>
             </div>
           </div>
@@ -4429,6 +4430,9 @@ function syncShapePopover() {
   document.querySelectorAll("#shape-size-toggle button").forEach(b => b.classList.toggle("active", parseFloat(b.dataset.width) === closestWidth));
   document.querySelectorAll("#shape-fill-toggle button").forEach(b => b.classList.toggle("active", (b.dataset.fill === "1") === fill));
   document.querySelectorAll("#shape-dash-toggle button").forEach(b => b.classList.toggle("active", b.dataset.dash === borderMode));
+  // the width only means something while there's a border to size
+  document.getElementById("shape-size-toggle").classList.toggle("tp-disabled", noBorder);
+  document.getElementById("shape-width-label").classList.toggle("tp-disabled", noBorder);
   document.querySelectorAll("#shape-popover .arrow-opt").forEach(o => o.classList.toggle("selected", o.dataset.style === kind));
 }
 function setShapeColor(color) {
