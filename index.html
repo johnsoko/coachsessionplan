@@ -385,6 +385,11 @@
   .tp-swatch { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15); }
   .tp-swatch.active { border-color: var(--bib); }
   .tp-disabled { opacity: 0.4; pointer-events: none; }
+  .tp-format-row { display: flex; gap: 6px; padding: 0 2px; align-items: stretch; }
+  .tp-format-row .tp-toggle-row { flex: 1; padding: 0; }
+  .tp-format-row .tp-toggle-row button { flex: 1; display: flex; align-items: center; justify-content: center; padding: 7px 0; }
+  .tp-fmt-btn { width: 34px; flex-shrink: 0; border: 1px solid var(--line-md); border-radius: 6px; background: var(--paper); color: var(--ink-soft); font: 600 15px/1 var(--display); cursor: pointer; padding: 0; }
+  .tp-fmt-btn[aria-pressed="true"] { background: var(--pitch); border-color: var(--pitch); color: var(--paper-card); }
   /* shape panel: one line per property — label, eye toggle, then its controls */
   .tp-field-line { display: flex; align-items: center; gap: 8px; padding: 0 2px; margin-top: 8px; }
   .tp-field-line .tp-label { margin: 0; width: 44px; flex-shrink: 0; }
@@ -1895,6 +1900,16 @@
                 <input type="range" id="text-size" min="10" max="32" step="2">
                 <span class="tp-size-val" id="text-size-val"></span>
               </div>
+              <span class="tp-label">Format</span>
+              <div class="tp-format-row">
+                <div class="tp-toggle-row" id="text-align-toggle">
+                  <button data-align="left" title="Align left"><svg width="16" height="14" viewBox="0 0 16 14" fill="none"><path d="M1 2h14M1 5.5h9M1 9h14M1 12.5h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+                  <button data-align="center" title="Align center"><svg width="16" height="14" viewBox="0 0 16 14" fill="none"><path d="M1 2h14M3.5 5.5h9M1 9h14M3.5 12.5h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+                  <button data-align="right" title="Align right"><svg width="16" height="14" viewBox="0 0 16 14" fill="none"><path d="M1 2h14M6 5.5h9M1 9h14M6 12.5h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+                </div>
+                <button type="button" class="tp-fmt-btn" id="text-bold-btn" title="Bold" aria-pressed="true"><b>B</b></button>
+                <button type="button" class="tp-fmt-btn" id="text-italic-btn" title="Italic" aria-pressed="false"><i>I</i></button>
+              </div>
             </div>
           </div>
         </div>
@@ -2307,7 +2322,7 @@ const shapeDefaults = { color: "#F7F8F3", width: 2.4, fill: false, dashed: false
 // same per-kind "last used" memory as equipment, applied to circle/
 // square/triangle so each shape kind remembers its own last width
 let shapeSizeMemory = { circle: 2.4, square: 2.4, triangle: 2.4 };
-const textDefaults  = { color: "#F7F8F3", size: 18, bgColor: "" };
+const textDefaults  = { color: "#F7F8F3", size: 18, bgColor: "", bold: true, italic: false, align: "center" };
 const ballDefaults  = { color: "#F7F8F3", size: 18 };
 
 /* ─────────────────────────────────────────────────────────
@@ -2433,6 +2448,8 @@ function noteFieldPref(surf, flipped) { prefField = { surface: surf, flipped: !!
   EQUIPMENT_KINDS.forEach(k => setIf(equipmentSizeMemory, k, prefNum((eq.sizes || {})[k], 6, 70)));
   setIf(ballDefaults, "size", prefNum((c.ball || {}).size, 6, 50));
   setIf(textDefaults, "size", prefNum((c.text || {}).size, 6, 60));
+  setIf(textDefaults, "bold", prefBool((c.text || {}).bold)); setIf(textDefaults, "italic", prefBool((c.text || {}).italic));
+  if (["left", "center", "right"].includes((c.text || {}).align)) textDefaults.align = c.text.align;
   ["light", "dark"].forEach(team => {
     const t = (c.team || {})[team]; if (!t) return;
     setIf(teamDefaults[team], "size", prefNum(t.size, 8, 50));
@@ -2451,7 +2468,7 @@ function collectUserPrefs() {
       draw: { width: drawDefaults.width, curved: drawDefaults.curved, arrowEnd: drawDefaults.arrowEnd, arrowStart: drawDefaults.arrowStart },
       shape: { width: shapeDefaults.width, fill: shapeDefaults.fill, dashed: shapeDefaults.dashed, noBorder: shapeDefaults.noBorder, sizes: { ...shapeSizeMemory } },
       equipment: { size: equipmentDefaults.size, sizes: { ...equipmentSizeMemory } },
-      ball: { size: ballDefaults.size }, text: { size: textDefaults.size },
+      ball: { size: ballDefaults.size }, text: { size: textDefaults.size, bold: textDefaults.bold, italic: textDefaults.italic, align: textDefaults.align },
       team: { light: team("light"), dark: team("dark") },
       playerQty: isFinite(qty) ? qty : undefined,
       formationTeam, formationSidesFlipped,
@@ -3514,6 +3531,38 @@ function addEquipmentToken(kind, x, y) {
 // per line in Chrome, <br> or <div> elsewhere), so this reads innerText —
 // which turns all of those into "\n" — and only falls back to walking the
 // nodes by hand where innerText isn't implemented.
+function insertLineBreakAtCaret() {
+  if (document.execCommand && document.execCommand("insertLineBreak")) return;
+  // no execCommand: put the <br> in by hand
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const r = sel.getRangeAt(0);
+  r.deleteContents();
+  const br = document.createElement("br");
+  r.insertNode(br);
+  // inserting at the very end of a text node leaves an empty text node
+  // after the <br>; clear those so "nothing after it" is detected properly
+  let after = br.nextSibling;
+  while (after && after.nodeType === 3 && after.nodeValue === "") { const next = after.nextSibling; after.remove(); after = next; }
+  // a <br> with nothing after it draws no new line — give the caret a
+  // second one to sit on, same as a browser does
+  if (!after) br.parentNode.appendChild(document.createElement("br"));
+  r.setStartAfter(br); r.collapse(true);
+  sel.removeAllRanges(); sel.addRange(r);
+}
+// real width of the widest line, measured with the actual font so left /
+// right alignment and the background chip fit the text; falls back to a
+// per-character estimate wherever a canvas isn't available
+let measureCtx = null;
+function measureTextWidth(lines, fontSize, bold, italic) {
+  try {
+    if (!measureCtx) measureCtx = document.createElement("canvas").getContext("2d");
+    measureCtx.font = `${italic ? "italic " : ""}${bold ? 700 : 500} ${fontSize}px 'Barlow Condensed', sans-serif`;
+    const w = Math.max(...lines.map(l => measureCtx.measureText(l).width));
+    if (isFinite(w) && w > 0) return w;
+  } catch (e) { /* fall through to the estimate */ }
+  return Math.max(...lines.map(l => l.length)) * fontSize * 0.52;
+}
 function readTextEditValue(el) {
   if (typeof el.innerText === "string") return el.innerText;
   let out = "";
@@ -3551,7 +3600,7 @@ function commitOrDiscardTextEdit(newContentRaw) {
   editingTextId = null;
 }
 function addTextToken(content, x, y) {
-  const t = { id: nextId++, type: "text", x, y, content, color: textDefaults.color, size: textDefaults.size, bgColor: textDefaults.bgColor, rotation: 0 };
+  const t = { id: nextId++, type: "text", x, y, content, color: textDefaults.color, size: textDefaults.size, bgColor: textDefaults.bgColor, bold: textDefaults.bold, italic: textDefaults.italic, align: textDefaults.align, rotation: 0 };
   tokens.push(t);
   return t;
 }
@@ -3905,6 +3954,10 @@ function renderTokens() {
       el.textContent = t.content || "";
       el.style.color = t.color || textDefaults.color;
       el.style.fontSize = ((t.size || textDefaults.size) * fieldScaleFactor()) + "px";
+      // older text boxes have none of these: they were always bold and centred
+      el.style.fontWeight = t.bold === false ? "500" : "";
+      el.style.fontStyle = t.italic ? "italic" : "";
+      el.style.textAlign = (t.align === "left" || t.align === "right") ? t.align : "";
       if (t.bgColor) {
         el.style.backgroundColor = t.bgColor;
         const pad = 4 * fieldScaleFactor();
@@ -3920,9 +3973,15 @@ function renderTokens() {
         el.contentEditable = "true";
         el.addEventListener("keydown", ev => {
           ev.stopPropagation();
-          // Enter (and Shift+Enter) add a new line like any text box;
-          // committing is clicking away, or Escape
+          // Enter adds a new line like any text box; committing is
+          // clicking away, or Escape. The browser's own Enter handling
+          // can't be trusted here: in a white-space:pre element Chrome
+          // inserts a bare "\n", and a trailing "\n" shows no new line at
+          // all until something is typed after it — which read as Enter
+          // doing nothing, while Shift+Enter (a real <br>) worked. So
+          // Enter is turned into that same <br> insertion.
           if (ev.key === "Escape") { ev.preventDefault(); el.blur(); }
+          else if (ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); insertLineBreakAtCaret(); }
         });
         el.addEventListener("blur", () => {
           commitOrDiscardTextEdit(readTextEditValue(el));
@@ -4533,6 +4592,12 @@ function syncTextPopover() {
   paintRowCurrent("#text-bg-swatch-row", bgColor);
   document.getElementById("text-size").value = size;
   document.getElementById("text-size-val").textContent = size + "px";
+  const align = t ? (t.align || "center") : textDefaults.align;
+  const bold = t ? t.bold !== false : textDefaults.bold;
+  const italic = t ? !!t.italic : textDefaults.italic;
+  document.querySelectorAll("#text-align-toggle button").forEach(b => b.classList.toggle("active", b.dataset.align === align));
+  document.getElementById("text-bold-btn").setAttribute("aria-pressed", bold ? "true" : "false");
+  document.getElementById("text-italic-btn").setAttribute("aria-pressed", italic ? "true" : "false");
 }
 function setTextColor(color) {
   pushHistory();
@@ -4548,6 +4613,27 @@ function setTextBgColor(color) {
   const matched = activeTokensOfType("text");
   if (matched.length) { matched.forEach(t => t.bgColor = color); renderTokens(); }
   textDefaults.bgColor = color;
+  syncTextPopover();
+}
+function setTextAlign(align) {
+  pushHistory();
+  const matched = activeTokensOfType("text");
+  if (matched.length) { matched.forEach(t => t.align = align); renderTokens(); renderPhaseThumbActive(); }
+  textDefaults.align = align;
+  syncTextPopover();
+}
+function setTextBold(bold) {
+  pushHistory();
+  const matched = activeTokensOfType("text");
+  if (matched.length) { matched.forEach(t => t.bold = bold); renderTokens(); renderPhaseThumbActive(); }
+  textDefaults.bold = bold;
+  syncTextPopover();
+}
+function setTextItalic(italic) {
+  pushHistory();
+  const matched = activeTokensOfType("text");
+  if (matched.length) { matched.forEach(t => t.italic = italic); renderTokens(); renderPhaseThumbActive(); }
+  textDefaults.italic = italic;
   syncTextPopover();
 }
 function setTextSize(size) {
@@ -4758,6 +4844,10 @@ function initTextPopover() {
   // crossed-out look, not a plain color fill) — just wire up its click
   bgRow.querySelector(".tp-swatch-none").addEventListener("click", () => setTextBgColor(""));
   setupColorRow(bgRow, c => setTextBgColor(c));
+  document.querySelectorAll("#text-align-toggle button").forEach(b => b.addEventListener("click", () => setTextAlign(b.dataset.align)));
+  const boldBtn = document.getElementById("text-bold-btn"), italicBtn = document.getElementById("text-italic-btn");
+  boldBtn.addEventListener("click", () => setTextBold(boldBtn.getAttribute("aria-pressed") !== "true"));
+  italicBtn.addEventListener("click", () => setTextItalic(italicBtn.getAttribute("aria-pressed") !== "true"));
   const sizeInput = document.getElementById("text-size");
   sizeInput.addEventListener("input", e => setTextSize(parseInt(e.target.value, 10)));
   sizeInput.addEventListener("change", () => pushHistory());
@@ -6246,20 +6336,23 @@ function phaseThumbHTML(ph, opts) {
       // of thumb.
       const lines = String(t.content || "").split("\n");
       const lineH = fontSize * 1.2;
+      const bold = t.bold !== false, italic = !!t.italic;
+      const align = (t.align === "left" || t.align === "right") ? t.align : "center";
+      const textW = measureTextWidth(lines, fontSize, bold, italic);
       const bgRect = t.bgColor
         ? (() => {
-            // widest line sets the width; each extra line adds one line height
-            const textW = Math.max(...lines.map(l => l.length)) * fontSize * 0.52;
             const padX = fontSize * 0.35, padY = fontSize * 0.28;
             const w = textW + padX * 2, h = fontSize * 1.15 + lineH * (lines.length - 1) + padY * 2;
             return `<rect x="${(p.x - w/2).toFixed(1)}" y="${(p.y - h/2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${(fontSize*0.22).toFixed(1)}" fill="${t.bgColor}"${rotAttr}/>`;
           })()
         : "";
-      // the block of lines is centred on the token's position; every line
-      // is centred on the same x, matching the centred text in the live editor
+      // the block of lines is centred on the token's position; within it
+      // every line hangs off the left edge, the centre, or the right edge
+      const anchor = align === "left" ? "start" : align === "right" ? "end" : "middle";
+      const lineX = align === "left" ? p.x - textW / 2 : align === "right" ? p.x + textW / 2 : p.x;
       const firstY = p.y + fontSize * 0.36 - (lines.length - 1) * lineH / 2;
-      const spans = lines.map((l, i) => `<tspan x="${p.x}" y="${(firstY + i * lineH).toFixed(2)}">${escapeHtml(l)}</tspan>`).join("");
-      return bgRect + `<text x="${p.x}" y="${firstY}" font-family="'Barlow Condensed', sans-serif" font-weight="700" font-size="${fontSize}" fill="${c}" text-anchor="middle"${rotAttr}>${spans}</text>`;
+      const spans = lines.map((l, i) => `<tspan x="${lineX.toFixed(2)}" y="${(firstY + i * lineH).toFixed(2)}">${escapeHtml(l)}</tspan>`).join("");
+      return bgRect + `<text x="${lineX.toFixed(2)}" y="${firstY}" font-family="'Barlow Condensed', sans-serif" font-weight="${bold ? 700 : 500}"${italic ? ' font-style="italic"' : ""} font-size="${fontSize}" fill="${c}" text-anchor="${anchor}"${rotAttr}>${spans}</text>`;
     }
     return "";
   }).join("");
