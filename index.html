@@ -1711,11 +1711,13 @@
               <div style="height:1px;background:var(--line);margin:6px 2px;"></div>
               <span class="tp-label" style="margin-top:0;">Color</span>
               <div class="tp-swatch-row" id="arrow-swatch-row"></div>
-              <span class="tp-label">Line Width</span>
-              <div class="tp-toggle-row" id="arrow-size-toggle">
-                <button data-width="1.5">Thin</button>
-                <button data-width="2.6" class="active">Medium</button>
-                <button data-width="4.2">Thick</button>
+              <div class="tp-field-line">
+                <span class="tp-label">Width</span>
+                <div class="tp-toggle-row" id="arrow-size-toggle">
+                  <button data-width="1.5" title="Thin"><svg width="26" height="14" viewBox="0 0 26 14"><path d="M2 7h22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
+                  <button data-width="2.6" class="active" title="Medium"><svg width="26" height="14" viewBox="0 0 26 14"><path d="M2 7h22" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+                  <button data-width="4.2" title="Thick"><svg width="26" height="14" viewBox="0 0 26 14"><path d="M2 7h22" stroke="currentColor" stroke-width="4.4" stroke-linecap="round"/></svg></button>
+                </div>
               </div>
               <span class="tp-label">Line</span>
               <div class="tp-toggle-row" id="arrow-curve-toggle">
