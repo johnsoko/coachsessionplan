@@ -570,6 +570,10 @@
   @media (hover: none) { .pn-section-eye { opacity: 0.8; } }
   .pn-hidden-note { display: none; margin-left: 8px; font-size: 10.5px; font-weight: 600; font-style: italic; color: var(--ink-faint); }
   .phase-note-infoblock.is-hidden .pn-hidden-note { display: inline; }
+  .phase-note-infoblock.is-hidden .phase-note-infoblock-label { cursor: pointer; }
+  .phase-note-infoblock.is-collapsed .phase-note-infoblock-lines { display: none; }
+  .pn-hidden-chevron { vertical-align: middle; margin-left: 2px; transition: transform 0.15s; }
+  .phase-note-infoblock.is-hidden:not(.is-collapsed) .pn-hidden-chevron { transform: rotate(180deg); }
   .phase-note-infoblock.is-hidden .phase-note-infoblock-lines { opacity: 0.45; }
   .phase-note-infoblock-delete:hover { color: #B4332B; background: rgba(180,51,43,0.1); }
   @media (hover: none) { .phase-note-infoblock-delete { opacity: 0.7; } }
@@ -7508,6 +7512,8 @@ async function editActivityDrill(ph) { await editActivityInCreator(ph); }
 document.getElementById("save-caret-btn").addEventListener("click", e => toggleMenu("save-options-menu", e));
 document.getElementById("save-opt-update").addEventListener("click", () => { document.getElementById("save-options-menu").classList.remove("open"); saveToPlan("update"); });
 document.getElementById("save-opt-new").addEventListener("click", () => { document.getElementById("save-options-menu").classList.remove("open"); saveToPlan("new"); });
+// hidden sections the coach has opened to look at (view state only — never saved)
+const expandedHiddenSections = new Set();
 function renderPhaseNotes() {
   const list = document.getElementById("phase-notes-list");
   if (!list) return;
@@ -7672,7 +7678,8 @@ function renderPhaseNotes() {
         // gets printed). A hidden section stays here in the plan — dimmed,
         // notes intact — and comes back with one click; nothing is deleted.
         const hiddenNote = document.createElement("span");
-        hiddenNote.className = "pn-hidden-note"; hiddenNote.textContent = "Hidden from output";
+        hiddenNote.className = "pn-hidden-note";
+        hiddenNote.innerHTML = `Hidden from output <svg class="pn-hidden-chevron" width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
         label.appendChild(hiddenNote);
         const eye = document.createElement("button");
         eye.type = "button"; eye.className = "pn-section-eye";
@@ -7683,9 +7690,22 @@ function renderPhaseNotes() {
           eye.title = shown ? "Hide this section from the output" : "Show this section in the output";
           eye.setAttribute("aria-label", eye.title);
           row.classList.toggle("is-hidden", !shown);
+          // a hidden section folds its notes away, like a closed dropdown —
+          // the label and "Hidden from output" stay, and clicking them peeks inside
+          row.classList.toggle("is-collapsed", !shown && !expandedHiddenSections.has(block.id));
         };
         syncEye();
-        eye.addEventListener("click", () => { block.enabled = block.enabled === false; syncEye(); });
+        eye.addEventListener("click", () => {
+          block.enabled = block.enabled === false;
+          expandedHiddenSections.delete(block.id); // hiding folds it; showing needs no fold
+          syncEye();
+        });
+        label.addEventListener("click", e => {
+          if (block.enabled !== false) return;
+          if (e.target.closest(".pn-section-eye, .phase-note-infoblock-delete, .phase-note-infoblock-title-input")) return;
+          if (expandedHiddenSections.has(block.id)) expandedHiddenSections.delete(block.id); else expandedHiddenSections.add(block.id);
+          syncEye();
+        });
         label.appendChild(eye);
         // only sections the coach added themselves can be deleted outright
         // (undoable); the standard ones can only be hidden
