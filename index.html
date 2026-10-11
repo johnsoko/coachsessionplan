@@ -540,6 +540,9 @@
   .pn-mini-row { display: flex; gap: 8px; width: 100%; }
   .pn-mini-col { flex: 1; min-width: 0; }
   .pn-mini-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-faint); display: block; margin-bottom: 4px; }
+  .pn-area-row { gap: 6px; margin-top: 6px; }
+  .pn-area-row .pn-mini-label { font-size: 8.5px; margin-bottom: 2px; }
+  .pn-area-row .pn-mini-input { padding: 5px 6px !important; font-size: 12px !important; }
   .pn-mini-input { width: 100%; padding: 9px 8px !important; font-size: 13px !important; text-align: center; }
   .phase-note-duration-readout { font-size: 11px; font-weight: 700; color: var(--ink-soft); margin: 8px 0 2px; }
   .phase-note-exercise { display: flex; flex-direction: column; gap: 6px; }
@@ -7558,7 +7561,7 @@ function renderPhaseNotes() {
     // Area section already uses. The title still shows only as a hover
     // overlay on the preview, same as before this change.
     const areaRow = document.createElement("div");
-    areaRow.className = "pn-mini-row";
+    areaRow.className = "pn-mini-row pn-area-row";
     areaRow.innerHTML = `
       <div class="pn-mini-col">
         <span class="pn-mini-label">Length (m)</span>
@@ -7587,7 +7590,6 @@ function renderPhaseNotes() {
       });
       exerciseWrap.appendChild(titleInput);
     }
-    exerciseWrap.appendChild(areaRow);
     if (thumb) {
       const titleOverlay = document.createElement("div");
       titleOverlay.className = "phase-note-thumb-title-overlay";
@@ -7603,6 +7605,8 @@ function renderPhaseNotes() {
       none.querySelector(".pn-no-diagram-title").textContent = ph.title || (phaseNoun() + " " + (phIdx + 1));
       exerciseWrap.appendChild(none);
     }
+    // the playing-area size sits under the diagram it describes
+    exerciseWrap.appendChild(areaRow);
 
     // Panel's Block Information (Organisation, Coaching Points, etc.) is
     // the same ph.infoBlocks data the Panel view edits — rendering it
