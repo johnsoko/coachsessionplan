@@ -542,9 +542,6 @@
   .pn-mini-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink-faint); display: block; margin-bottom: 4px; }
   .pn-mini-input { width: 100%; padding: 9px 8px !important; font-size: 13px !important; text-align: center; }
   .phase-note-duration-readout { font-size: 11px; font-weight: 700; color: var(--ink-soft); margin: 8px 0 2px; }
-  .pn-load-row { display: flex; gap: 6px; align-items: center; width: 100%; }
-  .pn-load-row .pn-mini-input { text-align: left; }
-  .pn-load-swatch { width: 30px; height: 30px; border-radius: 6px; border: 1.5px solid var(--line-md); flex-shrink: 0; padding: 0; }
   .phase-note-exercise { display: flex; flex-direction: column; gap: 6px; }
   .phase-note-card .phase-note-drill-title { font-weight: 600; font-size: 13px; text-align: center; }
   .phase-note-notes-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -682,9 +679,6 @@
     position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
     font-size: 12.5px; font-weight: 600; color: var(--ink-faint); pointer-events: none;
   }
-  .pd-load-row { display: flex; align-items: center; gap: 8px; }
-  .pd-load-row input { flex: 1; }
-  .pd-load-swatch { width: 34px; height: 34px; border-radius: 8px; border: 1.5px solid var(--line-md); flex-shrink: 0; }
   .pd-blocks-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
   .pd-block { border: 1px solid var(--line-md); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
   .pd-block-head { display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--paper-raised); }
@@ -2027,12 +2021,6 @@
                 </div>
               </div>
               <p class="pd-hint">Minutes per set, excluding rest.</p>
-              <label class="pd-section-label">Load</label>
-              <div class="pd-load-row">
-                <input type="text" class="field-input" id="pd-load" placeholder="Optional">
-                <button class="pd-load-swatch" id="pd-load-swatch" title="Load Color"></button>
-                <input type="color" id="pd-load-color-input" style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;">
-              </div>
             </div>
             <div class="notes-divider" style="margin:22px 0;"></div>
             <div class="pd-blocks-header">
@@ -5988,7 +5976,6 @@ function newSceneObj(contentSrc) {
 }
 // contentSrc here is a whole PHASE to copy the active scene's content
 // from (or null for blank); surfaceSrc always supplies the field type
-const DEFAULT_LOAD_COLOR = "#3B6FB6";
 // three blocks every phase starts with — title is left blank so the
 // coach's own wording shows through, with the label itself as a
 // placeholder hint. Focus leads (it frames what the activity is actually
@@ -6022,8 +6009,6 @@ function newPhaseObj(contentSrc, surfaceSrc) {
     id: phaseNextId++, surface: surfaceSrc || "full", scenes: [scene], activeSceneId: scene.id,
     noteBlocks: [""], title: contentSrc ? (contentSrc.title || "") : "", duration: contentSrc ? (contentSrc.duration || "") : "",
     dimensions: contentSrc ? (contentSrc.dimensions || "") : "",
-    load: contentSrc ? (contentSrc.load || "") : "",
-    loadColor: contentSrc ? (contentSrc.loadColor || DEFAULT_LOAD_COLOR) : DEFAULT_LOAD_COLOR,
     infoBlocks: contentSrc && contentSrc.infoBlocks ? contentSrc.infoBlocks.map(b => ({...b, id: nextId++, lines: Array.isArray(b.lines) ? [...b.lines] : b.lines})) : defaultInfoBlocks(),
     playingAreaLength: contentSrc ? (contentSrc.playingAreaLength || "") : "",
     playingAreaWidth: contentSrc ? (contentSrc.playingAreaWidth || "") : "",
@@ -6169,7 +6154,6 @@ function mirrorCurrentPhase() {
     id: phaseNextId++, surface: current.surface, scenes: newScenes,
     activeSceneId: newScenes[Math.max(0, current.scenes.findIndex(s=>s.id===current.activeSceneId))].id,
     noteBlocks: [""], title: current.title || "", duration: current.duration || "", dimensions: current.dimensions || "",
-    load: current.load || "", loadColor: current.loadColor || DEFAULT_LOAD_COLOR,
     // same deep-copy as newPhaseObj's own infoBlocks handling — a plain
     // {...b} would leave the new blocks' `lines` arrays pointing at the
     // SAME array instances as the original phase's blocks, so editing
@@ -7531,20 +7515,13 @@ function renderPhaseNotes() {
     handle.innerHTML = `<svg width="12" height="18" viewBox="0 0 12 18" fill="none"><circle cx="3" cy="3" r="1.4" fill="currentColor"/><circle cx="9" cy="3" r="1.4" fill="currentColor"/><circle cx="3" cy="9" r="1.4" fill="currentColor"/><circle cx="9" cy="9" r="1.4" fill="currentColor"/><circle cx="3" cy="15" r="1.4" fill="currentColor"/><circle cx="9" cy="15" r="1.4" fill="currentColor"/></svg>`;
 
     // Sets/Minutes/Length/Width/Load here are the exact same ph fields
-    // the Panel's own Playing Area / Active Time / Load fields read and
+    // the Panel's own Playing Area / Active Time fields read and
     // write — same object, so a change made in either place is already
     // "synced" the moment either view re-renders, with nothing extra to
     // keep in step.
     const timeWrap = document.createElement("div");
     timeWrap.className = "phase-note-time";
     timeWrap.innerHTML = `
-      <div class="pn-mini-group">
-        <span class="pn-mini-label">Load</span>
-        <div class="pn-load-row">
-          <input type="text" class="field-input pn-mini-input" data-field="load" placeholder="Optional" value="${escapeHtml(ph.load || "")}" title="Load">
-          <button class="pn-load-swatch" title="Load Color" style="background:${ph.loadColor || DEFAULT_LOAD_COLOR};"></button>
-        </div>
-      </div>
       <div class="pn-mini-group">
         <div class="pn-mini-row">
           <div class="pn-mini-col">
@@ -7571,17 +7548,6 @@ function renderPhaseNotes() {
     }
     setsInput.addEventListener("input", onTimeInputChanged);
     minutesInput.addEventListener("input", onTimeInputChanged);
-    const loadInput = timeWrap.querySelector('[data-field="load"]');
-    const loadSwatch = timeWrap.querySelector(".pn-load-swatch");
-    loadInput.addEventListener("input", () => { ph.load = loadInput.value; });
-    loadSwatch.addEventListener("click", () => {
-      // reuse the same single hidden native color input the Panel uses,
-      // rather than one per timetable card
-      const colorInput = document.getElementById("pd-load-color-input");
-      colorInput.value = ph.loadColor || DEFAULT_LOAD_COLOR;
-      colorInput.dataset.forPhaseId = ph.id;
-      colorInput.click();
-    });
 
     const exerciseWrap = document.createElement("div");
     exerciseWrap.className = "phase-note-exercise";
@@ -7866,8 +7832,8 @@ function refreshAnimatePanel() {
 ───────────────────────────────────────────────────────── */
 let rightPanelMode = "toolkit"; // "toolkit" | "detail" | "animate"
 function ensurePhaseDetailFields(ph) {
-  if (ph.load == null) ph.load = "";
-  if (!ph.loadColor) ph.loadColor = DEFAULT_LOAD_COLOR;
+  // the old Load field is gone — strip it from plans and drills saved while it existed
+  delete ph.load; delete ph.loadColor;
   if (!ph.infoBlocks || !ph.infoBlocks.length) ph.infoBlocks = defaultInfoBlocks();
   if (ph.playingAreaLength == null) ph.playingAreaLength = "";
   if (ph.playingAreaWidth == null) ph.playingAreaWidth = "";
@@ -7886,9 +7852,6 @@ function renderPhaseDetailPanel() {
   document.getElementById("pd-sets").value = ph.activeSets || "";
   document.getElementById("pd-minutes").value = ph.activeMinutes || "";
   updateDurationReadout(ph);
-  document.getElementById("pd-load").value = ph.load || "";
-  document.getElementById("pd-load-swatch").style.background = ph.loadColor;
-  document.getElementById("pd-load-color-input").value = ph.loadColor;
   renderPhaseDetailBlocks(ph);
 }
 function renderPhaseDetailBlocks(ph) {
@@ -7999,31 +7962,6 @@ document.getElementById("pd-minutes").addEventListener("input", e => {
   if (!ph) return;
   ph.activeMinutes = e.target.value;
   recomputeActiveDuration(ph);
-});
-document.getElementById("pd-load").addEventListener("input", e => {
-  const ph = phases.find(p => p.id === activePhaseId);
-  if (!ph) return;
-  ph.load = e.target.value;
-});
-document.getElementById("pd-load-swatch").addEventListener("click", () => {
-  const colorInput = document.getElementById("pd-load-color-input");
-  const ph = phases.find(p => p.id === activePhaseId);
-  colorInput.value = (ph && ph.loadColor) || DEFAULT_LOAD_COLOR;
-  colorInput.dataset.forPhaseId = activePhaseId;
-  colorInput.click();
-});
-// shared by both the Panel's own Load swatch and the Details/timetable
-// row's Load swatch — dataset.forPhaseId says which phase this click was
-// actually for, since the timetable can show any phase, not just
-// whichever one the Panel currently has open
-document.getElementById("pd-load-color-input").addEventListener("input", e => {
-  const targetId = parseInt(document.getElementById("pd-load-color-input").dataset.forPhaseId, 10);
-  const ph = phases.find(p => p.id === targetId);
-  if (!ph) return;
-  ph.loadColor = e.target.value;
-  if (targetId === activePhaseId) document.getElementById("pd-load-swatch").style.background = e.target.value;
-  const timetableSwatch = document.querySelector(`.phase-note-card[data-phase-id="${targetId}"] .pn-load-swatch`);
-  if (timetableSwatch) timetableSwatch.style.background = e.target.value;
 });
 document.getElementById("pd-add-block").addEventListener("click", () => {
   const ph = phases.find(p => p.id === activePhaseId);
@@ -9465,6 +9403,7 @@ function loadAppState(data) {
   phases.forEach(migrateLegacyDribbleShapes);
   phases.forEach(migrateLegacyNoteBlocks);
   phases.forEach(migrateLegacyObjective);
+  phases.forEach(ph => { delete ph.load; delete ph.loadColor; }); // the Load field was removed
   migrateLegacySessionDescription(data);
   if (data.outputSettings) { Object.assign(outputSettings, data.outputSettings); syncOutputSettingsUI(); }
   if (Array.isArray(data.sessionClips)) sessionClips = data.sessionClips;
