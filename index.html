@@ -556,6 +556,14 @@
   .phase-note-infoblock-label { display: flex; align-items: baseline; gap: 3px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink-soft); margin-bottom: 3px; }
   .phase-note-infoblock-label .note-block-controls { visibility: hidden; padding-top: 0; height: 0; pointer-events: none; }
   .phase-note-infoblock-label-text { padding: 0 4px; }
+  .phase-note-infoblock-delete { margin-left: auto; align-self: center; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--ink-faint); border-radius: 4px; padding: 0; cursor: pointer; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
+  .phase-note-infoblock:hover .phase-note-infoblock-delete, .phase-note-infoblock-delete:focus-visible { opacity: 1; }
+  .phase-note-infoblock-delete:hover { color: #B4332B; background: rgba(180,51,43,0.1); }
+  @media (hover: none) { .phase-note-infoblock-delete { opacity: 0.7; } }
+  .phase-note-infoblock-title-input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font: inherit; font-weight: 700; letter-spacing: inherit; color: var(--ink-soft); padding: 0 4px; }
+  .phase-note-infoblock-title-input::placeholder { color: var(--ink-faint); font-weight: 600; }
+  .phase-note-add-section { margin-top: 6px; border: 1px dashed var(--line-md); background: transparent; color: var(--ink-faint); font: 600 11.5px var(--body, inherit); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  .phase-note-add-section:hover { color: var(--ink-soft); border-color: var(--ink-faint); }
   .phase-note-infoblock-lines.note-blocks { border: none; background: transparent; padding: 0; min-height: 0; }
   .phase-note-infoblock-lines .note-block-text { font-size: 11.5px; line-height: 1.6; } /* same size as the block labels above them (Focus, Organisation…) */
   .phase-clips-label { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); }
@@ -851,6 +859,8 @@
     padding: 11px 18px; border-radius: 9px; opacity: 0; pointer-events: none; transition: all 0.2s ease; z-index: 100;
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.has-action { pointer-events: auto; }
+  .toast-action { margin-left: 14px; border: none; background: transparent; color: #9EE6A8; font: inherit; font-weight: 700; cursor: pointer; padding: 0; text-decoration: underline; }
 
   /* ── PLAYER NAME MODAL ── */
   .modal-overlay {
@@ -7617,7 +7627,7 @@ function renderPhaseNotes() {
     // old freeform notes text area now that blocks cover that need.
     const notesCol = document.createElement("div");
     notesCol.className = "phase-note-notes-col";
-    if (ph.infoBlocks && ph.infoBlocks.length) {
+    {
       const infoWrap = document.createElement("div");
       infoWrap.className = "phase-note-infoblocks";
       ph.infoBlocks.forEach(b => ensureBlockLines(b));
@@ -7635,7 +7645,34 @@ function renderPhaseNotes() {
           <span class="note-block-add">+</span>
           <span class="note-block-grip"><span class="action-grip-dots"><span></span><span></span><span></span><span></span><span></span><span></span></span></span>
         </span><span class="phase-note-infoblock-label-text"></span>`;
-        label.querySelector(".phase-note-infoblock-label-text").textContent = block.title || block.placeholder || "Block";
+        const labelTextEl = label.querySelector(".phase-note-infoblock-label-text");
+        labelTextEl.textContent = block.title || block.placeholder || "Block";
+        if (block.custom) {
+          // a section the coach added themselves: its name is theirs to type
+          const nameInput = document.createElement("input");
+          nameInput.type = "text"; nameInput.className = "phase-note-infoblock-title-input";
+          nameInput.placeholder = "Section title"; nameInput.maxLength = 60; nameInput.value = block.title || "";
+          nameInput.addEventListener("input", () => { block.title = nameInput.value; });
+          labelTextEl.replaceWith(nameInput);
+        }
+        // one click removes the whole section — its title and every note in it
+        const delSection = document.createElement("button");
+        delSection.type = "button"; delSection.className = "phase-note-infoblock-delete";
+        delSection.title = "Delete this section"; delSection.setAttribute("aria-label", "Delete this section");
+        delSection.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+        delSection.addEventListener("click", () => {
+          const at = ph.infoBlocks.indexOf(block);
+          if (at === -1) return;
+          ph.infoBlocks.splice(at, 1);
+          renderPhaseNotes();
+          const name = (block.title || block.placeholder || "Section").trim() || "Section";
+          toast(`Deleted “${name}”`, { actionLabel: "Undo", onAction: () => {
+            if (!phases.includes(ph) || ph.infoBlocks.includes(block)) return;
+            ph.infoBlocks.splice(Math.min(at, ph.infoBlocks.length), 0, block);
+            renderPhaseNotes();
+          }});
+        });
+        label.appendChild(delSection);
         const linesWrap = document.createElement("div");
         linesWrap.className = "phase-note-infoblock-lines note-blocks";
         renderNoteBlocks(block.lines, linesWrap);
@@ -7651,6 +7688,21 @@ function renderPhaseNotes() {
       notesCol.appendChild(empty);
     }
 
+    if (!isStandaloneDrillMode) {
+      // with no Create tab there'd be no way back to a deleted section otherwise
+      const addSection = document.createElement("button");
+      addSection.type = "button"; addSection.className = "phase-note-add-section";
+      addSection.textContent = "+ Add section";
+      addSection.addEventListener("click", () => {
+        if (!Array.isArray(ph.infoBlocks)) ph.infoBlocks = [];
+        const nb = { id: nextId++, enabled: true, custom: true, title: "", lines: [""], placeholder: "Section title" };
+        ph.infoBlocks.push(nb);
+        renderPhaseNotes();
+        const inputs = document.querySelectorAll(`.phase-note-card[data-phase-id="${ph.id}"] .phase-note-infoblock-title-input`);
+        if (inputs.length) inputs[inputs.length - 1].focus();
+      });
+      notesCol.appendChild(addSection);
+    }
     const actions = document.createElement("div");
     actions.className = "phase-note-row-actions";
     let libControl = null;
@@ -7838,7 +7890,7 @@ let rightPanelMode = "toolkit"; // "toolkit" | "detail" | "animate"
 function ensurePhaseDetailFields(ph) {
   // the old Load field is gone — strip it from plans and drills saved while it existed
   delete ph.load; delete ph.loadColor;
-  if (!ph.infoBlocks || !ph.infoBlocks.length) ph.infoBlocks = defaultInfoBlocks();
+  if (!Array.isArray(ph.infoBlocks)) ph.infoBlocks = defaultInfoBlocks(); // an emptied list stays empty — deleting every section is a choice
   if (ph.playingAreaLength == null) ph.playingAreaLength = "";
   if (ph.playingAreaWidth == null) ph.playingAreaWidth = "";
   if (ph.activeSets == null) ph.activeSets = "";
@@ -8817,12 +8869,20 @@ document.getElementById("add-tag-btn").addEventListener("click", () => {
 /* ─────────────────────────────────────────────────────────
    TOAST
 ───────────────────────────────────────────────────────── */
-function toast(msg) {
+function toast(msg, opts) {
   const t = document.getElementById("toast");
   t.textContent = msg;
+  const action = opts && opts.actionLabel && opts.onAction;
+  t.classList.toggle("has-action", !!action);
+  if (action) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "toast-action"; b.textContent = opts.actionLabel;
+    b.addEventListener("click", () => { t.classList.remove("show"); opts.onAction(); });
+    t.appendChild(b);
+  }
   t.classList.add("show");
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove("show"), 2200);
+  t._timer = setTimeout(() => t.classList.remove("show"), action ? 6000 : 2200);
 }
 
 /* ─────────────────────────────────────────────────────────
