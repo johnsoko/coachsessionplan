@@ -505,6 +505,10 @@
   .timetable-header-row.drill-mode, .phase-note-card.drill-mode {
     grid-template-columns: 20px 220px 1fr 64px;
   }
+  .pn-title-input { width: 100%; margin-bottom: 8px; font-weight: 600; }
+  .timetable-add-row { display: flex; gap: 8px; margin-top: 10px; }
+  .pn-no-diagram { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px dashed var(--line-md); border-radius: 8px; color: var(--ink-faint); font-size: 12.5px; }
+  .pn-no-diagram-title { font-weight: 600; color: var(--ink-soft); font-size: 13.5px; }
   .phase-note-card {
     display: grid; grid-template-columns: 20px 170px 220px 1fr 64px; align-items: start;
     gap: 12px;
@@ -912,6 +916,8 @@
     padding: 10px; border-bottom: 1px solid var(--line); cursor: pointer;
   }
   .import-phase-row:hover { background: var(--paper-raised); }
+  .import-phase-row.picked { background: var(--pitch-tint); }
+  .import-phase-row-check { width: 16px; height: 16px; accent-color: var(--pitch); flex-shrink: 0; margin: 0; }
   .import-phase-row-title { display: flex; align-items: center; gap: 10px; }
   .import-phase-row-thumb { width: 56px; aspect-ratio: 4/2.7; border-radius: 5px; background: var(--pitch); flex-shrink: 0; overflow: hidden; position: relative; }
   .import-phase-row-title-text { font-weight: 600; font-size: 13.5px; color: var(--ink); }
@@ -1420,6 +1426,7 @@
       </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="import-phase-cancel">Cancel</button>
+        <button class="btn btn-primary" id="import-phase-confirm" disabled>Import</button>
       </div>
     </div>
   </div>
@@ -1453,6 +1460,7 @@
     <div class="dash-main">
       <div class="dash-header">
         <h1>Drill Library</h1>
+        <button class="btn btn-primary" id="lib-new-drill-btn" style="margin-left:auto;">+ New Drill</button>
         <select id="lib-sort-select" class="field-input" style="width:auto; max-width:170px;">
           <option value="newest">Newest</option>
           <option value="oldest">Oldest</option>
@@ -2111,7 +2119,10 @@
           <span></span>
         </div>
         <div class="phase-notes-list" id="phase-notes-list"></div>
-        <button class="btn btn-primary" id="add-timeslot-btn" style="margin-top:10px; padding:7px 14px; font-size:12.5px;">+ Add Time Slot</button>
+        <div class="timetable-add-row" id="timetable-add-row">
+          <button class="btn btn-primary" id="import-drills-btn" style="padding:7px 14px; font-size:12.5px;">Import Drills</button>
+          <button class="btn btn-ghost" id="add-timeslot-btn" style="padding:7px 14px; font-size:12.5px;" title="An activity with no diagram — a break, a team talk, a game described in words">+ Add Time Slot</button>
+        </div>
 
         <div class="session-clips-section">
           <span class="phase-clips-label">Attached Clips:</span>
@@ -6203,6 +6214,12 @@ function renderPhaseThumbActive() {
   saveActivePhase();
   renderPhaseList();
 }
+// an activity with nothing drawn in any scene is text-only — a water
+// break, a team talk, a scrimmage described in words — and shows no
+// (empty) field in the Plan or Output
+function phaseHasDiagram(ph) {
+  return (ph.scenes || []).some(sc => (sc.tokens && sc.tokens.length) || (sc.shapes && sc.shapes.length));
+}
 function phaseThumbHTML(ph, opts) {
   opts = opts || {};
   const surf = SURFACES[ph.surface] || SURFACES.full;
@@ -6648,7 +6665,7 @@ function renderOutputContent() {
     const block = document.createElement("div");
     block.className = "output-phase-block";
 
-    const thumbWrap = createAnimatedThumb(ph, "output-phase-thumb-wrap", thumbOpts);
+    const thumbWrap = phaseHasDiagram(ph) ? createAnimatedThumb(ph, "output-phase-thumb-wrap", thumbOpts) : null;
 
     const label = outputSettings.showPhaseTitles ? (() => {
       const l = document.createElement("div");
@@ -6684,12 +6701,12 @@ function renderOutputContent() {
       side.className = "output-phase-side";
       if (label) side.appendChild(label);
       if (notes) side.appendChild(notes);
-      block.appendChild(thumbWrap);
+      if (thumbWrap) block.appendChild(thumbWrap);
       block.appendChild(side);
     } else {
       // grid layouts: label above the thumbnail, notes below it
       if (label) block.appendChild(label);
-      block.appendChild(thumbWrap);
+      if (thumbWrap) block.appendChild(thumbWrap);
       if (notes) block.appendChild(notes);
     }
     return block;
@@ -7286,6 +7303,21 @@ function renderPlanDescriptionField() {
   const el = document.getElementById("plan-description-input");
   if (el) el.value = planDescription || "";
 }
+// the library drill behind an activity: where an import came from, or the
+// one an older plan's activity was saved as. An activity drawn inside an
+// older plan has no library drill yet — it is saved to the library first
+// (creating one), so there is something for the creator to open.
+async function editActivityDrill(ph) {
+  let id = ph.sourceDrillId || ph.libraryDrillId;
+  if (!id) {
+    selectedForLibraryPhaseIds.add(ph.id);
+    try { await syncPhasesToLibrary(); } finally { selectedForLibraryPhaseIds.delete(ph.id); }
+    id = ph.libraryDrillId;
+    if (!id) { toast("Could not save this activity to your Drill Library"); return; }
+    toast("Saved to your Drill Library");
+  }
+  window.open(location.pathname + "?drill=" + encodeURIComponent(id), "_blank");
+}
 function renderPhaseNotes() {
   const list = document.getElementById("phase-notes-list");
   if (!list) return;
@@ -7298,7 +7330,7 @@ function renderPhaseNotes() {
   document.getElementById("timetable-header-row").classList.toggle("drill-mode", isStandaloneDrillMode);
   document.getElementById("timetable-header-duration").style.display = isStandaloneDrillMode ? "none" : "inline";
   // session title stays visible here in drill mode too — restored per request
-  document.getElementById("add-timeslot-btn").style.display = isStandaloneDrillMode ? "none" : "inline-flex";
+  document.getElementById("timetable-add-row").style.display = isStandaloneDrillMode ? "none" : "flex";
   const [sh, sm] = (document.getElementById("practice-starttime-input").value || "09:00").split(":").map(Number);
   let cursor = sh * 60 + sm;
   document.getElementById("timetable-total-duration").textContent = "Total Practice Duration: " + timetableTotalDuration() + " min";
@@ -7373,7 +7405,8 @@ function renderPhaseNotes() {
 
     const exerciseWrap = document.createElement("div");
     exerciseWrap.className = "phase-note-exercise";
-    const thumb = createAnimatedThumb(ph, "phase-note-thumb");
+    const hasDiagram = phaseHasDiagram(ph);
+    const thumb = hasDiagram ? createAnimatedThumb(ph, "phase-note-thumb") : null;
     // Length/Width replace the old single freeform Dimensions field —
     // same ph.playingAreaLength / ph.playingAreaWidth the Panel's Playing
     // Area section already uses. The title still shows only as a hover
@@ -7394,12 +7427,36 @@ function renderPhaseNotes() {
     const widthInput = areaRow.querySelectorAll(".pn-mini-input")[1];
     lengthInput.addEventListener("input", () => { ph.playingAreaLength = lengthInput.value; });
     widthInput.addEventListener("input", () => { ph.playingAreaWidth = widthInput.value; });
-    const titleOverlay = document.createElement("div");
-    titleOverlay.className = "phase-note-thumb-title-overlay";
-    titleOverlay.textContent = ph.title || (phaseNoun() + " " + (phIdx + 1));
-    thumb.appendChild(titleOverlay);
+    if (!isStandaloneDrillMode) {
+      // with no Create tab, this is where an activity gets its name
+      const titleInput = document.createElement("input");
+      titleInput.type = "text"; titleInput.className = "field-input pn-title-input";
+      titleInput.placeholder = phaseNoun() + " " + (phIdx + 1);
+      titleInput.value = ph.title || "";
+      titleInput.maxLength = 120;
+      titleInput.addEventListener("input", () => {
+        ph.title = titleInput.value;
+        const ov = card.querySelector(".phase-note-thumb-title-overlay, .pn-no-diagram-title");
+        if (ov) ov.textContent = ph.title || titleInput.placeholder;
+      });
+      exerciseWrap.appendChild(titleInput);
+    }
     exerciseWrap.appendChild(areaRow);
-    exerciseWrap.appendChild(thumb);
+    if (thumb) {
+      const titleOverlay = document.createElement("div");
+      titleOverlay.className = "phase-note-thumb-title-overlay";
+      titleOverlay.textContent = ph.title || (phaseNoun() + " " + (phIdx + 1));
+      thumb.appendChild(titleOverlay);
+      exerciseWrap.appendChild(thumb);
+    } else {
+      // no diagram: just a quiet label (and the title, which would
+      // otherwise only ever show over the preview)
+      const none = document.createElement("div");
+      none.className = "pn-no-diagram";
+      none.innerHTML = `<span class="pn-no-diagram-title"></span><span class="pn-no-diagram-note">Text only — no diagram</span>`;
+      none.querySelector(".pn-no-diagram-title").textContent = ph.title || (phaseNoun() + " " + (phIdx + 1));
+      exerciseWrap.appendChild(none);
+    }
 
     // Panel's Block Information (Organisation, Coaching Points, etc.) is
     // the same ph.infoBlocks data the Panel view edits — rendering it
@@ -7414,7 +7471,10 @@ function renderPhaseNotes() {
       const infoWrap = document.createElement("div");
       infoWrap.className = "phase-note-infoblocks";
       ph.infoBlocks.forEach(b => ensureBlockLines(b));
-      ph.infoBlocks.filter(b => b.enabled !== false && ((b.title || "").trim() || b.lines.some(l => (l || "").trim()))).forEach(block => {
+      // in a plan this is the only place notes get written, so every
+      // enabled block shows (empty ones included) with a line to type in;
+      // in the drill creator the Panel does that, and only filled ones show here
+      ph.infoBlocks.filter(b => b.enabled !== false && (!isStandaloneDrillMode || (b.title || "").trim() || b.lines.some(l => (l || "").trim()))).forEach(block => {
         const row = document.createElement("div");
         row.className = "phase-note-infoblock";
         const label = document.createElement("div");
@@ -7437,7 +7497,7 @@ function renderPhaseNotes() {
     if (!notesCol.children.length) {
       const empty = document.createElement("p");
       empty.style.cssText = "margin:0; color:var(--ink-faint); font-style:italic; font-size:12.5px;";
-      empty.textContent = "No block information yet — add some from the Panel in Create.";
+      empty.textContent = isStandaloneDrillMode ? "No block information yet — add some from the Panel in Create." : "No notes yet.";
       notesCol.appendChild(empty);
     }
 
@@ -7484,6 +7544,16 @@ function renderPhaseNotes() {
       deletePhase(ph.id);
       renderPhaseNotes();
     });
+    // drawing happens in the drill creator: this opens the activity's drill
+    // there in a new tab, so the plan stays exactly as it is meanwhile
+    if (!isStandaloneDrillMode && hasDiagram) {
+      const editBtn = document.createElement("button");
+      editBtn.title = "Edit this drill in the drill creator";
+      editBtn.className = "pn-edit-drill-btn";
+      editBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M9.5 2.5l3 3-7.3 7.3-3.4.5.5-3.4z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+      editBtn.addEventListener("click", () => editActivityDrill(ph));
+      actions.appendChild(editBtn);
+    }
     if (libControl) actions.appendChild(libControl);
     actions.appendChild(dupBtn);
     actions.appendChild(delBtn);
@@ -8007,8 +8077,17 @@ let importPhaseSelectedTags = new Set();
 let importPhasePage = 0;
 const IMPORT_PHASE_PAGE_SIZE = 8;
 
+// drills ticked in the Import window (id -> title), kept across pages and filters
+const importPhasePicked = new Map();
+function updateImportConfirm() {
+  const n = importPhasePicked.size;
+  const btn = document.getElementById("import-phase-confirm");
+  btn.disabled = n === 0;
+  btn.textContent = n > 1 ? `Import ${n} Drills` : "Import";
+}
 async function openImportPhaseModal() {
   document.getElementById("import-phase-modal-overlay").classList.add("open");
+  importPhasePicked.clear(); updateImportConfirm();
   document.getElementById("import-phase-search").value = "";
   importPhaseSelectedTags.clear();
   setImportTagPopOpen(false);
@@ -8117,7 +8196,8 @@ function renderImportPhaseRows() {
   const start = importPhasePage * IMPORT_PHASE_PAGE_SIZE;
   const pageItems = filtered.slice(start, start + IMPORT_PHASE_PAGE_SIZE);
   if (!importPhaseDrills.length) {
-    rowsEl.innerHTML = '<p class="dash-empty">No drills saved yet — check a drill\'s box and save its practice plan to add it to your library.</p>';
+    rowsEl.innerHTML = '<div class="dash-empty import-empty"><p>Your Drill Library is empty.</p><p>Drills are made in the drill creator — create one and it will appear here.</p><button class="btn btn-primary" id="import-create-drill-btn" style="margin-top:8px;">Create a drill</button></div>';
+    document.getElementById("import-create-drill-btn").addEventListener("click", () => window.open(location.pathname + "?drill=new", "_blank"));
   } else if (!filtered.length) {
     rowsEl.innerHTML = '<p class="dash-empty">No drills match your search/filter.</p>';
   } else {
@@ -8129,13 +8209,20 @@ function renderImportPhaseRows() {
       row.className = "import-phase-row";
       row.innerHTML = `
         <div class="import-phase-row-title">
+          <input type="checkbox" class="import-phase-row-check" tabindex="-1" ${importPhasePicked.has(d.id) ? "checked" : ""}>
           <div class="import-phase-row-thumb" id="import-phase-thumb-${d.id}"></div>
           <span class="import-phase-row-title-text">${escapeHtml(d.title || "Untitled Drill")}</span>
         </div>
         <div class="import-phase-row-tags">${tagsHTML}</div>
         <span class="import-phase-row-date">${updated}</span>
       `;
-      row.addEventListener("click", () => importDrillIntoPhases(d.id, d.title));
+      row.classList.toggle("picked", importPhasePicked.has(d.id));
+      row.addEventListener("click", () => {
+        if (importPhasePicked.has(d.id)) importPhasePicked.delete(d.id); else importPhasePicked.set(d.id, d.title);
+        row.classList.toggle("picked", importPhasePicked.has(d.id));
+        row.querySelector(".import-phase-row-check").checked = importPhasePicked.has(d.id);
+        updateImportConfirm();
+      });
       rowsEl.appendChild(row);
       // surface/scenes come straight from the list response now — no
       // per-row follow-up fetch needed
@@ -8148,42 +8235,75 @@ function renderImportPhaseRows() {
   document.getElementById("import-phase-prev").disabled = importPhasePage === 0;
   document.getElementById("import-phase-next").disabled = importPhasePage >= totalPages - 1;
 }
-async function importDrillIntoPhases(id, title) {
+// Imports are COPIES: the activity takes the drill's diagram, notes and
+// details as they are right now, then lives on its own in this plan —
+// editing it here never changes the library drill, and changing or
+// deleting the library drill never changes a saved plan. `sourceDrillId`
+// only remembers where it came from (for "Edit drill").
+async function importOneDrill(id, title, insertAfterIdx) {
+  const res = await fetch(`/api/drill-library/${id}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("load failed");
+  const data = await res.json();
+  const src = (Array.isArray(data.phases) && data.phases.length) ? data.phases[0] : null;
+  // each ORIGINAL token/shape id gets mapped to exactly one new id,
+  // reused consistently across every scene it appears in — assigning
+  // a fresh id independently per occurrence gave the same logical player
+  // a DIFFERENT id in each scene, which breaks the tween/wipe animation's
+  // scene-to-scene matching
+  const idMap = new Map();
+  const remapId = oldId => { if (!idMap.has(oldId)) idMap.set(oldId, nextId++); return idMap.get(oldId); };
+  const scenes = (data.scenes && data.scenes.length ? data.scenes : [{ tokens: [], shapes: [] }]).map(sc => ({
+    id: sceneNextId++,
+    tokens: (sc.tokens || []).map(t => ({ ...t, id: remapId(t.id) })),
+    shapes: (sc.shapes || []).map(s => ({ ...s, id: remapId(s.id) }))
+  }));
+  const sk = parseSurfaceKey(data.surface);
+  const newPhase = {
+    id: phaseNextId++, surface: sk.surface, fieldFlipped: sk.flipped, scenes, activeSceneId: scenes[0].id,
+    noteBlocks: [data.notes || ""], title: title || (src && src.title) || "", duration: "",
+    dimensions: data.dimensions || "", sourceDrillId: id
+  };
+  if (src) {
+    // the drill's real structured notes (separate titled blocks with
+    // their own lines), not just the flattened text
+    if (Array.isArray(src.infoBlocks) && src.infoBlocks.length) {
+      newPhase.infoBlocks = src.infoBlocks.map(b => ({ ...b, id: nextId++, lines: Array.isArray(b.lines) ? [...b.lines] : b.lines }));
+    }
+    ["playingAreaLength", "playingAreaWidth"].forEach(k => { if (src[k]) newPhase[k] = src[k]; });
+  }
+  phases.splice(insertAfterIdx, 0, newPhase);
+  return { phase: newPhase, extraPhases: Math.max(0, (Array.isArray(data.phases) ? data.phases.length : 1) - 1) };
+}
+async function importPickedDrills() {
+  const picks = Array.from(importPhasePicked.entries());
+  if (!picks.length) return;
+  const btn = document.getElementById("import-phase-confirm");
+  btn.disabled = true; btn.textContent = "Importing…";
   try {
-    const res = await fetch(`/api/drill-library/${id}`, { cache: "no-store" });
-    if (!res.ok) { toast("Could not load that drill"); return; }
-    const data = await res.json();
-    // each ORIGINAL token/shape id gets mapped to exactly one new id,
-    // reused consistently across every scene it appears in — assigning
-    // a fresh id independently per occurrence (as before) gave the same
-    // logical player a DIFFERENT id in each scene, which breaks the
-    // tween/wipe animation's scene-to-scene matching (it matches by id
-    // to tell "moved" from "brand new", so a mismatch makes everything
-    // look brand-new in every scene after the first)
-    const idMap = new Map();
-    const remapId = oldId => { if (!idMap.has(oldId)) idMap.set(oldId, nextId++); return idMap.get(oldId); };
-    const scenes = (data.scenes && data.scenes.length ? data.scenes : [{ tokens: [], shapes: [] }]).map(sc => ({
-      id: sceneNextId++,
-      tokens: (sc.tokens || []).map(t => ({ ...t, id: remapId(t.id) })),
-      shapes: (sc.shapes || []).map(s => ({ ...s, id: remapId(s.id) }))
-    }));
-    const newPhase = {
-      id: phaseNextId++, surface: parseSurfaceKey(data.surface).surface, fieldFlipped: parseSurfaceKey(data.surface).flipped, scenes, activeSceneId: scenes[0].id,
-      noteBlocks: [data.notes || ""], title: title || "", duration: "", dimensions: data.dimensions || "",
-      libraryDrillId: id
-    };
     saveActivePhase();
-    const insertAt = phases.findIndex(p => p.id === activePhaseId);
-    phases.splice(insertAt === -1 ? phases.length : insertAt + 1, 0, newPhase);
-    loadPhase(newPhase.id);
+    let at = phases.findIndex(p => p.id === activePhaseId); at = at === -1 ? phases.length : at + 1;
+    // a plan that is still just its one untouched blank starting activity
+    // shouldn't keep that empty slot sitting above the first import
+    const onlyBlank = phases.length === 1 && !phaseHasDiagram(phases[0]) && !(phases[0].title || "").trim() && !(phases[0].infoBlocks || []).some(b => (b.lines || []).some(l => (l || "").trim()));
+    let last = null, multi = 0;
+    for (const [id, title] of picks) {
+      const r = await importOneDrill(id, title, at++);
+      last = r.phase; if (r.extraPhases) multi++;
+    }
+    if (onlyBlank) { const i = phases.findIndex(p => p.id !== last.id && !phaseHasDiagram(p) && !(p.title || "").trim()); if (i !== -1 && phases.length > picks.length) phases.splice(i, 1); }
+    loadPhase(last.id);
     renderPhaseList();
-    renderPhaseNotes(); // keep the Details/Timetable view in sync too, since Add Exercise can trigger this from there
+    renderPhaseNotes();
     closeImportPhaseModal();
-    toast(`Imported "${title || "drill"}"`);
+    toast(picks.length === 1 ? `Imported "${picks[0][1] || "drill"}"` : `Imported ${picks.length} drills`);
+    if (multi) toast(multi === 1 ? "One drill has more than one phase — the first phase was imported" : `${multi} drills have more than one phase — their first phase was imported`);
   } catch {
-    toast("Could not import that drill — check your connection");
+    toast("Could not import — check your connection");
+  } finally {
+    updateImportConfirm();
   }
 }
+document.getElementById("import-phase-confirm").addEventListener("click", importPickedDrills);
 document.getElementById("import-phase-search").addEventListener("input", () => { importPhasePage = 0; renderImportPhaseRows(); });
 document.getElementById("import-phase-prev").addEventListener("click", () => { importPhasePage--; renderImportPhaseRows(); });
 document.getElementById("import-phase-next").addEventListener("click", () => { importPhasePage++; renderImportPhaseRows(); });
@@ -8333,6 +8453,7 @@ function renderModeContent(mode) {
   if (mode === "draw") { renderPhaseList(); renderObjectsList(); refreshAnimatePanel(); }
 }
 function switchMode(mode) {
+  if (mode === "draw" && !isStandaloneDrillMode) mode = "notes"; // plans have no Create tab
   currentMode = mode;
   // survives a refresh so a practice plan reopens on the same tab — but
   // skipped in the standalone drill creator, which should always start
@@ -8973,6 +9094,12 @@ function applyStandaloneDrillModeUI() {
   // the Output settings use the same word the rest of the app does
   document.getElementById("opt-show-titles-label").textContent = "Show " + phaseNoun() + " Titles";
   document.getElementById("opt-show-notes-label").textContent = "Show " + phaseNoun() + " Notes";
+  // a practice plan is assembled on the Plan tab (activities, imported
+  // drills, times, notes); drawing happens in the drill creator, so the
+  // Create tab only exists there
+  document.querySelectorAll('.mode-tab[data-mode="draw"], #mobile-mode-menu .dropdown-item[data-mode="draw"]').forEach(el => {
+    el.style.display = isStandaloneDrillMode ? "" : "none";
+  });
 }
 
 function getTags() {
@@ -9292,14 +9419,20 @@ function refreshAuthUI() {
       // their new, unsaved plan has no id yet. (Note: only the *screen*
       // survives a refresh this way, not the unsaved content itself —
       // that would need separate autosave/draft support.)
-      if (new URLSearchParams(location.search).get("id")) {
+      const drillParam = new URLSearchParams(location.search).get("drill");
+      if (drillParam) {
+        // opened from a plan's "Edit drill" (or "Create a drill") in a new tab
+        showScreen("app");
+        if (drillParam === "new") openStandaloneDrillEditorBlank(); else openStandaloneDrillEditorExisting(drillParam);
+        requestAnimationFrame(() => resizeCanvas());
+      } else if (new URLSearchParams(location.search).get("id")) {
         showScreen("app");
         // "animate" was a valid top-level mode before Animate moved into
         // the Toolkit/Panel/Animate toggle — a session stored before that
         // change could still have it saved, which would now match none
         // of the three views and leave the screen blank
         const restoredMode = sessionStorage.getItem("lastMode");
-        switchMode(["draw", "notes", "output"].includes(restoredMode) ? restoredMode : "draw");
+        switchMode(["draw", "notes", "output"].includes(restoredMode) ? restoredMode : "notes");
         requestAnimationFrame(() => resizeCanvas());
       } else {
         const lastScreen = sessionStorage.getItem("lastScreen");
@@ -9457,7 +9590,11 @@ async function saveDrill() {
 // Unchecking a phase never deletes its library copy — it just stops
 // further updates; removal is a deliberate action from elsewhere.
 async function syncPhasesToLibrary() {
-  const toSync = phases.filter(ph => selectedForLibraryPhaseIds.has(ph.id) || ph.libraryDrillId);
+  // Only activities explicitly sent to the library are written to it —
+  // and only the first time. A plan saving no longer overwrites the library
+  // drill an activity came from (imports are copies now); edits to a
+  // library drill are made in the drill creator.
+  const toSync = phases.filter(ph => selectedForLibraryPhaseIds.has(ph.id) && !ph.libraryDrillId);
   if (!toSync.length) return;
   const token = await getAuthToken();
   const headers = { "content-type": "application/json" };
@@ -9975,6 +10112,7 @@ function openStandaloneDrillEditorBlank() {
   applyStandaloneDrillModeUI();
   renderPhaseList(); // seedFreshDrill() already rendered this once, but before the flag flipped — redo it now
   renderPhaseNotes(); // refresh Details in case it's revisited — hides scheduling fields immediately
+  switchMode("draw"); // seedFreshDrill() went to the Plan tab (no Create tab in a plan); the creator starts on Create
 }
 
 async function openStandaloneDrillEditorExisting(id) {
@@ -10052,6 +10190,7 @@ async function openStandaloneDrillEditorExisting(id) {
 }
 
 document.getElementById("dash-nav-drills").addEventListener("click", openStandaloneDrillEditorBlank);
+document.getElementById("lib-new-drill-btn").addEventListener("click", openStandaloneDrillEditorBlank);
 document.getElementById("dash-nav-home").addEventListener("click", () => {
   showScreen("home");
   renderHomeDashboard();
@@ -10378,6 +10517,7 @@ document.getElementById("add-timeslot-btn").addEventListener("click", () => {
   addPhase(false);
   renderPhaseNotes();
 });
+document.getElementById("import-drills-btn").addEventListener("click", openImportPhaseModal);
 document.getElementById("practice-starttime-input").addEventListener("input", updateTimetableTimeRanges);
 function proceedWithClose() {
   // closing is a deliberate choice to leave, unlike an accidental refresh
