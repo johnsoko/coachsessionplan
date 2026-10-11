@@ -556,8 +556,21 @@
   .phase-note-infoblock-label { display: flex; align-items: baseline; gap: 3px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink-soft); margin-bottom: 3px; }
   .phase-note-infoblock-label .note-block-controls { visibility: hidden; padding-top: 0; height: 0; pointer-events: none; }
   .phase-note-infoblock-label-text { padding: 0 4px; }
-  .phase-note-infoblock-delete { margin-left: auto; align-self: center; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--ink-faint); border-radius: 4px; padding: 0; cursor: pointer; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
+  .phase-note-infoblock-delete { align-self: center; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--ink-faint); border-radius: 4px; padding: 0; cursor: pointer; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
   .phase-note-infoblock:hover .phase-note-infoblock-delete, .phase-note-infoblock-delete:focus-visible { opacity: 1; }
+  /* the eye follows the app's other eye toggles: plain while the section is
+     shown (revealed on hover), highlighted with a slash once it's hidden */
+  .pn-section-eye { margin-left: auto; align-self: center; width: 22px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--ink-faint); padding: 0; cursor: pointer; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
+  .pn-section-eye .eye-off { display: none; }
+  .phase-note-infoblock:hover .pn-section-eye, .pn-section-eye:focus-visible { opacity: 1; }
+  .pn-section-eye:hover { color: var(--ink); }
+  .pn-section-eye[aria-pressed="false"] { opacity: 1; background: var(--pitch); border-color: var(--pitch); color: var(--paper-card); }
+  .pn-section-eye[aria-pressed="false"] .eye-on { display: none; }
+  .pn-section-eye[aria-pressed="false"] .eye-off { display: block; }
+  @media (hover: none) { .pn-section-eye { opacity: 0.8; } }
+  .pn-hidden-note { display: none; margin-left: 8px; font-size: 10.5px; font-weight: 600; font-style: italic; color: var(--ink-faint); }
+  .phase-note-infoblock.is-hidden .pn-hidden-note { display: inline; }
+  .phase-note-infoblock.is-hidden .phase-note-infoblock-lines { opacity: 0.45; }
   .phase-note-infoblock-delete:hover { color: #B4332B; background: rgba(180,51,43,0.1); }
   @media (hover: none) { .phase-note-infoblock-delete { opacity: 0.7; } }
   .phase-note-infoblock-title-input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font: inherit; font-weight: 700; letter-spacing: inherit; color: var(--ink-soft); padding: 0 4px; }
@@ -7634,9 +7647,9 @@ function renderPhaseNotes() {
       // in a plan this is the only place notes get written, so every
       // enabled block shows (empty ones included) with a line to type in;
       // in the drill creator the Panel does that, and only filled ones show here
-      ph.infoBlocks.filter(b => b.enabled !== false && (!isStandaloneDrillMode || (b.title || "").trim() || b.lines.some(l => (l || "").trim()))).forEach(block => {
+      ph.infoBlocks.filter(b => !isStandaloneDrillMode || b.enabled === false || (b.title || "").trim() || b.lines.some(l => (l || "").trim())).forEach(block => {
         const row = document.createElement("div");
-        row.className = "phase-note-infoblock";
+        row.className = "phase-note-infoblock" + (block.enabled === false ? " is-hidden" : "");
         const label = document.createElement("div");
         label.className = "phase-note-infoblock-label";
         // hidden copy of a line row's controls (same markup, so the same
@@ -7655,24 +7668,46 @@ function renderPhaseNotes() {
           nameInput.addEventListener("input", () => { block.title = nameInput.value; });
           labelTextEl.replaceWith(nameInput);
         }
-        // one click removes the whole section — its title and every note in it
-        const delSection = document.createElement("button");
-        delSection.type = "button"; delSection.className = "phase-note-infoblock-delete";
-        delSection.title = "Delete this section"; delSection.setAttribute("aria-label", "Delete this section");
-        delSection.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
-        delSection.addEventListener("click", () => {
-          const at = ph.infoBlocks.indexOf(block);
-          if (at === -1) return;
-          ph.infoBlocks.splice(at, 1);
-          renderPhaseNotes();
-          const name = (block.title || block.placeholder || "Section").trim() || "Section";
-          toast(`Deleted “${name}”`, { actionLabel: "Undo", onAction: () => {
-            if (!phases.includes(ph) || ph.infoBlocks.includes(block)) return;
-            ph.infoBlocks.splice(Math.min(at, ph.infoBlocks.length), 0, block);
+        // The eye decides whether this section appears on the OUTPUT (what
+        // gets printed). A hidden section stays here in the plan — dimmed,
+        // notes intact — and comes back with one click; nothing is deleted.
+        const hiddenNote = document.createElement("span");
+        hiddenNote.className = "pn-hidden-note"; hiddenNote.textContent = "Hidden from output";
+        label.appendChild(hiddenNote);
+        const eye = document.createElement("button");
+        eye.type = "button"; eye.className = "pn-section-eye";
+        eye.innerHTML = `<svg class="eye-on" width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M1.5 9S4.4 3.6 9 3.6 16.5 9 16.5 9 13.6 14.4 9 14.4 1.5 9 1.5 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="9" r="2.3" fill="currentColor"/></svg><svg class="eye-off" width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M1.5 9S4.4 3.6 9 3.6 16.5 9 16.5 9 13.6 14.4 9 14.4 1.5 9 1.5 9z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" opacity="0.55"/><path d="M3 15L15 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`;
+        const syncEye = () => {
+          const shown = block.enabled !== false;
+          eye.setAttribute("aria-pressed", shown ? "true" : "false");
+          eye.title = shown ? "Hide this section from the output" : "Show this section in the output";
+          eye.setAttribute("aria-label", eye.title);
+          row.classList.toggle("is-hidden", !shown);
+        };
+        syncEye();
+        eye.addEventListener("click", () => { block.enabled = block.enabled === false; syncEye(); });
+        label.appendChild(eye);
+        // only sections the coach added themselves can be deleted outright
+        // (undoable); the standard ones can only be hidden
+        if (block.custom) {
+          const delSection = document.createElement("button");
+          delSection.type = "button"; delSection.className = "phase-note-infoblock-delete";
+          delSection.title = "Delete this section"; delSection.setAttribute("aria-label", "Delete this section");
+          delSection.innerHTML = `<svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+          delSection.addEventListener("click", () => {
+            const at = ph.infoBlocks.indexOf(block);
+            if (at === -1) return;
+            ph.infoBlocks.splice(at, 1);
             renderPhaseNotes();
-          }});
-        });
-        label.appendChild(delSection);
+            const name = (block.title || block.placeholder || "Section").trim() || "Section";
+            toast(`Deleted “${name}”`, { actionLabel: "Undo", onAction: () => {
+              if (!phases.includes(ph) || ph.infoBlocks.includes(block)) return;
+              ph.infoBlocks.splice(Math.min(at, ph.infoBlocks.length), 0, block);
+              renderPhaseNotes();
+            }});
+          });
+          label.appendChild(delSection);
+        }
         const linesWrap = document.createElement("div");
         linesWrap.className = "phase-note-infoblock-lines note-blocks";
         renderNoteBlocks(block.lines, linesWrap);
