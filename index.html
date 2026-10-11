@@ -36,6 +36,17 @@
   button { cursor: pointer; }
 
   /* ══════════════════════════ TOP BAR ══════════════════════════ */
+  #close-btn .close-back { display: none; }
+  #close-btn.back-to-plan .close-x { display: none; }
+  #close-btn.back-to-plan .close-back { display: block; }
+  #close-btn.back-to-plan { font-weight: 700; color: var(--pitch-deep); }
+  #plan-edit-note { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+  #save-menu-wrap { display: flex; align-items: stretch; }
+  #save-caret-btn { padding: 0 8px; margin-left: 1px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+  #save-caret-btn[style*="display:none"] + .dropdown-menu, #save-caret-btn[style*="display: none"] + .dropdown-menu { display: none !important; }
+  #save-menu-wrap:has(#save-caret-btn:not([style*="none"])) #save-btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .phase-note-card.pn-flash { animation: pnFlash 1.5s ease; }
+  @keyframes pnFlash { 0%, 40% { box-shadow: 0 0 0 3px var(--pitch); } 100% { box-shadow: 0 0 0 3px transparent; } }
   #topbar {
     height: var(--topbar-h); display: flex; align-items: center; gap: 6px; padding: 0 14px;
     background: var(--paper-card); border-bottom: 1px solid var(--line); position: relative; z-index: 60;
@@ -1377,6 +1388,17 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="confirm-modal-overlay">
+    <div class="modal-card" style="text-align:center;">
+      <h4 id="confirm-modal-title"></h4>
+      <p id="confirm-modal-text" style="font-size:13.5px; color:var(--ink-soft); margin-bottom:4px;"></p>
+      <div class="modal-actions" style="justify-content:center;">
+        <button class="btn btn-ghost" id="confirm-modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="confirm-modal-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="unsaved-changes-modal-overlay">
     <div class="modal-card" style="text-align:center;">
       <h4>You have unsaved changes</h4>
@@ -1487,10 +1509,12 @@
   <!-- ══════════════════════════ TOP BAR ══════════════════════════ -->
   <div id="topbar">
     <button id="close-btn">
-      <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <svg class="close-x" width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <svg class="close-back" width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M9.5 3L5 7.5 9.5 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="close-btn-label">Close</span>
     </button>
     <div class="topbar-sep"></div>
+    <span id="plan-edit-note" style="display:none;"></span>
 
     <div class="mode-tabs" id="mode-tabs">
       <button class="mode-tab active" data-mode="draw">
@@ -1584,8 +1608,16 @@
       <div class="dd-wrap" id="save-menu-wrap">
         <button class="btn btn-primary" id="save-btn">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 2h7L11.5 4.5v7.5h-9v-10z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" fill="none"/><rect x="4.5" y="2" width="4" height="3" fill="currentColor"/></svg>
-          Save
+          <span id="save-btn-label">Save</span>
         </button>
+        <!-- only while the drill creator is open from a plan's activity -->
+        <button class="btn btn-primary" id="save-caret-btn" style="display:none;" title="More ways to save" aria-label="More ways to save">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dropdown-menu" id="save-options-menu" style="right:0;">
+          <div class="dropdown-item" id="save-opt-update">Save to Plan + Update Library Drill</div>
+          <div class="dropdown-item" id="save-opt-new">Save to Plan + Save as New Drill</div>
+        </div>
       </div>
 
       <button class="icon-btn" id="help-btn" title="Tutorials">
@@ -7303,21 +7335,169 @@ function renderPlanDescriptionField() {
   const el = document.getElementById("plan-description-input");
   if (el) el.value = planDescription || "";
 }
-// the library drill behind an activity: where an import came from, or the
-// one an older plan's activity was saved as. An activity drawn inside an
-// older plan has no library drill yet — it is saved to the library first
-// (creating one), so there is something for the creator to open.
-async function editActivityDrill(ph) {
-  let id = ph.sourceDrillId || ph.libraryDrillId;
-  if (!id) {
-    selectedForLibraryPhaseIds.add(ph.id);
-    try { await syncPhasesToLibrary(); } finally { selectedForLibraryPhaseIds.delete(ph.id); }
-    id = ph.libraryDrillId;
-    if (!id) { toast("Could not save this activity to your Drill Library"); return; }
-    toast("Saved to your Drill Library");
-  }
-  window.open(location.pathname + "?drill=" + encodeURIComponent(id), "_blank");
+/* ═════════════════════════════════════════════════════════════════════
+   EDITING A PLAN'S ACTIVITY IN THE DRILL CREATOR
+   The creator opens in this same tab with the plan parked safely in
+   memory (and sessionStorage, so a refresh doesn't lose the way back).
+   The plan always receives the changes; the Drill Library only does if
+   you choose "Update Library Drill" or "Save as New Drill". The way back
+   is always the button where Close normally is.
+═════════════════════════════════════════════════════════════════════ */
+let planEditCtx = null;
+const PLAN_EDIT_CTX_KEY = "csp_plan_edit_ctx";
+function persistPlanEditCtx() {
+  try { if (planEditCtx) sessionStorage.setItem(PLAN_EDIT_CTX_KEY, JSON.stringify(planEditCtx)); else sessionStorage.removeItem(PLAN_EDIT_CTX_KEY); } catch {}
 }
+function updatePlanEditUI() {
+  const ctx = planEditCtx;
+  const closeBtn = document.getElementById("close-btn");
+  closeBtn.classList.toggle("back-to-plan", !!ctx);
+  closeBtn.title = ctx ? "Back to the practice plan" : "";
+  closeBtn.querySelector(".close-btn-label").textContent = ctx ? "Back to Plan" : "Close";
+  const note = document.getElementById("plan-edit-note");
+  note.style.display = ctx ? "" : "none";
+  if (ctx) note.textContent = "Editing a drill from “" + (ctx.planTitle || "your plan") + "”";
+  document.getElementById("save-btn-label").textContent = ctx ? "Save to Plan" : "Save";
+  document.getElementById("save-caret-btn").style.display = ctx ? "" : "none";
+  document.getElementById("save-opt-update").style.display = (ctx && ctx.sourceExists) ? "" : "none";
+  if (!ctx) document.getElementById("save-options-menu").classList.remove("open");
+}
+function confirmDialog(title, text, okLabel) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById("confirm-modal-overlay");
+    document.getElementById("confirm-modal-title").textContent = title;
+    document.getElementById("confirm-modal-text").textContent = text;
+    const okBtn = document.getElementById("confirm-modal-ok"), cancelBtn = document.getElementById("confirm-modal-cancel");
+    okBtn.textContent = okLabel || "OK";
+    const done = v => { overlay.classList.remove("open"); okBtn.onclick = cancelBtn.onclick = null; resolve(v); };
+    okBtn.onclick = () => done(true); cancelBtn.onclick = () => done(false);
+    overlay.classList.add("open");
+  });
+}
+async function editActivityInCreator(ph) {
+  if (isStandaloneDrillMode || planEditCtx) return;
+  saveActivePhase();
+  const ctx = {
+    snapshot: JSON.parse(JSON.stringify(serializeAppState())),   // the whole plan, exactly as it is now
+    baselineJSON: lastSavedSnapshotJSON,                          // so "unsaved changes" means the same thing on return
+    planDrillId: currentDrillId, planTitle: document.getElementById("title-input").value.trim(),
+    activityId: ph.id, activityTitle0: (ph.title || "").trim(),
+    sourceDrillId: null, sourceTitle: "", sourceExists: false, draftKey: ""
+  };
+  // the library drill this activity came from, for its tags/description
+  // (so "Update Library Drill" doesn't blank them) — and to know whether
+  // it still exists at all
+  const srcId = ph.sourceDrillId || ph.libraryDrillId;
+  let src = null;
+  if (srcId) {
+    try { const res = await fetch(`/api/drill-library/${srcId}`, { cache: "no-store" }); if (res.ok) src = await res.json(); } catch {}
+  }
+  if (src) { ctx.sourceDrillId = srcId; ctx.sourceExists = true; ctx.sourceTitle = src.title || ""; }
+  // the creator works on this plan's COPY of the drill, not the library's
+  const copy = JSON.parse(JSON.stringify(ph));
+  tokens = []; shapes = [];
+  phases = [copy];
+  planDescription = (src && (src.planDescription != null ? src.planDescription : src.description)) || "";
+  sessionClips = (src && Array.isArray(src.clips)) ? src.clips : [];
+  isStandaloneDrillMode = true;
+  currentStandaloneDrillId = ctx.sourceExists ? srcId : null;
+  currentDrillId = null;
+  const drillTitle = copy.title || ctx.sourceTitle || "";
+  document.getElementById("title-input").value = drillTitle;
+  document.getElementById("notes-title-input").value = drillTitle;
+  setTags(src && Array.isArray(src.tags) ? src.tags : []);
+  activePhaseId = null;
+  loadPhase(copy.id);
+  applyStandaloneDrillModeUI();
+  renderPhaseList();
+  history.replaceState(null, "", location.pathname);
+  clearDraftSnapshot();
+  markSavedSnapshot();
+  ctx.draftKey = currentDraftKey();
+  planEditCtx = ctx; persistPlanEditCtx(); updatePlanEditUI();
+  switchMode("draw");
+  requestAnimationFrame(() => resizeCanvas());
+}
+// puts the plan back — as it was when you left (`data` omitted) or with
+// the edited activity merged in — on the Plan tab, at that activity
+function returnToPlan(data) {
+  const ctx = planEditCtx;
+  if (!ctx) return;
+  planEditCtx = null; persistPlanEditCtx();
+  clearDraftSnapshot();
+  const state = data || JSON.parse(JSON.stringify(ctx.snapshot));
+  isStandaloneDrillMode = false; currentStandaloneDrillId = null; currentDrillId = ctx.planDrillId;
+  tokens = []; shapes = [];
+  planDescription = state.planDescription || "";
+  applyStandaloneDrillModeUI();
+  loadAppState(state);
+  lastSavedSnapshotJSON = ctx.baselineJSON;
+  history.replaceState(null, "", ctx.planDrillId ? "?id=" + ctx.planDrillId : location.pathname);
+  updatePlanEditUI();
+  switchMode("notes");
+  const card = document.querySelector(`#phase-notes-list .phase-note-card[data-phase-id="${ctx.activityId}"]`);
+  if (card) {
+    if (card.scrollIntoView) card.scrollIntoView({ block: "center" });
+    card.classList.add("pn-flash");
+    setTimeout(() => card.classList.remove("pn-flash"), 1600);
+  }
+  if (hasUnsavedChanges()) saveDraftSnapshot();
+}
+// mode: "plan" (plan only) | "update" (plan + overwrite the library drill) | "new" (plan + a new library drill)
+async function saveToPlan(mode) {
+  const ctx = planEditCtx;
+  if (!ctx) return;
+  if (typeof Clerk !== "undefined" && !Clerk.user) { Clerk.openSignIn(); toast("Sign in to save"); return; }
+  saveActivePhase();
+  const edited = phases[0];
+  const titleInput = document.getElementById("title-input");
+  const drillTitle = titleInput.value.trim();
+  let libSaved = false;
+  if (mode === "update") {
+    if (!ctx.sourceExists) return;
+    const yes = await confirmDialog(`Update “${ctx.sourceTitle || "this drill"}” in your Drill Library?`,
+      "This replaces the saved drill with your changes. Other plans that used it keep their own copy.", "Update Library Drill");
+    if (!yes) return;
+    currentStandaloneDrillId = ctx.sourceDrillId;
+    libSaved = await saveStandaloneDrill({ quiet: true });
+    if (!libSaved) return;
+  } else if (mode === "new") {
+    if (!drillTitle) { toast("Enter a drill title first"); titleInput.focus(); return; }
+    currentStandaloneDrillId = null; // no id = a brand-new library drill
+    // two drills with the same name are hard to tell apart in the library
+    const sameAsOriginal = ctx.sourceExists && drillTitle === (ctx.sourceTitle || "").trim();
+    if (sameAsOriginal) titleInput.value = drillTitle + " (copy)";
+    libSaved = await saveStandaloneDrill({ quiet: true });
+    titleInput.value = drillTitle;
+    if (!libSaved) return;
+  }
+  const libId = libSaved ? currentStandaloneDrillId : null;
+  // the plan takes everything the creator edits (diagram, notes, field,
+  // playing area, name) and keeps what belongs to the plan (time, sets, load)
+  const snap = JSON.parse(JSON.stringify(ctx.snapshot));
+  const target = snap.phases.find(p => p.id === ctx.activityId);
+  if (target) {
+    ["surface", "fieldFlipped", "scenes", "activeSceneId", "infoBlocks", "noteBlocks", "dimensions", "playingAreaLength", "playingAreaWidth"]
+      .forEach(k => { if (edited[k] !== undefined) target[k] = JSON.parse(JSON.stringify(edited[k])); });
+    if (drillTitle) target.title = drillTitle;
+    if (libId) target.sourceDrillId = libId;
+  }
+  snap.phaseNextId = Math.max(snap.phaseNextId || 0, phaseNextId);
+  snap.sceneNextId = Math.max(snap.sceneNextId || 0, sceneNextId);
+  snap.nextId = Math.max(snap.nextId || 0, nextId);
+  returnToPlan(snap);
+  if (ctx.planDrillId) {
+    await saveDrill();
+    toast(mode === "new" ? "Saved to your plan and added to your Drill Library" : mode === "update" ? "Saved to your plan and updated the library drill" : "Saved to your plan");
+  } else {
+    toast(mode === "plan" ? "Added to your plan — save the plan to keep it" : "Added to your plan and library — save the plan to keep it");
+  }
+}
+// kept under its old name: the pencil button on a plan's activity
+async function editActivityDrill(ph) { await editActivityInCreator(ph); }
+document.getElementById("save-caret-btn").addEventListener("click", e => toggleMenu("save-options-menu", e));
+document.getElementById("save-opt-update").addEventListener("click", () => { document.getElementById("save-options-menu").classList.remove("open"); saveToPlan("update"); });
+document.getElementById("save-opt-new").addEventListener("click", () => { document.getElementById("save-options-menu").classList.remove("open"); saveToPlan("new"); });
 function renderPhaseNotes() {
   const list = document.getElementById("phase-notes-list");
   if (!list) return;
@@ -9445,6 +9625,13 @@ function refreshAuthUI() {
           if (draft) {
             if (draft.isStandaloneDrillMode) openStandaloneDrillEditorBlank(); else seedFreshDrill();
             applyDraft(draft);
+            if (draft.isStandaloneDrillMode) {
+              try {
+                const stored = JSON.parse(sessionStorage.getItem(PLAN_EDIT_CTX_KEY) || "null");
+                if (stored && stored.draftKey === draft.contextKey) { planEditCtx = stored; updatePlanEditUI(); }
+                else sessionStorage.removeItem(PLAN_EDIT_CTX_KEY);
+              } catch {}
+            }
           } else {
             seedFreshDrill();
           }
@@ -9491,14 +9678,15 @@ async function getAuthToken() {
   return Clerk.session.getToken();
 }
 
-async function saveStandaloneDrill() {
+async function saveStandaloneDrill(opts) {
+  opts = opts || {};
   saveActivePhase();
   const ph = phases[0];
   const title = document.getElementById("title-input").value.trim();
   if (!title) {
     toast("Enter a drill title before saving");
     document.getElementById("title-input").focus();
-    return;
+    return false;
   }
   const creatorName = currentCreatorName();
   const payload = {
@@ -9526,16 +9714,18 @@ async function saveStandaloneDrill() {
     const res = currentStandaloneDrillId
       ? await fetch(`/api/drill-library/${currentStandaloneDrillId}`, { method: "PUT", headers, body: JSON.stringify(payload) })
       : await fetch(`/api/drill-library`, { method: "POST", headers, body: JSON.stringify(payload) });
-    if (res.status === 401) { toast("Please sign in and try saving again"); return; }
+    if (res.status === 401) { toast("Please sign in and try saving again"); return false; }
     if (!res.ok) throw new Error("save failed");
     const json = await res.json();
     if (json.id) currentStandaloneDrillId = json.id;
     invalidateKnownTags();
-    toast("Drill saved");
+    if (!opts.quiet) toast("Drill saved");
     clearDraftSnapshot();
     markSavedSnapshot();
+    return true;
   } catch {
     toast("Save failed — check your connection and try again");
+    return false;
   }
 }
 async function saveDrill() {
@@ -9544,6 +9734,7 @@ async function saveDrill() {
     toast("Sign in to save your drill");
     return;
   }
+  if (planEditCtx) { await saveToPlan("plan"); return; }
   if (isStandaloneDrillMode) { await saveStandaloneDrill(); return; }
   if (!document.getElementById("title-input").value.trim()) {
     toast("Enter a session title before saving");
@@ -9652,6 +9843,7 @@ async function loadDrillFromUrl() {
     // reset them) come back correctly for this practice plan
     isStandaloneDrillMode = false;
     currentStandaloneDrillId = null;
+    planEditCtx = null; persistPlanEditCtx(); updatePlanEditUI();
     applyStandaloneDrillModeUI();
     loadAppState(data);
     markSavedSnapshot(); // baseline is the server's last-saved version, BEFORE any draft gets overlaid
@@ -10106,6 +10298,7 @@ async function openPracticePlan(id) {
    happens from the Drill Library's detail page)
 ═════════════════════════════════════════════════════════════════════ */
 function openStandaloneDrillEditorBlank() {
+  planEditCtx = null; updatePlanEditUI();
   seedFreshDrill(); // resets to one blank phase, "draw" mode, isStandaloneDrillMode=false by default
   isStandaloneDrillMode = true;
   currentStandaloneDrillId = null;
@@ -10116,6 +10309,7 @@ function openStandaloneDrillEditorBlank() {
 }
 
 async function openStandaloneDrillEditorExisting(id) {
+  planEditCtx = null; updatePlanEditUI();
   try {
     const res = await fetch(`/api/drill-library/${id}`, { cache: "no-store" });
     if (!res.ok) { toast("Could not load that drill"); return; }
@@ -10520,6 +10714,8 @@ document.getElementById("add-timeslot-btn").addEventListener("click", () => {
 document.getElementById("import-drills-btn").addEventListener("click", openImportPhaseModal);
 document.getElementById("practice-starttime-input").addEventListener("input", updateTimetableTimeRanges);
 function proceedWithClose() {
+  // in the creator for a plan's activity, "close" means back to the plan
+  if (planEditCtx) { returnToPlan(); return; }
   // closing is a deliberate choice to leave, unlike an accidental refresh
   // — any draft snapshot for this session is no longer needed
   clearDraftSnapshot();
