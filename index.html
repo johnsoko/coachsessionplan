@@ -265,6 +265,7 @@
   .token.eq-dummy     { border-radius: 7px 7px 3px 3px; box-shadow: none; }
   .token.eq-ladder    { border-radius: 2px; border-style: solid; box-shadow: none; }
   .token.eq-pole      { border-radius: 3px; box-shadow: none; }
+  .token.eq-polegate  { border-radius: 0; box-shadow: none; }
   .token.text  { width: auto; height: auto; border-radius: 0; box-shadow: none; background: none; font-family: var(--display); font-weight: 700; white-space: pre; text-align: center; padding: 2px 4px; }
   .token.text[contenteditable="true"] { outline: 1.5px dashed var(--bib); outline-offset: 3px; cursor: text; min-width: 26px; min-height: 1.2em; }
   .token.text[contenteditable="true"]:empty::before { content: "Type…"; opacity: 0.5; }
@@ -1829,6 +1830,9 @@
                 <div class="arrow-opt" data-kind="pole" title="Training pole">
                   <svg width="3" height="14" viewBox="0 0 297.5 1488.9"><path d="M 148.3,2.4 C 139.5,6.8 133.3,15.8 129.5,29.4 C 128.0,34.9 127.5,90.5 123.6,709.2 C 120.9,1155.3 119.1,1383.2 118.4,1383.7 C 96.1,1399.1 84.5,1405.8 55.5,1420.2 C 29.8,1433.0 19.2,1439.6 12.9,1446.7 C 5.2,1455.5 0.1,1470.0 0,1483.2 L 0,1488.9 L 148.8,1488.7 L 297.5,1488.4 L 297.3,1481.9 C 296.5,1461.8 288.5,1447.3 272.2,1436.6 C 268.5,1434.1 252.9,1425.8 237.5,1418.1 C 212.0,1405.2 181.8,1387.3 178.4,1382.8 C 177.7,1381.8 178.5,1188.1 181.5,706.0 C 184.1,285.4 185.3,28.7 184.8,25.6 C 183.0,15.7 176.1,6.1 168.1,2.3 C 166.1,1.3 162.0,0.4 159.0,0.1 C 154.5,-0.2 152.5,0.3 148.3,2.4" fill="#1B211C"/></svg>
                 </div>
+                <div class="arrow-opt" data-kind="polegate" title="Pole gate">
+                  <svg width="27" height="14" viewBox="0 0 2828.35 1488.9"><path d="M 148.3,2.4 C 139.5,6.8 133.3,15.8 129.5,29.4 C 128.0,34.9 127.5,90.5 123.6,709.2 C 120.9,1155.3 119.1,1383.2 118.4,1383.7 C 96.1,1399.1 84.5,1405.8 55.5,1420.2 C 29.8,1433.0 19.2,1439.6 12.9,1446.7 C 5.2,1455.5 0.1,1470.0 0,1483.2 L 0,1488.9 L 148.8,1488.7 L 297.5,1488.4 L 297.3,1481.9 C 296.5,1461.8 288.5,1447.3 272.2,1436.6 C 268.5,1434.1 252.9,1425.8 237.5,1418.1 C 212.0,1405.2 181.8,1387.3 178.4,1382.8 C 177.7,1381.8 178.5,1188.1 181.5,706.0 C 184.1,285.4 185.3,28.7 184.8,25.6 C 183.0,15.7 176.1,6.1 168.1,2.3 C 166.1,1.3 162.0,0.4 159.0,0.1 C 154.5,-0.2 152.5,0.3 148.3,2.4" fill="#1B211C"/><path transform="translate(2530.85 0)" d="M 148.3,2.4 C 139.5,6.8 133.3,15.8 129.5,29.4 C 128.0,34.9 127.5,90.5 123.6,709.2 C 120.9,1155.3 119.1,1383.2 118.4,1383.7 C 96.1,1399.1 84.5,1405.8 55.5,1420.2 C 29.8,1433.0 19.2,1439.6 12.9,1446.7 C 5.2,1455.5 0.1,1470.0 0,1483.2 L 0,1488.9 L 148.8,1488.7 L 297.5,1488.4 L 297.3,1481.9 C 296.5,1461.8 288.5,1447.3 272.2,1436.6 C 268.5,1434.1 252.9,1425.8 237.5,1418.1 C 212.0,1405.2 181.8,1387.3 178.4,1382.8 C 177.7,1381.8 178.5,1188.1 181.5,706.0 C 184.1,285.4 185.3,28.7 184.8,25.6 C 183.0,15.7 176.1,6.1 168.1,2.3 C 166.1,1.3 162.0,0.4 159.0,0.1 C 154.5,-0.2 152.5,0.3 148.3,2.4" fill="#1B211C"/></svg>
+                </div>
               </div>
               <div style="height:1px;background:var(--line);margin:6px 2px;"></div>
               <span class="tp-label" style="margin-top:0;">Color</span>
@@ -2314,13 +2318,31 @@ function nextAvailableNumber(team) {
 const equipmentDefaults = { color: "#E2892B", size: 24 };
 // each equipment kind gets its own starting size when first placed, since
 // a cone and a large goal obviously shouldn't render at the same scale
-const EQUIPMENT_DEFAULT_SIZES = { cone: 14, flatcone: 14, minigoal: 32, largegoal: 32, dummy: 24, ladder: 24, pole: 30 };
+const EQUIPMENT_DEFAULT_SIZES = { cone: 14, flatcone: 14, minigoal: 32, largegoal: 32, dummy: 24, ladder: 24, pole: 30, polegate: 30 };
 // remembers the last size actually used per kind — starts from the
 // defaults above, then updates as the user resizes things, so the slider
 // (and the next piece placed) reflects "what I used last for this kind"
 // rather than snapping back to the original default every time
 let equipmentSizeMemory = { ...EQUIPMENT_DEFAULT_SIZES };
-const EQUIPMENT_KINDS = ["cone", "flatcone", "minigoal", "largegoal", "dummy", "ladder", "pole"];
+const EQUIPMENT_KINDS = ["cone", "flatcone", "minigoal", "largegoal", "dummy", "ladder", "pole", "polegate"];
+// The training pole's outline (its own 297.5 x 1488.9 box), shared with
+// the pole gate, which is simply two of them set a fixed distance apart
+// as one object — one click places both, already level and evenly spaced,
+// and the whole gate moves, rotates and resizes as a unit. Size (the
+// slider) is the pole HEIGHT, as for a single pole; the opening between
+// the poles is 1.5x that height — on a field where a pole reads as about
+// 2m, that's the 2-3m a player runs through — and the overall width
+// follows from both.
+const POLE_PATH_D = "M 148.3,2.4 C 139.5,6.8 133.3,15.8 129.5,29.4 C 128.0,34.9 127.5,90.5 123.6,709.2 C 120.9,1155.3 119.1,1383.2 118.4,1383.7 C 96.1,1399.1 84.5,1405.8 55.5,1420.2 C 29.8,1433.0 19.2,1439.6 12.9,1446.7 C 5.2,1455.5 0.1,1470.0 0,1483.2 L 0,1488.9 L 148.8,1488.7 L 297.5,1488.4 L 297.3,1481.9 C 296.5,1461.8 288.5,1447.3 272.2,1436.6 C 268.5,1434.1 252.9,1425.8 237.5,1418.1 C 212.0,1405.2 181.8,1387.3 178.4,1382.8 C 177.7,1381.8 178.5,1188.1 181.5,706.0 C 184.1,285.4 185.3,28.7 184.8,25.6 C 183.0,15.7 176.1,6.1 168.1,2.3 C 166.1,1.3 162.0,0.4 159.0,0.1 C 154.5,-0.2 152.5,0.3 148.3,2.4";
+const POLE_BOX_W = 297.5, POLE_BOX_H = 1488.9;
+const POLEGATE_GAP = 1.5;                                   // opening, as a multiple of pole height
+const POLEGATE_BOX_W = POLE_BOX_W * 2 + POLEGATE_GAP * POLE_BOX_H; // two pole widths + the opening, in the pole outline's own units
+const POLEGATE_WIDTH_RATIO = POLEGATE_BOX_W / POLE_BOX_H;      // …as a multiple of pole height (the element's box matches its artwork exactly)
+const POLEGATE_MASK_URL = (() => {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${POLEGATE_BOX_W} ${POLE_BOX_H}' preserveAspectRatio='none'>` +
+    `<path d='${POLE_PATH_D}'/><path transform='translate(${POLEGATE_BOX_W - POLE_BOX_W} 0)' d='${POLE_PATH_D}'/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+})();
 const drawDefaults  = { color: "#F7F8F3", width: 2.6, curved: false, arrowEnd: true, arrowStart: false };
 const shapeDefaults = { color: "#F7F8F3", width: 2.4, fill: false, dashed: false, noBorder: false };
 // same per-kind "last used" memory as equipment, applied to circle/
@@ -3916,6 +3938,14 @@ function applyEquipmentStyle(el, t) {
       el.style.background = `repeating-linear-gradient(90deg, ${c} 0 3px, transparent 3px 9px)`;
       el.style.borderColor = c; el.style.borderWidth = "2px";
       break;
+    case "polegate":
+      el.style.width = (s * POLEGATE_WIDTH_RATIO) + "px"; el.style.height = s + "px";
+      el.style.background = c;
+      el.style.maskImage = POLEGATE_MASK_URL; el.style.webkitMaskImage = POLEGATE_MASK_URL;
+      el.style.maskSize = "100% 100%"; el.style.webkitMaskSize = "100% 100%";
+      el.style.maskRepeat = "no-repeat"; el.style.webkitMaskRepeat = "no-repeat";
+      el.style.maskPosition = "center"; el.style.webkitMaskPosition = "center";
+      break;
     case "pole":
       el.style.width = Math.round(s * 0.2) + "px"; el.style.height = s + "px";
       el.style.background = c;
@@ -4088,7 +4118,7 @@ function equipmentHalfHeightPx(t) {
   // small items like cones, but put the handle right on top of (or even
   // inside) anything tall, like the goals
   const s = (t.size || equipmentDefaults.size) * fieldScaleFactor();
-  const ratios = { cone: 1, flatcone: 0.42, minigoal: 1.15, largegoal: 1.7, dummy: 0.57, ladder: 0.45, pole: 1 };
+  const ratios = { cone: 1, flatcone: 0.42, minigoal: 1.15, largegoal: 1.7, dummy: 0.57, ladder: 0.45, pole: 1, polegate: 1 };
   return (s * (ratios[t.kind] || 1)) / 2;
 }
 function buildRotationHandle(t, pos) {
@@ -6364,6 +6394,11 @@ function phaseThumbHTML(ph, opts) {
       } else if (t.kind === "ladder") {
         const w = toVB(s * 1.8), h = toVB(s * 0.45);
         shapeSvg = `<rect x="${(p.x-w/2).toFixed(1)}" y="${(p.y-h/2).toFixed(1)}" width="${w}" height="${h}" fill="none" stroke="${c}" stroke-width="${toVB(2)}"/>`;
+      } else if (t.kind === "polegate") {
+        const h = toVB(s), sc = h / POLE_BOX_H;
+        const poleW = POLE_BOX_W * sc, totalW = POLEGATE_BOX_W * sc;
+        const left = p.x - totalW / 2, top = p.y - h / 2;
+        shapeSvg = `<g fill="${c}"><path transform="translate(${left.toFixed(1)} ${top.toFixed(1)}) scale(${sc.toFixed(5)})" d="${POLE_PATH_D}"/><path transform="translate(${(left + totalW - poleW).toFixed(1)} ${top.toFixed(1)}) scale(${sc.toFixed(5)})" d="${POLE_PATH_D}"/></g>`;
       } else if (t.kind === "pole") {
         const w = toVB(s * 0.2), h = toVB(s);
         const dpath = "M 148.3,2.4 C 139.5,6.8 133.3,15.8 129.5,29.4 C 128.0,34.9 127.5,90.5 123.6,709.2 C 120.9,1155.3 119.1,1383.2 118.4,1383.7 C 96.1,1399.1 84.5,1405.8 55.5,1420.2 C 29.8,1433.0 19.2,1439.6 12.9,1446.7 C 5.2,1455.5 0.1,1470.0 0,1483.2 L 0,1488.9 L 148.8,1488.7 L 297.5,1488.4 L 297.3,1481.9 C 296.5,1461.8 288.5,1447.3 272.2,1436.6 C 268.5,1434.1 252.9,1425.8 237.5,1418.1 C 212.0,1405.2 181.8,1387.3 178.4,1382.8 C 177.7,1381.8 178.5,1188.1 181.5,706.0 C 184.1,285.4 185.3,28.7 184.8,25.6 C 183.0,15.7 176.1,6.1 168.1,2.3 C 166.1,1.3 162.0,0.4 159.0,0.1 C 154.5,-0.2 152.5,0.3 148.3,2.4";
@@ -8189,6 +8224,9 @@ function objectGroupDefs() {
     { key: "eq-pole", label: "Training Poles",
       tok: t => t.type === "equipment" && t.kind === "pole",
       icon: icon(`<svg width="16" height="14" viewBox="0 0 16 14"><path d="M8 1.3v9.4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M4.3 12.7c0-1.6 1.7-2.7 3.7-2.7s3.7 1.1 3.7 2.7" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>`) },
+    { key: "eq-polegate", label: "Pole Gates",
+      tok: t => t.type === "equipment" && t.kind === "polegate",
+      icon: icon(`<svg width="22" height="12" viewBox="0 0 2828.35 1488.9"><path d="M 148.3,2.4 C 139.5,6.8 133.3,15.8 129.5,29.4 C 128.0,34.9 127.5,90.5 123.6,709.2 C 120.9,1155.3 119.1,1383.2 118.4,1383.7 C 96.1,1399.1 84.5,1405.8 55.5,1420.2 C 29.8,1433.0 19.2,1439.6 12.9,1446.7 C 5.2,1455.5 0.1,1470.0 0,1483.2 L 0,1488.9 L 148.8,1488.7 L 297.5,1488.4 L 297.3,1481.9 C 296.5,1461.8 288.5,1447.3 272.2,1436.6 C 268.5,1434.1 252.9,1425.8 237.5,1418.1 C 212.0,1405.2 181.8,1387.3 178.4,1382.8 C 177.7,1381.8 178.5,1188.1 181.5,706.0 C 184.1,285.4 185.3,28.7 184.8,25.6 C 183.0,15.7 176.1,6.1 168.1,2.3 C 166.1,1.3 162.0,0.4 159.0,0.1 C 154.5,-0.2 152.5,0.3 148.3,2.4" fill="currentColor"/><path transform="translate(2530.85 0)" d="M 148.3,2.4 C 139.5,6.8 133.3,15.8 129.5,29.4 C 128.0,34.9 127.5,90.5 123.6,709.2 C 120.9,1155.3 119.1,1383.2 118.4,1383.7 C 96.1,1399.1 84.5,1405.8 55.5,1420.2 C 29.8,1433.0 19.2,1439.6 12.9,1446.7 C 5.2,1455.5 0.1,1470.0 0,1483.2 L 0,1488.9 L 148.8,1488.7 L 297.5,1488.4 L 297.3,1481.9 C 296.5,1461.8 288.5,1447.3 272.2,1436.6 C 268.5,1434.1 252.9,1425.8 237.5,1418.1 C 212.0,1405.2 181.8,1387.3 178.4,1382.8 C 177.7,1381.8 178.5,1188.1 181.5,706.0 C 184.1,285.4 185.3,28.7 184.8,25.6 C 183.0,15.7 176.1,6.1 168.1,2.3 C 166.1,1.3 162.0,0.4 159.0,0.1 C 154.5,-0.2 152.5,0.3 148.3,2.4" fill="currentColor"/></svg>`) },
     { key: "text", label: "Text Labels",
       tok: t => t.type === "text",
       icon: icon(`<svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M4 4.5h10M9 4.5v9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>`) },
