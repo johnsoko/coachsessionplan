@@ -818,6 +818,8 @@
   .output-title { font-family: var(--display); font-size: 30px; font-weight: 700; margin-bottom: 18px; }
   .output-plan-description { font-size: 15px; line-height: 1.5; color: var(--ink-soft); margin: -10px 0 18px; white-space: pre-wrap; }
   .output-phase-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin: 22px 0 10px; display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
+  .output-phase-label-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .output-phase-label-dims { font-size: 12px; font-weight: 500; color: var(--ink-faint); white-space: nowrap; flex-shrink: 0; }
   .output-phase-label-meta { font-size: 11px; font-weight: 500; color: var(--ink-faint); line-height: 1.3; }
   .output-phase-label-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .output-section { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); }
@@ -6742,10 +6744,21 @@ function renderOutputContent() {
     const label = outputSettings.showPhaseTitles ? (() => {
       const l = document.createElement("div");
       l.className = "output-phase-label";
+      // top row: the title on the left, the grid size (playing area) on the right
+      const top = document.createElement("div");
+      top.className = "output-phase-label-top";
       const titleSpan = document.createElement("span");
       titleSpan.className = "output-phase-label-title";
       titleSpan.textContent = (ph.title || "").trim() || (phaseNoun() + " " + (idx + 1));
-      l.appendChild(titleSpan);
+      top.appendChild(titleSpan);
+      const dims = phaseDimensionsText(ph);
+      if (dims) {
+        const dimsSpan = document.createElement("span");
+        dimsSpan.className = "output-phase-label-dims";
+        dimsSpan.textContent = dims;
+        top.appendChild(dimsSpan);
+      }
+      l.appendChild(top);
       const meta = phaseMetaText(ph);
       if (meta) {
         const metaEl = document.createElement("div");
@@ -9562,19 +9575,17 @@ function renderInfoBlockHTML(b) {
 // combined "20 × 30m" style label from the Panel's separate Playing
 // Area Length/Width fields — blank if neither is set, just the one
 // number if only one is (no stray "×" or unit floating on its own)
-// what a coach entered about an activity, as one small line for the Output:
-// "3 sets × 5 min  ·  40m x 30m" (time only in a plan — a drill has no schedule)
+// the activity's timing as one small line for the Output, under its title:
+// "3 sets × 5 min" (a plan only — a drill has no schedule). The playing-area
+// size is shown separately, at the right of the title row.
 function phaseMetaText(ph) {
-  const parts = [];
-  if (!isStandaloneDrillMode) {
-    const sets = (ph.activeSets || "").toString().trim(), mins = (ph.activeMinutes || "").toString().trim();
-    if (sets && mins) parts.push(`${sets} ${Number(sets) === 1 ? "set" : "sets"} × ${mins} min`);
-    else if (mins) parts.push(`${mins} min`);
-    else if (sets) parts.push(`${sets} ${Number(sets) === 1 ? "set" : "sets"}`);
-  }
-  const dims = phaseDimensionsText(ph);
-  if (dims) parts.push(dims);
-  return parts.join("  ·  ");
+  if (isStandaloneDrillMode) return "";
+  const sets = (ph.activeSets || "").toString().trim(), mins = (ph.activeMinutes || "").toString().trim();
+  const setsText = `${sets} ${Number(sets) === 1 ? "set" : "sets"}`;
+  if (sets && mins) return `${setsText} × ${mins} min`;
+  if (mins) return `${mins} min`;
+  if (sets) return setsText;
+  return "";
 }
 function phaseDimensionsText(ph) {
   const l = (ph.playingAreaLength || "").toString().trim();
