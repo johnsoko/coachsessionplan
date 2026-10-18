@@ -560,10 +560,11 @@
   .phase-note-infoblock-label:hover .pn-section-controls, .phase-note-infoblock-label .pn-section-controls:focus-within { opacity: 1; }
   @media (hover: none) { .phase-note-infoblock-label .pn-section-controls { opacity: 0.8; } }
   .phase-note-infoblock.dragging { opacity: 0.4; }
-  /* a barely-there tint on the section's label row while it's hovered or being typed in —
-     it says "this is the SECTION", as opposed to the grey a single note line gets */
-  .phase-note-infoblock-label.pn-label-editable { border-radius: 4px; transition: background 0.15s; }
-  .phase-note-infoblock-label.pn-label-editable:hover, .phase-note-infoblock-label.pn-label-editable:focus-within { background: rgba(46, 107, 63, 0.065); }
+  /* a thin border around the whole section (label + notes) while its label is hovered or its
+     title typed in: it says "this is the SECTION", as opposed to the grey a single note line gets.
+     The border is always there, transparent, so nothing shifts when it appears. */
+  .phase-note-infoblock { border: 1px solid transparent; border-radius: 6px; padding: 2px 4px; margin: 0 -5px; transition: border-color 0.12s; }
+  .phase-note-infoblock.section-active { border-color: rgba(46, 107, 63, 0.4); }
   .phase-note-infoblock-label-text { padding: 0 4px; }
   .phase-note-infoblock-delete { align-self: center; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--ink-faint); border-radius: 4px; padding: 0; cursor: pointer; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
   .phase-note-infoblock:hover .phase-note-infoblock-delete, .phase-note-infoblock-delete:focus-visible { opacity: 1; }
@@ -7679,6 +7680,15 @@ function renderPhaseNotes() {
         row.dataset.blockId = block.id;
         if (!isStandaloneDrillMode) {
           label.classList.add("pn-label-editable");
+          // a thin border around the WHOLE section (label + its notes) while
+          // the pointer is on its label or its title is being typed in —
+          // so it's clear the section itself is what's being worked on
+          let overLabel = false, typingInLabel = false;
+          const syncActive = () => row.classList.toggle("section-active", overLabel || typingInLabel);
+          label.addEventListener("mouseenter", () => { overLabel = true; syncActive(); });
+          label.addEventListener("mouseleave", () => { overLabel = false; syncActive(); });
+          label.addEventListener("focusin", () => { typingInLabel = true; syncActive(); });
+          label.addEventListener("focusout", () => { typingInLabel = false; syncActive(); });
           label.querySelector(".note-block-add").addEventListener("click", () => {
             const at = ph.infoBlocks.indexOf(block);
             const nb = { id: nextId++, enabled: true, custom: true, title: "", lines: [""], placeholder: "Section title" };
