@@ -10879,8 +10879,21 @@ document.getElementById("lib-sort-select").addEventListener("change", e => {
 
 document.getElementById("dash-new-plan-btn").addEventListener("click", seedFreshDrill);
 document.getElementById("add-timeslot-btn").addEventListener("click", () => {
-  addPhase(false);
+  // a new time slot always goes at the END of the plan (the "active" activity
+  // isn't something you can see on the Plan page, so inserting after it
+  // would put the new card somewhere unpredictable)
+  saveActivePhase();
+  const current = phases.find(p => p.id === activePhaseId);
+  const ph = newPhaseObj(null, current ? current.surface : "full");
+  phases.push(ph);
+  loadPhase(ph.id);
   renderPhaseNotes();
+  const card = document.querySelector(`#phase-notes-list .phase-note-card[data-phase-id="${ph.id}"]`);
+  if (card) {
+    if (card.scrollIntoView) card.scrollIntoView({ block: "center", behavior: "smooth" });
+    const title = card.querySelector(".pn-title-input");
+    if (title) title.focus({ preventScroll: true });
+  }
 });
 document.getElementById("import-drills-btn").addEventListener("click", openImportPhaseModal);
 document.getElementById("practice-starttime-input").addEventListener("input", updateTimetableTimeRanges);
