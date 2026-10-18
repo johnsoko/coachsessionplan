@@ -536,6 +536,9 @@
   .phase-note-time-range { font-size: 10.5px; color: var(--ink-faint); }
   .phase-note-time { padding: 0; }
   .phase-note-time .pn-area-row { margin-top: 0; }
+  /* three small boxes in a 170px column: no spinner arrows eating their width */
+  .phase-note-time .pn-mini-input { -moz-appearance: textfield; appearance: textfield; }
+  .phase-note-time .pn-mini-input::-webkit-outer-spin-button, .phase-note-time .pn-mini-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .pn-mini-group { margin-bottom: 16px; width: 100%; }
   .pn-mini-group:last-child { margin-bottom: 0; }
   .pn-mini-row { display: flex; gap: 8px; width: 100%; }
@@ -6061,6 +6064,7 @@ function newPhaseObj(contentSrc, surfaceSrc) {
     playingAreaWidth: contentSrc ? (contentSrc.playingAreaWidth || "") : "",
     activeSets: contentSrc ? (contentSrc.activeSets || "") : "",
     activeMinutes: contentSrc ? (contentSrc.activeMinutes || "") : "",
+    activeRest: contentSrc ? (contentSrc.activeRest || "") : "",
     // per-activity field zoom level (0-100, the slider's own value)
     viewZoom: 0,
     // generic vertical/horizontal flip for surfaces with no pre-made
@@ -6207,7 +6211,7 @@ function mirrorCurrentPhase() {
     // the mirrored phase's notes would silently edit the original's too
     infoBlocks: current.infoBlocks ? current.infoBlocks.map(b => ({...b, id: nextId++, lines: Array.isArray(b.lines) ? [...b.lines] : b.lines})) : defaultInfoBlocks(),
     playingAreaLength: current.playingAreaLength || "", playingAreaWidth: current.playingAreaWidth || "",
-    activeSets: current.activeSets || "", activeMinutes: current.activeMinutes || "",
+    activeSets: current.activeSets || "", activeMinutes: current.activeMinutes || "", activeRest: current.activeRest || "",
     viewZoom: 0,
     fieldFlipped: !!current.fieldFlipped
   };
@@ -7602,22 +7606,31 @@ function renderPhaseNotes() {
             <span class="pn-mini-label">Min</span>
             <input type="number" class="field-input pn-mini-input" data-field="minutes" min="0" step="1" value="${ph.activeMinutes || ""}" title="Minutes per set">
           </div>
+          <div class="pn-mini-col">
+            <span class="pn-mini-label">Rest</span>
+            <input type="number" class="field-input pn-mini-input" data-field="rest" min="0" step="0.5" value="${ph.activeRest || ""}" title="Rest between sets, in minutes (counts toward the total time)">
+          </div>
         </div>
-        <div class="phase-note-duration-readout">${ph.duration ? ph.duration + " min" : ""}</div>
+        <div class="phase-note-duration-readout" title="${activityDurationBreakdown(ph)}">${ph.duration ? ph.duration + " min" : ""}</div>
         <div class="phase-note-time-range">${startEnd}</div>
       </div>
     `;
     const setsInput = timeWrap.querySelector('[data-field="sets"]');
     const minutesInput = timeWrap.querySelector('[data-field="minutes"]');
+    const restInput = timeWrap.querySelector('[data-field="rest"]');
     function onTimeInputChanged() {
       ph.activeSets = setsInput.value;
       ph.activeMinutes = minutesInput.value;
+      ph.activeRest = restInput.value;
       recomputeActiveDuration(ph); // also refreshes the Panel's own readout if present
-      timeWrap.querySelector(".phase-note-duration-readout").textContent = ph.duration ? ph.duration + " min" : "";
+      const readout = timeWrap.querySelector(".phase-note-duration-readout");
+      readout.textContent = ph.duration ? ph.duration + " min" : "";
+      readout.title = activityDurationBreakdown(ph);
       updateTimetableTimeRanges();
     }
     setsInput.addEventListener("input", onTimeInputChanged);
     minutesInput.addEventListener("input", onTimeInputChanged);
+    restInput.addEventListener("input", onTimeInputChanged);
 
     const exerciseWrap = document.createElement("div");
     exerciseWrap.className = "phase-note-exercise";
@@ -8047,6 +8060,7 @@ function ensurePhaseDetailFields(ph) {
   if (ph.playingAreaWidth == null) ph.playingAreaWidth = "";
   if (ph.activeSets == null) ph.activeSets = "";
   if (ph.activeMinutes == null) ph.activeMinutes = "";
+  if (ph.activeRest == null) ph.activeRest = "";
 }
 function renderPhaseDetailPanel() {
   const panel = document.getElementById("phase-detail-panel");
@@ -8148,10 +8162,28 @@ document.getElementById("pd-width").addEventListener("input", e => {
 // Details timetable's start/end time math and the session total still
 // run on ph.duration — recomputing it here keeps that working unchanged
 // rather than needing its own rewrite
-function recomputeActiveDuration(ph) {
+// Rest (minutes, halves allowed) is taken BETWEEN sets, so n sets have n-1
+// rests; it counts toward the activity's time, and so toward the start/end
+// times and the practice total. Rounded to the nearest whole minute because
+// the timetable works in whole minutes.
+function activityTotalMinutes(ph) {
   const sets = parseInt(ph.activeSets, 10) || 0;
   const minutes = parseInt(ph.activeMinutes, 10) || 0;
-  ph.duration = (sets && minutes) ? String(sets * minutes) : "";
+  if (!(sets && minutes)) return 0;
+  const rest = parseFloat(ph.activeRest);
+  const restTotal = (rest > 0 && sets > 1) ? rest * (sets - 1) : 0;
+  return Math.round(sets * minutes + restTotal);
+}
+// "3 × 5 min + 2 × 1 min rest" — what the total is made of, for a tooltip
+function activityDurationBreakdown(ph) {
+  const sets = parseInt(ph.activeSets, 10) || 0, minutes = parseInt(ph.activeMinutes, 10) || 0;
+  if (!(sets && minutes)) return "";
+  const rest = parseFloat(ph.activeRest);
+  return (rest > 0 && sets > 1) ? `${sets} × ${minutes} min + ${sets - 1} × ${rest} min rest` : `${sets} × ${minutes} min`;
+}
+function recomputeActiveDuration(ph) {
+  const total = activityTotalMinutes(ph);
+  ph.duration = total ? String(total) : "";
   updateDurationReadout(ph);
 }
 function updateDurationReadout(ph) {
@@ -9583,6 +9615,8 @@ function phaseMetaText(ph) {
     if (sets && mins) parts.push(`${setsText} × ${mins} min`);
     else if (mins) parts.push(`${mins} min`);
     else if (sets) parts.push(setsText);
+    const rest = parseFloat(ph.activeRest);
+    if (rest > 0) parts.push(`${rest} min rest`);
   }
   const dims = phaseDimensionsText(ph);
   if (dims) parts.push(dims);
