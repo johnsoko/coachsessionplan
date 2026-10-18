@@ -868,7 +868,9 @@
   #output-phases-container { margin-top: 34px; }
   .output-phase-block { margin-top: 44px; }
   .output-phase-block:first-child { margin-top: 0; }
-  .output-phase-block .output-phase-label { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--ink); margin: 0 0 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  /* a column: the title row (title left, grid size right) on top, the small timing line beneath it */
+  .output-phase-block .output-phase-label { font-family: var(--display); font-size: 15px; font-weight: 700; color: var(--ink); margin: 0 0 12px; display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; gap: 2px; }
+  .output-phase-block .output-phase-label-top { width: 100%; }
   .output-phase-notes { margin-top: 4px; }
   .output-info-block { margin-bottom: 12px; }
   .output-info-block:last-child { margin-bottom: 0; }
