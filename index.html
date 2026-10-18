@@ -534,6 +534,8 @@
   .phase-note-time { align-self: start; display: flex; flex-direction: column; align-items: center; text-align: center; } /* pinned to the top of the row — long notes never push it down */
   .phase-note-time input.field-input { margin-bottom: 4px; text-align: center; }
   .phase-note-time-range { font-size: 10.5px; color: var(--ink-faint); }
+  .phase-note-duration-split { font-size: 10px; color: var(--ink-faint); line-height: 1.2; }
+  .phase-note-duration-split:empty { display: none; }
   .phase-note-time { padding: 0; }
   .phase-note-time .pn-area-row { margin-top: 0; }
   /* three small boxes in a 170px column: no spinner arrows eating their width */
@@ -7612,6 +7614,7 @@ function renderPhaseNotes() {
           </div>
         </div>
         <div class="phase-note-duration-readout" title="${activityDurationBreakdown(ph)}">${ph.duration ? ph.duration + " min" : ""}</div>
+        <div class="phase-note-duration-split">${activityDurationSplitText(ph)}</div>
         <div class="phase-note-time-range">${startEnd}</div>
       </div>
     `;
@@ -7626,6 +7629,7 @@ function renderPhaseNotes() {
       const readout = timeWrap.querySelector(".phase-note-duration-readout");
       readout.textContent = ph.duration ? ph.duration + " min" : "";
       readout.title = activityDurationBreakdown(ph);
+      timeWrap.querySelector(".phase-note-duration-split").textContent = activityDurationSplitText(ph);
       updateTimetableTimeRanges();
     }
     setsInput.addEventListener("input", onTimeInputChanged);
@@ -8173,6 +8177,19 @@ function activityTotalMinutes(ph) {
   const rest = parseFloat(ph.activeRest);
   const restTotal = (rest > 0 && sets > 1) ? rest * (sets - 1) : 0;
   return Math.round(sets * minutes + restTotal);
+}
+// the part of the total that is rest, in minutes (0 when there's none to count)
+function activityRestMinutes(ph) {
+  const sets = parseInt(ph.activeSets, 10) || 0, minutes = parseInt(ph.activeMinutes, 10) || 0;
+  const rest = parseFloat(ph.activeRest);
+  return (sets && minutes && rest > 0 && sets > 1) ? rest * (sets - 1) : 0;
+}
+// "15 + 2 rest" — shown under the total so it's plain that rest is counted
+function activityDurationSplitText(ph) {
+  const rest = activityRestMinutes(ph);
+  if (!rest) return "";
+  const play = (parseInt(ph.activeSets, 10) || 0) * (parseInt(ph.activeMinutes, 10) || 0);
+  return `${play} + ${Number(rest.toFixed(1))} rest`;
 }
 // "3 × 5 min + 2 × 1 min rest" — what the total is made of, for a tooltip
 function activityDurationBreakdown(ph) {
