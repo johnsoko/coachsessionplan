@@ -6210,7 +6210,22 @@ function mirrorCurrentPhase() {
   toast("Mirrored phase added");
 }
 function deletePhase(id) {
-  if (phases.length <= 1) { toast("A session needs at least one phase"); return; }
+  if (phases.length <= 1) {
+    // In a plan, deleting the only activity simply puts back the blank
+    // starting one — no need to forbid it; the empty card says it all.
+    // (A drill in the creator keeps its one phase: there it would silently wipe the drawing.)
+    if (isStandaloneDrillMode) { toast("A session needs at least one phase"); return; }
+    if (!phases.some(p => p.id === id)) return;
+    const fresh = newPhaseObj(null);
+    const startField = (typeof prefField !== "undefined" && prefField && SURFACES[prefField.surface]) ? prefField : null;
+    fresh.surface = startField ? startField.surface : "full";
+    fresh.fieldFlipped = startField ? !!startField.flipped : false;
+    tokens = []; shapes = [];
+    phases = [fresh];
+    activePhaseId = null;
+    loadPhase(fresh.id);
+    return;
+  }
   const idx = phases.findIndex(p => p.id === id);
   if (idx === -1) return;
   const wasActive = (activePhaseId === id);
@@ -7868,7 +7883,6 @@ function renderPhaseNotes() {
     delBtn.className = "danger";
     delBtn.innerHTML = `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 4.5h9M6 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4.5 4.5V12a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V4.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>`;
     delBtn.addEventListener("click", () => {
-      if (phases.length <= 1) { toast("A session needs at least one phase"); return; }
       deletePhase(ph.id);
       renderPhaseNotes();
     });
