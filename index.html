@@ -554,7 +554,12 @@
      the same 4px padding the line text has — so it lines up with that
      text however wide those controls end up, instead of a guessed indent */
   .phase-note-infoblock-label { display: flex; align-items: baseline; gap: 3px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink-soft); margin-bottom: 3px; }
-  .phase-note-infoblock-label .note-block-controls { visibility: hidden; padding-top: 0; height: 0; pointer-events: none; }
+  .phase-note-infoblock-label .note-block-controls.pn-spacer { visibility: hidden; padding-top: 0; height: 0; pointer-events: none; }
+  /* the section's own + and grip, shown while the label is hovered (like the controls on a note line) */
+  .phase-note-infoblock-label .pn-section-controls { padding-top: 0; align-self: center; }
+  .phase-note-infoblock-label:hover .pn-section-controls, .phase-note-infoblock-label .pn-section-controls:focus-within { opacity: 1; }
+  @media (hover: none) { .phase-note-infoblock-label .pn-section-controls { opacity: 0.8; } }
+  .phase-note-infoblock.dragging { opacity: 0.4; }
   .phase-note-infoblock-label-text { padding: 0 4px; }
   .phase-note-infoblock-delete { align-self: center; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--ink-faint); border-radius: 4px; padding: 0; cursor: pointer; opacity: 0; transition: opacity 0.12s; flex-shrink: 0; }
   .phase-note-infoblock:hover .phase-note-infoblock-delete, .phase-note-infoblock-delete:focus-visible { opacity: 1; }
@@ -579,8 +584,6 @@
   @media (hover: none) { .phase-note-infoblock-delete { opacity: 0.7; } }
   .phase-note-infoblock-title-input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font: inherit; font-weight: 700; letter-spacing: inherit; color: var(--ink-soft); padding: 0 4px; }
   .phase-note-infoblock-title-input::placeholder { color: var(--ink-faint); font-weight: 600; }
-  .phase-note-add-section { margin-top: 6px; border: 1px dashed var(--line-md); background: transparent; color: var(--ink-faint); font: 600 11.5px var(--body, inherit); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
-  .phase-note-add-section:hover { color: var(--ink-soft); border-color: var(--ink-faint); }
   .phase-note-infoblock-lines.note-blocks { border: none; background: transparent; padding: 0; min-height: 0; }
   .phase-note-infoblock-lines .note-block-text { font-size: 11.5px; line-height: 1.6; } /* same size as the block labels above them (Focus, Organisation…) */
   .phase-clips-label { font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--ink-faint); }
@@ -7512,6 +7515,8 @@ async function editActivityDrill(ph) { await editActivityInCreator(ph); }
 document.getElementById("save-caret-btn").addEventListener("click", e => toggleMenu("save-options-menu", e));
 document.getElementById("save-opt-update").addEventListener("click", () => { document.getElementById("save-options-menu").classList.remove("open"); saveToPlan("update"); });
 document.getElementById("save-opt-new").addEventListener("click", () => { document.getElementById("save-options-menu").classList.remove("open"); saveToPlan("new"); });
+// the section currently being dragged to a new place within its activity
+let draggedSection = null;
 // hidden sections the coach has opened to look at (view state only — never saved)
 const expandedHiddenSections = new Set();
 function renderPhaseNotes() {
@@ -7660,10 +7665,54 @@ function renderPhaseNotes() {
         label.className = "phase-note-infoblock-label";
         // hidden copy of a line row's controls (same markup, so the same
         // width) holds the title's left edge in line with the text below
-        label.innerHTML = `<span class="note-block-controls" aria-hidden="true">
-          <span class="note-block-add">+</span>
-          <span class="note-block-grip"><span class="action-grip-dots"><span></span><span></span><span></span><span></span><span></span><span></span></span></span>
-        </span><span class="phase-note-infoblock-label-text"></span>`;
+        const gripDots = `<span class="action-grip-dots"><span></span><span></span><span></span><span></span><span></span><span></span></span>`;
+        label.innerHTML = (isStandaloneDrillMode
+          ? `<span class="note-block-controls pn-spacer" aria-hidden="true"><span class="note-block-add">+</span><span class="note-block-grip">${gripDots}</span></span>`
+          // in a plan these are real, same as the controls on each note line:
+          // + adds a section below this one, the grip drags it to a new place
+          : `<span class="note-block-controls pn-section-controls"><button type="button" class="note-block-add" title="Add a section below">+</button><span class="note-block-grip" title="Drag to reorder sections">${gripDots}</span></span>`)
+          + `<span class="phase-note-infoblock-label-text"></span>`;
+        row.dataset.blockId = block.id;
+        if (!isStandaloneDrillMode) {
+          label.querySelector(".note-block-add").addEventListener("click", () => {
+            const at = ph.infoBlocks.indexOf(block);
+            const nb = { id: nextId++, enabled: true, custom: true, title: "", lines: [""], placeholder: "Section title" };
+            ph.infoBlocks.splice(at === -1 ? ph.infoBlocks.length : at + 1, 0, nb);
+            renderPhaseNotes();
+            const input = document.querySelector(`.phase-note-card[data-phase-id="${ph.id}"] .phase-note-infoblock[data-block-id="${nb.id}"] .phase-note-infoblock-title-input`);
+            if (input) input.focus();
+          });
+          // only the grip arms dragging, so selecting text in a section's
+          // notes is never mistaken for a drag
+          label.querySelector(".note-block-grip").addEventListener("mousedown", () => { row.draggable = true; });
+          row.addEventListener("dragstart", e => {
+            if (!row.draggable) return;
+            e.stopPropagation(); // not the activity card's own drag
+            if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", ""); }
+            draggedSection = { ph, row };
+            requestAnimationFrame(() => row.classList.add("dragging"));
+          });
+          row.addEventListener("dragover", e => {
+            if (!draggedSection || draggedSection.ph !== ph || draggedSection.row === row) return;
+            e.preventDefault(); e.stopPropagation();
+            const r = row.getBoundingClientRect();
+            infoWrap.insertBefore(draggedSection.row, e.clientY > r.top + r.height / 2 ? row.nextSibling : row);
+          });
+          row.addEventListener("drop", e => { if (draggedSection) { e.preventDefault(); e.stopPropagation(); } });
+          row.addEventListener("dragend", () => {
+            row.draggable = false; row.classList.remove("dragging");
+            if (!draggedSection) return;
+            draggedSection = null;
+            // the sections that were on screen take the new on-screen order, in
+            // the same slots they occupied (any not shown keep their places)
+            const byId = new Map(ph.infoBlocks.map(b => [String(b.id), b]));
+            const shownOrder = Array.from(infoWrap.children).map(r => byId.get(r.dataset.blockId)).filter(Boolean);
+            const shownSet = new Set(shownOrder);
+            let k = 0;
+            ph.infoBlocks = ph.infoBlocks.map(b => shownSet.has(b) ? shownOrder[k++] : b);
+            renderPhaseNotes();
+          });
+        }
         const labelTextEl = label.querySelector(".phase-note-infoblock-label-text");
         labelTextEl.textContent = block.title || block.placeholder || "Block";
         if (block.custom) {
@@ -7740,24 +7789,24 @@ function renderPhaseNotes() {
       const empty = document.createElement("p");
       empty.style.cssText = "margin:0; color:var(--ink-faint); font-style:italic; font-size:12.5px;";
       empty.textContent = isStandaloneDrillMode ? "No block information yet — add some from the Panel in Create." : "No notes yet.";
+      if (!isStandaloneDrillMode) {
+        // every section normally carries its own +; with none left, this one starts the list
+        const first = document.createElement("button");
+        first.type = "button"; first.className = "note-block-add"; first.title = "Add a section";
+        first.style.cssText = "margin-left:8px; vertical-align:middle;"; first.textContent = "+";
+        first.addEventListener("click", () => {
+          if (!Array.isArray(ph.infoBlocks)) ph.infoBlocks = [];
+          const nb = { id: nextId++, enabled: true, custom: true, title: "", lines: [""], placeholder: "Section title" };
+          ph.infoBlocks.push(nb);
+          renderPhaseNotes();
+          const input = document.querySelector(`.phase-note-card[data-phase-id="${ph.id}"] .phase-note-infoblock-title-input`);
+          if (input) input.focus();
+        });
+        empty.appendChild(first);
+      }
       notesCol.appendChild(empty);
     }
 
-    if (!isStandaloneDrillMode) {
-      // with no Create tab there'd be no way back to a deleted section otherwise
-      const addSection = document.createElement("button");
-      addSection.type = "button"; addSection.className = "phase-note-add-section";
-      addSection.textContent = "+ Add section";
-      addSection.addEventListener("click", () => {
-        if (!Array.isArray(ph.infoBlocks)) ph.infoBlocks = [];
-        const nb = { id: nextId++, enabled: true, custom: true, title: "", lines: [""], placeholder: "Section title" };
-        ph.infoBlocks.push(nb);
-        renderPhaseNotes();
-        const inputs = document.querySelectorAll(`.phase-note-card[data-phase-id="${ph.id}"] .phase-note-infoblock-title-input`);
-        if (inputs.length) inputs[inputs.length - 1].focus();
-      });
-      notesCol.appendChild(addSection);
-    }
     const actions = document.createElement("div");
     actions.className = "phase-note-row-actions";
     let libControl = null;
