@@ -819,7 +819,10 @@
   .output-plan-description { font-size: 15px; line-height: 1.5; color: var(--ink-soft); margin: -10px 0 18px; white-space: pre-wrap; }
   .output-phase-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin: 22px 0 10px; display: flex; flex-direction: column; align-items: stretch; gap: 2px; }
   .output-phase-label-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-  .output-phase-label-dims { font-size: 11.5px; font-weight: 500; color: var(--ink-faint); white-space: nowrap; flex-shrink: 0; text-align: right; }
+  /* set in the body font, which the whole page has already loaded: this line used to inherit the
+     condensed display font at weight 500 — a font file nothing else on the page uses — so the browser
+     drew it in a stand-in font (bigger, wider) until that file arrived, then snapped it to size */
+  .output-phase-label-dims { font-family: var(--body); font-size: 11.5px; font-weight: 500; color: var(--ink-faint); white-space: nowrap; flex-shrink: 0; text-align: right; }
   .output-phase-label-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .output-section { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--line); }
   .output-section-label { font-family: var(--display); font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
