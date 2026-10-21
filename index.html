@@ -3932,12 +3932,26 @@ function assignFormationNumbers(players) {
   numbers.forEach((n, i) => { if (n == null) claim(i, nextFree(1)); });
   return numbers;
 }
+// The size a formation's players should be: whatever the players already on
+// the field are (this team's first, else the other team's — the most common
+// size if they differ), so a new lineup never looks out of scale beside them;
+// with nobody on the field yet, the Players panel's current size for the team.
+function formationPlayerSize(team) {
+  const onField = tokens.filter(t => t.type === "player" && Number(t.size) > 0);
+  const same = onField.filter(t => t.team === team);
+  const pool = same.length ? same : onField;
+  if (!pool.length) return teamDefaults[team].size;
+  const counts = new Map();
+  pool.forEach(t => counts.set(t.size, (counts.get(t.size) || 0) + 1));
+  return Array.from(counts.entries()).sort((a, b) => (b[1] - a[1]) || (b[0] - a[0]))[0][0];
+}
 function applyFormation(key) {
   const f = FORMATIONS[key];
   if (!f) return;
   const team = formationTeam;
   const isVertical = VERTICAL_SURFACES.includes(surface);
   const formationNums = assignFormationNumbers(f.players);
+  const playerSize = formationPlayerSize(team); // read BEFORE this team's old players are removed
   pushHistory();
   // a formation replaces that team's current players rather than piling
   // more on top of whatever was already on the field
@@ -3961,7 +3975,7 @@ function applyFormation(key) {
     const y = isVertical ? depthPos : p.y;
     tokens.push({
       id: nextId++, type: "player", team, x, y, num, pos: p.pos,
-      color: teamDefaults[team].color, size: teamDefaults[team].size,
+      color: teamDefaults[team].color, size: playerSize,
       labelMode: teamDefaults[team].labelMode, badgeHidden: teamDefaults[team].badgeHidden,
       showName: teamDefaults[team].showNames, name: ""
     });
@@ -3971,6 +3985,12 @@ function applyFormation(key) {
   renderTokens(); renderShapes();
   renderPhaseThumbActive();
   toast(f.label + " applied to " + (team === "dark" ? "Away" : "Home"));
+  // Formations is just a panel of one-off actions and never changes the armed
+  // tool — so a drawing/placement tool used earlier was still armed afterwards,
+  // and dragging on the field drew or placed instead of selecting. Hand the
+  // field back to Select (leaving the panel open for another formation).
+  setTool("select", true);
+  document.getElementById("formations-tool").classList.toggle("active", document.getElementById("formations-popover").classList.contains("open"));
 }
 document.getElementById("formation-team-toggle").addEventListener("click", e => {
   const btn = e.target.closest("button[data-team]");
