@@ -1264,6 +1264,14 @@
     #view-output { display: block !important; position: static !important; height: auto !important; overflow: visible !important; }
     .stub-main { width: 100% !important; height: auto !important; overflow: visible !important; padding: 0 !important; }
     .output-card { box-shadow: none !important; border: none !important; max-width: 100% !important; }
+    /* the page itself is plain paper: the app's off-white / cream panel colours
+       (body, the Output card and the wrappers between them) are screen styling,
+       and with "Background graphics" on in the print dialog they were printed as
+       a tinted sheet around the content */
+    html, body, #app-shell, #view-output, .stub-main, #output-card, .output-card { background: none !important; }
+    /* ...while the playing-field colour behind each diagram is part of the picture,
+       so it prints whatever the dialog's background setting is */
+    .output-phase-thumb-wrap { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
   /* PUBLIC VIEW — a shared link (?id=...) opened by someone not signed
      in. The plan's data loads the same way it always does (the backend's
