@@ -119,7 +119,6 @@
   .view.active { display: flex; }
 
   /* ── DRAW VIEW ── */
-  #view-draw { }
   #draw-main-row { display: flex; flex: 1; min-width: 0; min-height: 0; }
 
   #left-panel {
@@ -220,22 +219,6 @@
   .canvas-toolbar {
     display: flex; align-items: center; justify-content: center; padding: 14px 0 0;
   }
-  .surface-toggle { display: flex; background: var(--paper-raised); border-radius: 8px; padding: 3px; }
-  .surface-pager { display: flex; align-items: center; gap: 6px; }
-  .surface-page-arrow {
-    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; border: none;
-    background: var(--paper-raised); color: var(--ink); display: flex; align-items: center; justify-content: center;
-  }
-  .surface-page-arrow:disabled { opacity: 0.3; }
-  @keyframes surfaceSlideFromRight { from { transform: translateX(16px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-  @keyframes surfaceSlideFromLeft { from { transform: translateX(-16px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-  .surface-toggle.slide-next { animation: surfaceSlideFromRight 0.2s ease; }
-  .surface-toggle.slide-prev { animation: surfaceSlideFromLeft 0.2s ease; }
-  .surface-toggle button {
-    border: none; background: transparent; font-size: 12.5px; font-weight: 500; color: var(--ink-soft);
-    padding: 6px 12px; border-radius: 6px; font-family: var(--body);
-  }
-  .surface-toggle button.active { background: var(--paper-card); color: var(--ink); box-shadow: 0 1px 2px rgba(27,33,28,0.12); }
   .canvas-inner {
     flex: 1; width: 100%; position: relative; overflow: auto;
     background-image: radial-gradient(var(--line-md) 1px, transparent 1px);
@@ -305,7 +288,6 @@
     width: var(--toolkit-w); background: var(--paper-card); border-left: 1px solid var(--line);
     display: flex; flex-direction: column; overflow: hidden;
   }
-  #draw-panel-toggle { margin: 16px 16px 0; flex-shrink: 0; }
   #draw-tools-content { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 16px 20px; }
   .tk-section-label {
     font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: var(--ink-faint); text-transform: uppercase;
@@ -500,10 +482,8 @@
   .tag-suggest-item { padding: 7px 10px; border-radius: 6px; font-size: 12.5px; color: var(--ink); cursor: pointer; white-space: nowrap; }
   .tag-suggest-item:hover, .tag-suggest-item.active { background: var(--paper-raised); }
   select, .field-input { width: 100%; border: 1px solid var(--line-md); background: var(--paper-card); border-radius: 7px; padding: 10px 12px; font-size: 13.5px; color: var(--ink); }
-  .notes-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   textarea { width: 100%; border: 1px solid var(--line-md); background: var(--paper-card); border-radius: 7px; padding: 10px 12px; font-size: 13.5px; color: var(--ink); resize: vertical; min-height: 90px; font-family: var(--body); }
   .notes-divider { height: 1px; background: var(--line); margin: 30px 0; }
-  .notes-hint { font-size: 12.5px; color: var(--ink-faint); }
   .phase-notes-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
   .timetable-summary {
     display: flex; align-items: center; gap: 7px; background: var(--paper-card); border: 1px solid var(--line);
@@ -552,7 +532,6 @@
   .pn-mini-input { width: 100%; padding: 9px 8px !important; font-size: 13px !important; text-align: center; }
   .phase-note-duration-readout { font-size: 11px; font-weight: 700; color: var(--ink-soft); margin: 8px 0 2px; }
   .phase-note-exercise { display: flex; flex-direction: column; gap: 6px; }
-  .phase-note-card .phase-note-drill-title { font-weight: 600; font-size: 13px; text-align: center; }
   .phase-note-notes-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   .phase-note-infoblocks { display: flex; flex-direction: column; gap: 8px; }
   /* the title sits in the same kind of row as the lines under it: an
@@ -630,10 +609,6 @@
   #output-clips-row.phase-clips-row, .lib-detail-clips-row.phase-clips-row { flex-direction: column; }
   #output-clips-row .phase-clip-unit, .lib-detail-clips-row .phase-clip-unit,
   #output-clips-row .phase-clip-card, .lib-detail-clips-row .phase-clip-card { width: 100%; }
-  .phase-note-add-exercise {
-    font-size: 11px; color: var(--pitch-deep); border: 1.5px dashed var(--line-md); border-radius: 5px;
-    padding: 4px 7px; background: none; margin-top: 2px;
-  }
   .phase-note-row-actions { display: flex; flex-direction: column; gap: 4px; align-items: center; }
   .phase-note-library-check { width: 15px; height: 15px; cursor: pointer; accent-color: var(--bib); margin-bottom: 2px; }
   .phase-note-library-badge {
@@ -655,10 +630,6 @@
     padding: 8px; opacity: 0; transition: opacity 0.15s; pointer-events: none;
   }
   .phase-note-thumb:hover .phase-note-thumb-title-overlay { opacity: 1; }
-  .phase-note-notes.note-blocks { align-self: stretch; height: 100%; min-height: 56px; padding: 6px 6px; }
-  .phase-note-notes .note-block-text { font-size: 11.5px; padding: 3px 4px; line-height: 1.4; }
-  .phase-note-notes .note-block-add { width: 15px; height: 15px; font-size: 12px; }
-  .phase-note-notes .note-block-delete { width: 15px; height: 15px; }
   .thumb-play-btn {
     position: absolute; bottom: 8px; right: 8px; z-index: 6; width: 28px; height: 28px; border-radius: 50%;
     border: none; background: rgba(27,33,28,0.55); color: #F7F8F3; display: flex; align-items: center; justify-content: center;
@@ -668,7 +639,6 @@
   .phase-note-thumb:hover > .thumb-play-btn, .output-phase-thumb-wrap:hover > .thumb-play-btn, .lib-card-thumb-inner:hover > .thumb-play-btn, .lib-detail-thumb-inner:hover > .thumb-play-btn, .thumb-play-btn.playing { opacity: 1; }
   .thumb-play-btn:hover { background: var(--pitch-deep); }
   .thumb-play-btn.playing { background: var(--bib); color: #201200; }
-  .phase-note-label { font-family: var(--display); font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
   .note-blocks { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; padding: 10px 8px; background: var(--paper); min-height: 110px; }
   .note-block-row { display: flex; align-items: flex-start; gap: 3px; border-radius: 5px; position: relative; }
   .note-block-row:hover { background: var(--paper-raised); }
@@ -698,7 +668,6 @@
 
   /* ── ANIMATE / OUTPUT stub views ── */
   #view-output { overflow-y: auto; }
-  .stub-left { width: var(--left-w); background: var(--paper-card); border-right: 1px solid var(--line); padding: 16px; overflow-y: auto; }
   .stub-main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 30px; overflow-y: auto; }
   #draw-panel-toggle { margin: 16px 16px 0; flex-shrink: 0; }
   #animate-timeline-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -739,7 +708,6 @@
   #toolkit h3 { font-family: var(--display); font-size: 18px; font-weight: 600; margin-bottom: 16px; }
   .stub-check { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--ink-soft); margin-bottom: 22px; }
   .stub-check input { width: 15px; height: 15px; accent-color: var(--pitch); }
-  .stub-hint { font-size: 13px; color: var(--ink-faint); line-height: 1.6; }
   .add-scene-bubble {
     position: absolute; right: 38px; top: 50%; transform: translateY(-50%);
     background: var(--ink); color: #F7F8F3; font-size: 12px; font-weight: 600;
@@ -753,12 +721,6 @@
   .animate-play-buttons .btn { padding: 9px 6px; font-size: 12.5px; white-space: nowrap; gap: 5px; }
 
   .animate-scrub-row { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 640px; margin-top: 12px; }
-  .animate-play-btn {
-    width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--paper-raised); color: var(--ink);
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  }
-  .animate-play-btn:hover { background: var(--pitch-tint); color: var(--pitch-deep); }
-  .animate-play-btn.playing { background: var(--bib); color: #201200; }
   #phase-play-btn.playing, #play-full-btn.playing { opacity: 0.65; }
   .animate-progress-track { flex: 1; height: 5px; border-radius: 3px; background: var(--paper-raised); overflow: hidden; }
   .animate-progress-fill { height: 100%; width: 0%; background: var(--pitch); border-radius: 3px; transition: width 0.08s linear; }
@@ -773,7 +735,6 @@
   .action-grip { display: flex; flex-direction: column; gap: 2px; color: var(--ink); flex-shrink: 0; }
   .action-grip-dots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px; flex-shrink: 0; }
   .action-grip-dots span { width: 3px; height: 3px; border-radius: 50%; background: currentColor; display: block; }
-  .action-icon { flex-shrink: 0; color: var(--pitch-deep); display: flex; align-items: center; }
   .action-label { flex: 1; font-size: 12.5px; font-weight: 500; color: var(--ink); }
   .action-row.active-scene .action-label { font-weight: 700; color: var(--pitch-deep); }
   .action-del { width: 20px; height: 20px; border-radius: 5px; border: none; background: transparent; color: var(--ink-faint); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
@@ -1147,7 +1108,6 @@
     margin-bottom: 2px;
   }
   .dash-nav-item.active { background: var(--pitch-tint); color: var(--pitch-deep); font-weight: 600; }
-  .dash-sidebar-divider { height: 1px; background: var(--line); margin: 20px 6px 4px; }
   .dash-nav-item:disabled { opacity: 0.45; cursor: not-allowed; }
   .dash-main { flex: 1; padding: 36px 44px; overflow-y: auto; }
   .dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
@@ -1283,7 +1243,6 @@
   .lib-detail-thumb { margin-bottom: 20px; }
   .lib-detail-thumb-inner { position: relative; width: 100%; aspect-ratio: 4/2.7; background: var(--pitch); border-radius: 12px; overflow: hidden; }
   .lib-detail-title { font-family: var(--display); font-size: 28px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
-  .lib-detail-meta { font-size: 13px; color: var(--ink-faint); margin-bottom: 14px; }
   .lib-detail-desc { font-size: 14.5px; line-height: 1.6; color: var(--ink); margin-bottom: 16px; white-space: pre-wrap; }
   .lib-detail-label { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
   .lib-detail-phases-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 30px 24px; }
@@ -2656,7 +2615,6 @@ function setupColorRow(row, onPick) {
   row.appendChild(chip);
 }
 // saved swatches changed — only the picker shows them now
-function refreshColorRows() {}
 
 const colorPicker = { el: null, h: 0, s: 100, v: 100, onApply: null, opener: null };
 function cpHex() { return hsvToHex(colorPicker.h, colorPicker.s, colorPicker.v); }
@@ -2692,7 +2650,6 @@ function cpCommit() {
   colorPrefs.lastCustom = hex;
   if (colorPicker.onApply) colorPicker.onApply(hex);
   saveColorPrefs();
-  refreshColorRows();
   cpRender(true);
 }
 function cpSetFromHex(hex, commit, skipHexInput) {
@@ -2750,11 +2707,11 @@ function buildColorPicker() {
     const h = cpHex();
     if (colorPrefs.saved.includes(h) || colorPrefs.saved.length >= MAX_SAVED_COLORS) return;
     colorPrefs.saved.push(h);
-    saveColorPrefs(); refreshColorRows(); cpRender(true);
+    saveColorPrefs();cpRender(true);
   });
   el.querySelector(".cp-saved").addEventListener("click", e => {
     const rm = e.target.closest("[data-remove]");
-    if (rm) { colorPrefs.saved = colorPrefs.saved.filter(c => c !== rm.dataset.remove); saveColorPrefs(); refreshColorRows(); cpRender(true); return; }
+    if (rm) { colorPrefs.saved = colorPrefs.saved.filter(c => c !== rm.dataset.remove); saveColorPrefs();cpRender(true); return; }
     const slot = e.target.closest(".cp-slot.filled");
     if (slot) cpSetFromHex(slot.dataset.color, true);
   });
@@ -3256,7 +3213,7 @@ function pushHistory() {
 }
 function clearSelectionState() {
   selectedTokenId = null; selectedShapeId = null;
-  multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
+  multiTokenIds = []; multiShapeIds = [];
   closeAllPopovers();
 }
 function undo() {
@@ -3266,7 +3223,7 @@ function undo() {
   const prev = undoStack.pop();
   tokens = prev.tokens; shapes = prev.shapes;
   clearSelectionState();
-  renderTokens(); renderShapes(); hideToolbars();
+  renderTokens(); renderShapes();
   renderPhaseThumbActive();
 }
 function redo() {
@@ -3276,7 +3233,7 @@ function redo() {
   const next = redoStack.pop();
   tokens = next.tokens; shapes = next.shapes;
   clearSelectionState();
-  renderTokens(); renderShapes(); hideToolbars();
+  renderTokens(); renderShapes();
   renderPhaseThumbActive();
 }
 
@@ -3344,7 +3301,7 @@ document.addEventListener("keydown", e => {
     else if (selectedShapeId) deleteShape(selectedShapeId);
   }
   if (e.key === "Escape") {
-    multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
+    multiTokenIds = []; multiShapeIds = [];
     closeAllPopovers(); setTool("select");
   }
 });
@@ -3383,8 +3340,7 @@ function setTool(tool, keepPanelOpen) {
   if (!keepPanelOpen) closeAllPopovers();
   refreshToolButtonStates();
   selectedTokenId = null; selectedShapeId = null;
-  multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
-  hideToolbars();
+  multiTokenIds = []; multiShapeIds = [];
   renderTokens(); renderShapes();
   updateDrawHint(tool);
 }
@@ -3742,7 +3698,7 @@ function addTextToken(content, x, y) {
 function deleteToken(id) {
   pushHistory();
   tokens = tokens.filter(t => t.id !== id);
-  selectedTokenId = null; hideToolbars(); closeAllPopovers();
+  selectedTokenId = null;closeAllPopovers();
   renderTokens(); renderPhaseThumbActive();
   updateDrawHint(currentTool); // the field may be empty again — let the hint reappear
 }
@@ -3981,7 +3937,7 @@ function applyFormation(key) {
     });
   });
   selectedTokenId = null; selectedShapeId = null;
-  multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
+  multiTokenIds = []; multiShapeIds = [];
   renderTokens(); renderShapes();
   renderPhaseThumbActive();
   toast(f.label + " applied to " + (team === "dark" ? "Away" : "Home"));
@@ -4195,7 +4151,6 @@ function renderTokens() {
       layer.appendChild(nameEl);
     }
   });
-  if (selectedTokenId) showTokenToolbar(selectedTokenId); else hideTokenToolbar();
   if (editingTextId) {
     const activeEl = layer.querySelector(`[data-token-id="${editingTextId}"]`);
     if (activeEl) {
@@ -4211,7 +4166,7 @@ function renderTokens() {
   renderObjectsList();
 }
 
-let dragTokenId = null, dragMoved = false;
+let dragMoved = false;
 // updates just the .selected class on existing token elements rather than
 // tearing down and recreating them — a full renderTokens() here would
 // replace the very element the user's cursor is on mid-click, which can
@@ -4261,16 +4216,24 @@ function startTokenRotate(ev, id) {
     t.rotation = Math.round(angleDeg);
     renderTokens();
   }
+  trackDrag(onMove, () => {
+    if (moved) renderPhaseThumbActive();
+  });
+}
+// Follows a mouse or touch drag: calls onMove as the pointer moves and, when
+// it lifts, stops listening and calls onEnd. (The same four-listener
+// set-up and tear-down was written out by hand in every drag in the editor.)
+function trackDrag(onMove, onEnd) {
   function onUp() {
     document.removeEventListener("mousemove", onMove);
     document.removeEventListener("mouseup", onUp);
     document.removeEventListener("touchmove", onMove);
     document.removeEventListener("touchend", onUp);
-    if (moved) renderPhaseThumbActive();
+    if (onEnd) onEnd();
   }
   document.addEventListener("mousemove", onMove);
   document.addEventListener("mouseup", onUp);
-  document.addEventListener("touchmove", onMove, {passive:false});
+  document.addEventListener("touchmove", onMove, { passive: false });
   document.addEventListener("touchend", onUp);
 }
 // While a text box is being edited, the same mouse gesture has to mean
@@ -4326,17 +4289,9 @@ function startTextEditDrag(e, id, el) {
     el.style.left = t.x + "%";
     el.style.top = t.y + "%";
   }
-  function onUp() {
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
-    document.removeEventListener("touchmove", onMove);
-    document.removeEventListener("touchend", onUp);
+  trackDrag(onMove, () => {
     if (dragging) { pushHistory(); renderPhaseThumbActive(); }
-  }
-  document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onUp);
-  document.addEventListener("touchmove", onMove, {passive:false});
-  document.addEventListener("touchend", onUp);
+  });
 }
 function startTokenDrag(e, id) {
   if (currentTool !== "select" && !PLACEMENT_TOOLS.has(currentTool)) return;
@@ -4356,10 +4311,9 @@ function startTokenDrag(e, id) {
   // exactly like it would have if Select had been the active tool from
   // the start
   if (currentTool !== "select") { currentTool = "select"; closeAllPopovers(); updateDrawHint("select"); }
-  dragTokenId = id; dragMoved = false;
+  dragMoved = false;
   selectedTokenId = id; selectedShapeId = null;
-  multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
-  hideShapeToolbar();
+  multiTokenIds = []; multiShapeIds = [];
   const selT = tokens.find(tk => tk.id === id);
   refreshTokenSelectionClasses(); renderShapes();
 
@@ -4398,7 +4352,6 @@ function startTokenDrag(e, id) {
     document.removeEventListener("mouseup", onUp);
     document.removeEventListener("touchmove", onMove);
     document.removeEventListener("touchend", onUp);
-    dragTokenId = null;
     if (dragMoved) {
       const rect = stage.getBoundingClientRect();
       const cx = ev.changedTouches ? ev.changedTouches[0].clientX : ev.clientX;
@@ -4435,9 +4388,6 @@ function startTokenDrag(e, id) {
 // the floating duplicate/delete toolbar has been replaced by keyboard
 // shortcuts (Delete, Ctrl/Cmd+C/X/V) — kept as no-ops so existing call
 // sites elsewhere don't need to change
-function showTokenToolbar(id) {}
-function hideTokenToolbar() {}
-function hideToolbars() {}
 
 function closeAllPopovers() {
   ["arrow-popover", "player-popover", "equipment-popover", "shape-popover", "text-popover", "ball-popover", "formations-popover", "field-popover"].forEach(id => {
@@ -4454,10 +4404,6 @@ function closeAllPopovers() {
 // marquee drag or an Objects-tab group) — so editing a property applies
 // to the whole selection at once instead of just one item
 function selectedIds() { return multiTokenIds.length || multiShapeIds.length ? { t: multiTokenIds, s: multiShapeIds } : { t: selectedTokenId != null ? [selectedTokenId] : [], s: selectedShapeId != null ? [selectedShapeId] : [] }; }
-function activeTokensForTeam(team) {
-  const ids = selectedIds().t;
-  return tokens.filter(t => ids.includes(t.id) && t.type === "player" && t.team === team);
-}
 function activeTokensOfType(type) {
   const ids = selectedIds().t;
   return tokens.filter(t => ids.includes(t.id) && t.type === type);
@@ -5224,17 +5170,6 @@ function drawArrowhead(x2, y2, angle, size, color) {
   ctx.fillStyle = color;
   ctx.fill();
 }
-function strokeSmooth(points) {
-  if (points.length < 2) return;
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length - 1; i++) {
-    const mx = (points[i].x + points[i+1].x) / 2, my = (points[i].y + points[i+1].y) / 2;
-    ctx.quadraticCurveTo(points[i].x, points[i].y, mx, my);
-  }
-  ctx.lineTo(points[points.length-1].x, points[points.length-1].y);
-  ctx.stroke();
-}
 function drawShapeGeometry(kind, p1, p2, fill, color, noBorder) {
   const rx = Math.min(p1.x, p2.x), ry = Math.min(p1.y, p2.y);
   const rw = Math.abs(p2.x - p1.x), rh = Math.abs(p2.y - p1.y);
@@ -5471,17 +5406,9 @@ function startShapeResize(s, role) {
     else if (role === "control") { s.cx = p.x; s.cy = p.y; }
     renderShapes();
   }
-  function onUp() {
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
-    document.removeEventListener("touchmove", onMove);
-    document.removeEventListener("touchend", onUp);
+  trackDrag(onMove, () => {
     renderPhaseThumbActive();
-  }
-  document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onUp);
-  document.addEventListener("touchmove", onMove, { passive: false });
-  document.addEventListener("touchend", onUp);
+  });
 }
 function translateShape(s, dx, dy) {
   s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy;
@@ -5490,8 +5417,8 @@ function translateShape(s, dx, dy) {
 function selectAndMaybeMoveShape(shape, startPct) {
   if (blockIfScene1InAnimate()) return;
   selectedShapeId = shape.id;
-  selectedTokenId = null; hideTokenToolbar();
-  multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
+  selectedTokenId = null;
+  multiTokenIds = []; multiShapeIds = [];
   renderShapes();
 
   let moved = false;
@@ -5502,17 +5429,9 @@ function selectAndMaybeMoveShape(shape, startPct) {
     if (!moved && Math.hypot(p.x - startPct.x, p.y - startPct.y) > 0.4) { moved = true; pushHistory(); }
     if (moved) { translateShape(shape, p.x - last.x, p.y - last.y); last = p; renderShapes(); }
   }
-  function onUp() {
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
-    document.removeEventListener("touchmove", onMove);
-    document.removeEventListener("touchend", onUp);
+  trackDrag(onMove, () => {
     if (moved) renderPhaseThumbActive();
-  }
-  document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onUp);
-  document.addEventListener("touchmove", onMove, { passive: false });
-  document.addEventListener("touchend", onUp);
+  });
   // deferred to the next tick so opening/animating the properties panel
   // (a reflow + smooth-scroll) can never land in the middle of setting
   // up this drag and swallow the initial pointer movement
@@ -5536,30 +5455,19 @@ function startGroupDrag(startPct) {
       });
       shapes.forEach(s => { if (multiShapeIds.includes(s.id)) translateShape(s, dx, dy); });
       last = p;
-      renderTokens(); renderShapes(); showGroupToolbar();
+      renderTokens(); renderShapes();
     }
   }
-  function onUp() {
-    document.removeEventListener("mousemove", onMove);
-    document.removeEventListener("mouseup", onUp);
-    document.removeEventListener("touchmove", onMove);
-    document.removeEventListener("touchend", onUp);
+  trackDrag(onMove, () => {
     if (moved) renderPhaseThumbActive();
-  }
-  document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onUp);
-  document.addEventListener("touchmove", onMove, { passive: false });
-  document.addEventListener("touchend", onUp);
+  });
 }
-function showGroupToolbar() {}
-function hideGroupToolbar() {}
 function deleteMultiSelection() {
   if (multiTokenIds.length + multiShapeIds.length === 0) return;
   pushHistory();
   tokens = tokens.filter(t => !multiTokenIds.includes(t.id));
   shapes = shapes.filter(s => !multiShapeIds.includes(s.id));
   multiTokenIds = []; multiShapeIds = [];
-  hideGroupToolbar();
   renderTokens(); renderShapes(); renderPhaseThumbActive();
   updateDrawHint(currentTool); // the field may be empty again — let the hint reappear
   // same reasoning as onStageDown's deselect branch and deleteShape:
@@ -5701,13 +5609,12 @@ function renderShapes() {
       drawShape(s, s.id === selectedShapeId || multiShapeIds.includes(s.id));
     }
   });
-  if (selectedShapeId) showShapeToolbar(selectedShapeId); else hideShapeToolbar();
   renderObjectsList();
 }
 function deleteShape(id) {
   pushHistory();
   shapes = shapes.filter(s => s.id !== id);
-  selectedShapeId = null; hideShapeToolbar();
+  selectedShapeId = null;
   renderShapes(); renderPhaseThumbActive();
   updateDrawHint(currentTool); // the field may be empty again — let the hint reappear
   // same reasoning as onStageDown's deselect branch: the now-deleted
@@ -5717,11 +5624,6 @@ function deleteShape(id) {
   if (document.getElementById("arrow-popover").classList.contains("open")) syncArrowPopover();
   if (document.getElementById("shape-popover").classList.contains("open")) syncShapePopover();
 }
-function shapeMidpoint(s) {
-  return px((s.x1+s.x2)/2, (s.y1+s.y2)/2);
-}
-function showShapeToolbar(id) {}
-function hideShapeToolbar() {}
 
 function hitTestShape(s, x, y, tolerance) {
   const p = px(x, y);
@@ -5782,7 +5684,7 @@ function hitTestShape(s, x, y, tolerance) {
 /* ─────────────────────────────────────────────────────────
    STAGE POINTER HANDLING
 ───────────────────────────────────────────────────────── */
-let isDrawing = false, drawStart = null, freehand = [];
+let isDrawing = false, drawStart = null;
 // set on mousedown when that click's empty-space hit deselected an
 // existing shape/token — read back in onStageUp to tell a real drag
 // (a new shape was actually drawn, so the tool should stay armed) apart
@@ -5865,8 +5767,7 @@ function onStageDown(e) {
     deselectedShapeOnThisDraw = !!(selectedShapeId || selectedTokenId);
     if (deselectedShapeOnThisDraw) {
       selectedShapeId = null; selectedTokenId = null;
-      multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
-      hideShapeToolbar();
+      multiTokenIds = []; multiShapeIds = [];
       // NOT closeAllPopovers() here: with the arrow/shape tool still
       // armed, the only way something was left selected at this point is
       // the shape just finished drawing (its own popover is already the
@@ -5886,7 +5787,7 @@ function onStageDown(e) {
       if (currentTool === "shape") syncShapePopover(); else syncArrowPopover();
     }
     pushHistory();
-    isDrawing = true; drawStart = p; freehand = [p];
+    isDrawing = true; drawStart = p;
     document.addEventListener("mousemove", onStageMove);
     document.addEventListener("touchmove", onStageMove, {passive:false});
     document.addEventListener("mouseup", onStageUp);
@@ -5900,9 +5801,9 @@ function onStageDown(e) {
     selectAndMaybeMoveShape(clicked, p);
   } else {
     selectedShapeId = null; selectedTokenId = null;
-    multiTokenIds = []; multiShapeIds = []; hideGroupToolbar();
+    multiTokenIds = []; multiShapeIds = [];
     closeAllPopovers();
-    hideToolbars(); renderShapes(); renderTokens();
+renderShapes(); renderTokens();
     if (currentTool === "select") startMarqueeSelect(p);
   }
 }
@@ -6273,12 +6174,12 @@ function deletePhase(id) {
 // live, animated reorder: moves the existing DOM nodes (never recreates
 // them, which would kill the active native drag) and uses a FLIP
 // transform so the other thumbnails visibly slide into their new spot
-function livePositionPhase(draggedId, targetId) {
+function liveReorderPhaseList(listId, draggedId, targetId) {
   const fromIdx = phases.findIndex(p => p.id === draggedId);
   const toIdx = phases.findIndex(p => p.id === targetId);
-  if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+  if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return false;
 
-  const list = document.getElementById("phase-list");
+  const list = document.getElementById(listId);
   const items = Array.from(list.children);
   const firstRects = new Map();
   items.forEach(el => firstRects.set(el, el.getBoundingClientRect()));
@@ -6303,7 +6204,12 @@ function livePositionPhase(draggedId, targetId) {
       });
     }
   });
-  updatePhaseLabelsOnly();
+  return true;
+}
+// the same live reorder for the two lists that show activities: the Create
+// tab's thumbnail strip and the Plan tab's cards
+function livePositionPhase(draggedId, targetId) {
+  if (liveReorderPhaseList("phase-list", draggedId, targetId)) updatePhaseLabelsOnly();
 }
 function updatePhaseLabelsOnly() {
   const list = document.getElementById("phase-list");
@@ -6588,6 +6494,12 @@ function renderPhaseList() {
   const prevBtn = document.getElementById("mobile-phase-prev"), nextBtn = document.getElementById("mobile-phase-next");
   if (prevBtn) prevBtn.disabled = idx <= 0;
   if (nextBtn) nextBtn.disabled = idx >= phases.length - 1;
+  // The strip of thumbnails (and the Output page below) are rebuilt from
+  // scratch, so doing it for a tab nobody can see — every add, delete or
+  // import while on the Plan tab — was the most expensive thing the app
+  // did on a longer plan. Switching to a tab renders it (renderModeContent),
+  // so only the one actually showing needs to be kept current.
+  if (currentMode !== "draw") { if (currentMode === "output") renderOutputContent(); return; }
   const list = document.getElementById("phase-list");
   list.innerHTML = "";
   phases.forEach((ph, i) => {
@@ -6650,7 +6562,6 @@ function renderPhaseList() {
       draggedPhaseId = null;
       div.draggable = false;
       document.querySelectorAll(".phase-thumb").forEach(t => t.classList.remove("dragging"));
-      renderAnimateOutputPhaseLists();
     });
     div.addEventListener("dragover", e => {
       e.preventDefault();
@@ -6672,7 +6583,6 @@ function renderPhaseList() {
     div.addEventListener("drop", e => e.preventDefault());
     list.appendChild(div);
   });
-  renderAnimateOutputPhaseLists();
 }
 // safety net: if a grip mousedown never turned into an actual drag (e.g.
 // just a click), make sure the card doesn't stay draggable afterward
@@ -6719,12 +6629,6 @@ function resetOutputSettingsToPrefs() {
   if (typeof o.fieldColor === "string" && /^#[0-9a-fA-F]{6}$/.test(o.fieldColor)) outputSettings.fieldColor = o.fieldColor.toUpperCase();
   setIf(outputSettings, "scale", prefNum(o.scale, 50, 200));
   syncOutputSettingsUI();
-}
-function renderAnimateOutputPhaseLists() {
-  // this still keeps the small phase-list preview used inside the
-  // Draw/Animate views' own left panel + Notes page working; Output's
-  // own multi-phase write-up is built separately by renderOutputContent()
-  renderOutputContent();
 }
 // the signed-in account's display name, for both the save payload's
 // creatorName and the live Output header — same Clerk fields either way
@@ -7200,37 +7104,20 @@ function timetableTotalDuration() {
   return phases.reduce((sum, ph) => sum + (parseInt(ph.duration, 10) || 0), 0);
 }
 function livePositionPhaseNoteRow(draggedId, targetId) {
-  const fromIdx = phases.findIndex(p => p.id === draggedId);
-  const toIdx = phases.findIndex(p => p.id === targetId);
-  if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
-  const list = document.getElementById("phase-notes-list");
-  const items = Array.from(list.children);
-  const firstRects = new Map();
-  items.forEach(el => firstRects.set(el, el.getBoundingClientRect()));
-  const [moved] = phases.splice(fromIdx, 1);
-  phases.splice(toIdx, 0, moved);
-  const idToEl = new Map(items.map(el => [Number(el.dataset.phaseId), el]));
-  phases.forEach(ph => list.appendChild(idToEl.get(ph.id)));
-  items.forEach(el => {
-    if (Number(el.dataset.phaseId) === draggedId) return;
-    const first = firstRects.get(el);
-    const last = el.getBoundingClientRect();
-    const dy = first.top - last.top;
-    if (dy) {
-      el.style.transition = "none";
-      el.style.transform = `translateY(${dy}px)`;
-      requestAnimationFrame(() => { el.style.transition = "transform 0.22s cubic-bezier(.2,.7,.3,1)"; el.style.transform = ""; });
-    }
-  });
-  updateTimetableTimeRanges();
+  if (liveReorderPhaseList("phase-notes-list", draggedId, targetId)) updateTimetableTimeRanges();
 }
 function updateTimetableTimeRanges() {
   const [sh, sm] = (document.getElementById("practice-starttime-input").value || "09:00").split(":").map(Number);
   let cursor = sh * 60 + sm;
   document.getElementById("timetable-total-duration").textContent = "Total Practice Duration: " + timetableTotalDuration() + " min";
+  // one pass over the cards, instead of a document-wide search for each
+  // activity — this runs on every keystroke in Sets / Min / Rest and on
+  // every step of a drag-reorder
+  const cardById = new Map(Array.from(document.getElementById("phase-notes-list").children).map(c => [Number(c.dataset.phaseId), c]));
   phases.forEach(ph => {
     const dur = parseInt(ph.duration, 10) || 0;
-    const rangeEl = document.querySelector(`.phase-note-card[data-phase-id="${ph.id}"] .phase-note-time-range`);
+    const card = cardById.get(ph.id);
+    const rangeEl = card && card.querySelector(".phase-note-time-range");
     if (rangeEl) rangeEl.textContent = dur ? `${formatClockTime(cursor)} - ${formatClockTime(cursor + dur)}` : "";
     cursor += dur;
   });
@@ -8063,7 +7950,6 @@ function refreshAnimatePanel() {
   const idx = phases.findIndex(p => p.id === activePhaseId);
   document.getElementById("animate-phase-title").textContent = (ph && (ph.title || "").trim()) || (phaseNoun() + " " + (idx + 1));
   renderSceneTimeline();
-  renderAnimateOutputPhaseLists();
   setAnimateProgress(0);
   updatePlaybackUIVisibility();
 }
@@ -8841,7 +8727,7 @@ let currentMode = "draw";
 function renderModeContent(mode) {
   if (mode === "output") {
     saveActivePhase();
-    renderAnimateOutputPhaseLists();
+    renderOutputContent();
     document.getElementById("output-title").textContent = document.getElementById("title-input").value;
   }
   if (mode === "notes") { renderPhaseNotes(); renderPlanDescriptionField(); }
