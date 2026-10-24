@@ -2206,7 +2206,8 @@
         </div>
         <div class="phase-notes-list" id="phase-notes-list"></div>
         <div class="timetable-add-row" id="timetable-add-row">
-          <button class="btn btn-primary" id="import-drills-btn" style="padding:7px 14px; font-size:12.5px;">Import Drills</button>
+          <button class="btn btn-primary" id="import-drills-btn" style="padding:7px 14px; font-size:12.5px;" title="Add drills you've already saved in your Drill Library">Import Drills</button>
+          <button class="btn btn-ghost" id="create-activity-btn" style="padding:7px 14px; font-size:12.5px;" title="Draw a brand-new activity in the drill creator — it's added to this plan and saved to your Drill Library">+ Create Activity</button>
           <button class="btn btn-ghost" id="add-timeslot-btn" style="padding:7px 14px; font-size:12.5px;" title="An activity with no diagram — a break, a team talk, a game described in words">+ Add Time Slot</button>
         </div>
 
@@ -7667,9 +7668,10 @@ function updatePlanEditUI() {
   closeBtn.querySelector(".close-btn-label").textContent = ctx ? "Back to Plan" : "Close";
   const note = document.getElementById("plan-edit-note");
   note.style.display = ctx ? "" : "none";
-  if (ctx) note.textContent = "Editing a drill from “" + (ctx.planTitle || "your plan") + "”";
-  document.getElementById("save-btn-label").textContent = ctx ? "Save to Plan" : "Save";
-  document.getElementById("save-caret-btn").style.display = ctx ? "" : "none";
+  if (ctx) note.textContent = (ctx.isNew ? "Creating a new activity for “" : "Editing a drill from “") + (ctx.planTitle || "your plan") + "”";
+  // creating has one outcome (the drill is saved to the library AND added to the plan), so no menu of choices
+  document.getElementById("save-btn-label").textContent = ctx ? (ctx.isNew ? "Add to Plan" : "Save to Plan") : "Save";
+  document.getElementById("save-caret-btn").style.display = (ctx && !ctx.isNew) ? "" : "none";
   document.getElementById("save-opt-update").style.display = (ctx && ctx.sourceExists) ? "" : "none";
   if (!ctx) document.getElementById("save-options-menu").classList.remove("open");
 }
@@ -7758,6 +7760,7 @@ function returnToPlan(data) {
 async function saveToPlan(mode) {
   const ctx = planEditCtx;
   if (!ctx) return;
+  if (ctx.isNew) { await addNewActivityToPlan(); return; }
   if (typeof Clerk !== "undefined" && !Clerk.user) { Clerk.openSignIn(); toast("Sign in to save"); return; }
   saveActivePhase();
   const edited = phases[0];
@@ -7804,6 +7807,78 @@ async function saveToPlan(mode) {
     toast(mode === "plan" ? "Added to your plan — save the plan to keep it" : "Added to your plan and library — save the plan to keep it");
   }
 }
+// "+ Create Activity": a blank drill creator, in this tab, for a brand-new activity. Saving there
+// (Add to Plan) saves it to the Drill Library AND puts it in the plan — the way back is the same
+// "Back to Plan" button used when editing an activity.
+async function createActivityInCreator() {
+  if (isStandaloneDrillMode || planEditCtx) return;
+  saveActivePhase();
+  const ctx = {
+    snapshot: JSON.parse(JSON.stringify(serializeAppState())),
+    baselineJSON: lastSavedSnapshotJSON,
+    planDrillId: currentDrillId, planTitle: document.getElementById("title-input").value.trim(),
+    activityId: null, activityTitle0: "", isNew: true,
+    sourceDrillId: null, sourceTitle: "", sourceExists: false, draftKey: ""
+  };
+  const fresh = newPhaseObj(null);
+  const startField = (typeof prefField !== "undefined" && prefField && SURFACES[prefField.surface]) ? prefField : null;
+  fresh.surface = startField ? startField.surface : "full";
+  fresh.fieldFlipped = startField ? !!startField.flipped : false;
+  tokens = []; shapes = [];
+  phases = [fresh];
+  planDescription = ""; sessionClips = [];
+  isStandaloneDrillMode = true;
+  currentStandaloneDrillId = null;          // no id: saving creates a NEW library drill
+  currentDrillId = null;
+  document.getElementById("title-input").value = "";
+  document.getElementById("notes-title-input").value = "";
+  setTags([]);
+  activePhaseId = null;
+  loadPhase(fresh.id);
+  applyStandaloneDrillModeUI();
+  renderPhaseList();
+  history.replaceState(null, "", location.pathname);
+  clearDraftSnapshot();
+  markSavedSnapshot();
+  ctx.draftKey = currentDraftKey();
+  planEditCtx = ctx; persistPlanEditCtx(); updatePlanEditUI();
+  switchMode("draw");
+  requestAnimationFrame(() => { resizeCanvas(); const t = document.getElementById("title-input"); if (t) t.focus(); });
+}
+// saves the new drill to the library, then adds it to the plan as an activity and returns there
+async function addNewActivityToPlan() {
+  const ctx = planEditCtx;
+  if (!ctx || !ctx.isNew) return;
+  if (typeof Clerk !== "undefined" && !Clerk.user) { Clerk.openSignIn(); toast("Sign in to save"); return; }
+  saveActivePhase();
+  const titleInput = document.getElementById("title-input");
+  const drillTitle = titleInput.value.trim();
+  if (!drillTitle) { toast("Name this activity first"); titleInput.focus(); return; }
+  currentStandaloneDrillId = null;                         // always a new library drill
+  const saved = await saveStandaloneDrill({ quiet: true });
+  if (!saved) return;                                      // it said why; you stay in the creator, nothing is lost
+  const libId = currentStandaloneDrillId;
+  const edited = JSON.parse(JSON.stringify(phases[0]));
+  edited.title = drillTitle;
+  edited.sourceDrillId = libId;
+  const snap = JSON.parse(JSON.stringify(ctx.snapshot));
+  // a plan that is still just its one untouched blank starting activity gives up that empty slot
+  const only = snap.phases.length === 1 ? snap.phases[0] : null;
+  const onlyBlank = only && !phaseHasDiagram(only) && !(only.title || "").trim() && !(only.infoBlocks || []).some(b => (b.lines || []).some(l => (l || "").trim()));
+  if (onlyBlank) snap.phases = [edited]; else snap.phases.push(edited);   // otherwise at the end, like + Add Time Slot
+  snap.phaseNextId = Math.max(snap.phaseNextId || 0, phaseNextId);
+  snap.sceneNextId = Math.max(snap.sceneNextId || 0, sceneNextId);
+  snap.nextId = Math.max(snap.nextId || 0, nextId);
+  ctx.activityId = edited.id;                              // so the new card is the one scrolled to and highlighted
+  returnToPlan(snap);
+  if (ctx.planDrillId) {
+    await saveDrill();
+    toast("Activity added to your plan and saved to your Drill Library");
+  } else {
+    toast("Activity added and saved to your Drill Library — save the plan to keep it");
+  }
+}
+document.getElementById("create-activity-btn").addEventListener("click", createActivityInCreator);
 // kept under its old name: the pencil button on a plan's activity
 async function editActivityDrill(ph) { await editActivityInCreator(ph); }
 document.getElementById("save-caret-btn").addEventListener("click", e => toggleMenu("save-options-menu", e));
@@ -10445,6 +10520,7 @@ async function saveDrill() {
     toast("Sign in to save your drill");
     return;
   }
+  if (planEditCtx && planEditCtx.isNew) { await addNewActivityToPlan(); return; }
   if (planEditCtx) { await saveToPlan("plan"); return; }
   if (isStandaloneDrillMode) { await saveStandaloneDrill(); return; }
   if (!document.getElementById("title-input").value.trim()) {
