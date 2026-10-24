@@ -229,6 +229,19 @@
     border-radius: 12px; overflow: hidden;
     box-shadow: 0 20px 44px -20px rgba(27,33,28,0.35);
   }
+  /* CROP TOOL: the whole field is shown, dimmed outside the box being chosen */
+  #crop-overlay { position: absolute; inset: 0; z-index: 8; cursor: crosshair; touch-action: none; display: none; overflow: hidden; }
+  #crop-overlay.on { display: block; }
+  .crop-box { position: absolute; box-sizing: border-box; border: 2px solid #FFD400; box-shadow: 0 0 0 9999px rgba(10, 14, 11, 0.55); cursor: move; }
+  .crop-box.empty { display: none; }
+  .crop-handle { position: absolute; width: 12px; height: 12px; box-sizing: border-box; background: #FFD400; border: 1.5px solid #1B211C; border-radius: 3px; }
+  .crop-handle[data-h="nw"] { left: -7px; top: -7px; cursor: nwse-resize; } .crop-handle[data-h="se"] { right: -7px; bottom: -7px; cursor: nwse-resize; }
+  .crop-handle[data-h="ne"] { right: -7px; top: -7px; cursor: nesw-resize; } .crop-handle[data-h="sw"] { left: -7px; bottom: -7px; cursor: nesw-resize; }
+  .crop-handle[data-h="n"] { left: calc(50% - 6px); top: -7px; cursor: ns-resize; } .crop-handle[data-h="s"] { left: calc(50% - 6px); bottom: -7px; cursor: ns-resize; }
+  .crop-handle[data-h="w"] { top: calc(50% - 6px); left: -7px; cursor: ew-resize; } .crop-handle[data-h="e"] { top: calc(50% - 6px); right: -7px; cursor: ew-resize; }
+  .crop-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .crop-actions .btn { width: 100%; justify-content: center; padding: 7px 10px; font-size: 12.5px; }
+  #crop-note { position: absolute; left: 10px; bottom: 10px; z-index: 7; pointer-events: none; padding: 4px 10px; border-radius: 12px; background: rgba(27, 33, 28, 0.78); color: #F7F8F3; font-size: 11.5px; font-weight: 600; }
   #pitch-svg, #draw-canvas, #token-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
   #pitch-svg { display: block; }
   #draw-canvas { touch-action: none; }
@@ -496,7 +509,9 @@
   .timetable-header-row.drill-mode, .phase-note-card.drill-mode {
     grid-template-columns: 20px 220px 1fr 64px;
   }
-  .pn-title-input { width: 100%; margin-bottom: 8px; font-weight: 600; }
+  .pn-title-field { margin-bottom: 8px; }
+  .pn-title-field .pn-mini-label { font-size: 8.5px; margin-bottom: 2px; cursor: text; }
+  .pn-title-input { width: 100%; font-weight: 600; }
   .timetable-add-row { display: flex; gap: 8px; margin-top: 10px; }
   .pn-no-diagram { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px dashed var(--line-md); border-radius: 8px; color: var(--ink-faint); font-size: 12.5px; }
   .pn-no-diagram-title { font-weight: 600; color: var(--ink-soft); font-size: 13.5px; }
@@ -1714,6 +1729,7 @@
             <canvas id="draw-canvas"></canvas>
             <div id="token-layer"></div>
             <div class="hint-pill" id="hint-pill" style="display:none;"></div>
+            <div id="crop-note" style="display:none;"></div>
           </div>
         </div>
         <div class="animate-scrub-row" id="animate-scrub-row" style="display:none;">
@@ -1968,6 +1984,21 @@
                 </div>
                 <button type="button" class="tp-fmt-btn" id="text-bold-btn" title="Bold" aria-pressed="true"><b>B</b></button>
                 <button type="button" class="tp-fmt-btn" id="text-italic-btn" title="Italic" aria-pressed="false"><i>I</i></button>
+              </div>
+            </div>
+          </div>
+          <div style="position:relative;">
+            <button class="tk-btn" data-tool="crop" id="crop-tool" style="width:100%;">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M5 1.5v11a1.5 1.5 0 0 0 1.5 1.5h10M1.5 5h11A1.5 1.5 0 0 1 14 6.5v10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Crop Field
+            </button>
+            <div class="team-popover" id="crop-popover">
+              <p class="tp-hint" id="crop-hint" style="margin-top:0;">Drag on the field to choose the area to keep. Drag the box to move it, or its handles to resize.</p>
+              <p class="tp-hint" id="crop-status"></p>
+              <div class="crop-actions">
+                <button class="btn btn-primary" id="crop-apply-btn" type="button">Apply Crop</button>
+                <button class="btn btn-ghost" id="crop-reset-btn" type="button">Reset to Full Field</button>
+                <button class="btn btn-ghost" id="crop-cancel-btn" type="button">Cancel</button>
               </div>
             </div>
           </div>
@@ -3027,11 +3058,20 @@ function isGenericFlip(ph) { return !!(ph && ph.fieldFlipped) && !DEDICATED_ORIE
 // that string itself — "square~v" — and is unpacked wherever a stored
 // surface is read. Dedicated keys (fullV, half…) already say it themselves.
 const FLIP_SUFFIX = "~v";
-function surfaceKeyOf(ph) { return isGenericFlip(ph) ? ph.surface + FLIP_SUFFIX : ph.surface; }
+function surfaceKeyOf(ph) {
+  const c = phaseCrop(ph);
+  return (isGenericFlip(ph) ? ph.surface + FLIP_SUFFIX : ph.surface) + (c ? ":c" + [c.x, c.y, c.w, c.h].map(n => +n.toFixed(1)).join(",") : "");
+}
 function parseSurfaceKey(raw) {
-  const str = String(raw || "full");
+  let str = String(raw || "full"), crop = null;
+  const ci = str.indexOf(":c");
+  if (ci !== -1) {
+    const n = str.slice(ci + 2).split(",").map(Number);
+    crop = n.length === 4 ? normalizeCrop({ x: n[0], y: n[1], w: n[2], h: n[3] }) : null;
+    str = str.slice(0, ci);
+  }
   const flipped = str.endsWith(FLIP_SUFFIX);
-  return { surface: flipped ? str.slice(0, -FLIP_SUFFIX.length) : str, flipped };
+  return { surface: flipped ? str.slice(0, -FLIP_SUFFIX.length) : str, flipped, crop };
 }
 // lists every surface as a single scrollable panel now that Field has its
 // own toolkit popover, rather than paging four at a time above the canvas.
@@ -3133,6 +3173,48 @@ function flippedViewBox(viewBox) {
 // active surface IS a dedicated vertical key (fullV, half, the existing
 // hand-made pairs), or because the active phase has generically flipped
 // whatever plain surface is selected
+/* ═════════════════════════════════════════════════════════════════════
+   CROP — an activity can show just part of its field. Every object keeps
+   its position as a percentage of the WHOLE field; a crop is only a window
+   onto it (ph.crop = { x, y, w, h }, all % of the field), so resetting the
+   crop brings back everything outside it, and flipping/mirroring just move
+   the window with the field. The window is applied at a few seams only:
+   px() and pctFromEvent() (canvas + mouse), viewPct() (where DOM objects sit),
+   fieldScaleFactor() (objects grow with the field), the field SVG's viewBox,
+   and the stage's shape (applySurface). Previews/Output/PDF just crop the
+   SVG's viewBox.
+═════════════════════════════════════════════════════════════════════ */
+const CROP_MIN_PCT = 12;                       // a crop can't be smaller than this share of the field's width/height
+const FULL_VIEW = { x: 0, y: 0, w: 100, h: 100 };
+let cropEditing = false;                       // the Crop tool is open (the whole field is shown while you choose)
+let cropDraft = null;                          // the box being drawn/adjusted
+let currentView = FULL_VIEW;                   // what the main field is showing right now
+function normalizeCrop(c) {
+  if (!c || ![c.x, c.y, c.w, c.h].every(Number.isFinite)) return null;
+  const w = Math.min(100, Math.max(CROP_MIN_PCT, c.w)), h = Math.min(100, Math.max(CROP_MIN_PCT, c.h));
+  const x = Math.min(100 - w, Math.max(0, c.x)), y = Math.min(100 - h, Math.max(0, c.y));
+  if (w >= 99.5 && h >= 99.5) return null;     // the whole field is no crop
+  return { x: +x.toFixed(2), y: +y.toFixed(2), w: +w.toFixed(2), h: +h.toFixed(2) };
+}
+function phaseCrop(ph) { return ph ? normalizeCrop(ph.crop) : null; }
+function refreshCropView() {
+  const ph = phases.find(p => p.id === activePhaseId);
+  currentView = (cropEditing ? null : phaseCrop(ph)) || FULL_VIEW;
+  return currentView;
+}
+// "x y w h" of the part of a field's viewBox a crop shows
+function croppedViewBox(viewBox, crop) {
+  if (!crop) return viewBox;
+  const [vx, vy, vw, vh] = viewBox.split(/\s+/).map(Number);
+  return [vx + crop.x / 100 * vw, vy + crop.y / 100 * vh, crop.w / 100 * vw, crop.h / 100 * vh].map(n => +n.toFixed(3)).join(" ");
+}
+// where a field position sits inside the stage, as a % of the stage (the stage shows the crop)
+function viewPct(x, y) {
+  const v = currentView;
+  if (v === FULL_VIEW) return { x, y };        // no crop: exactly the stored position, no arithmetic noise
+  return { x: (x - v.x) / v.w * 100, y: (y - v.y) / v.h * 100 };
+}
+function isFullView() { return currentView.w >= 100 && currentView.h >= 100; }
 function isFieldVertical(ph) {
   // Half's own dedicated "vertical" key is literally named "half" (its
   // horizontal counterpart is "halfT") — a naming quirk that VERTICAL_
@@ -3155,9 +3237,13 @@ function applySurface(name) {
   // instead of a computed transpose of the horizontal one
   const genericFlip = !DEDICATED_ORIENTATION_KEYS.has(name) && !!(ph && ph.fieldFlipped);
   const ratio = genericFlip ? flippedRatio(s.ratio) : s.ratio;
-  const viewBox = genericFlip ? flippedViewBox(s.viewBox) : s.viewBox;
+  const fullViewBox = genericFlip ? flippedViewBox(s.viewBox) : s.viewBox;
+  // with a crop, the stage takes the SHAPE of the cropped area and the field SVG shows just that part
+  refreshCropView();
+  const crop = cropEditing ? null : phaseCrop(ph);
+  const viewBox = croppedViewBox(fullViewBox, crop);
   const stageEl = document.getElementById("pitch-stage");
-  stageEl.style.aspectRatio = ratio;
+  stageEl.style.aspectRatio = crop ? viewBox.split(/\s+/).slice(2).join(" / ") : ratio;
   // square-ish surfaces (like 4 Grid) would otherwise stretch as tall as
   // they are wide at the usual 640px cap, which is often taller than the
   // canvas area and forces a vertical scrollbar — cap those narrower so
@@ -3173,7 +3259,12 @@ function applySurface(name) {
   // throwing off every token/equipment icon's apparent size relative to
   // it even though their own underlying (correct) position was untouched.
   const baseMax = (s.maxWidth || 640) + "px";
-  if (genericFlip) {
+  if (crop) {
+    // a cropped view also needs a definite width (see the flipped case below):
+    // as wide as the field would be, or narrower when the crop is taller than wide
+    const cp = viewBox.split(/\s+/).map(Number);
+    stageBaseSizing = { width: (parseFloat(baseMax) * Math.min(1, cp[2] / cp[3])) + "px", maxWidth: "100%", maxHeight: "none" };
+  } else if (genericFlip) {
     // The flipped field needs a DEFINITE width. Its only children are
     // absolutely positioned, so it has no content size of its own, and a
     // max-height on its own doesn't give it one either (a max is a ceiling,
@@ -3210,6 +3301,7 @@ function applySurface(name) {
 ───────────────────────────────────────────────────────── */
 function snapshot() {
   return {
+    crop: (() => { const c = phaseCrop(activePhaseObj()); return c ? { ...c } : null; })(),
     tokens: tokens.map(t => ({...t})),
     shapes: shapes.map(s => ({...s, points: s.points ? s.points.map(p=>({...p})) : undefined}))
   };
@@ -3218,6 +3310,13 @@ function pushHistory() {
   undoStack.push(snapshot());
   if (undoStack.length > 50) undoStack.shift();
   redoStack.length = 0;
+}
+function restoreCropFrom(snap) {
+  const ph = activePhaseObj();
+  if (!ph || !("crop" in snap)) return;
+  const before = JSON.stringify(phaseCrop(ph));
+  if (snap.crop) ph.crop = { ...snap.crop }; else delete ph.crop;
+  if (JSON.stringify(phaseCrop(ph)) !== before) applyCropView();
 }
 function clearSelectionState() {
   selectedTokenId = null; selectedShapeId = null;
@@ -3230,6 +3329,7 @@ function undo() {
   redoStack.push(snapshot());
   const prev = undoStack.pop();
   tokens = prev.tokens; shapes = prev.shapes;
+  restoreCropFrom(prev);
   clearSelectionState();
   renderTokens(); renderShapes();
   renderPhaseThumbActive();
@@ -3240,6 +3340,7 @@ function redo() {
   undoStack.push(snapshot());
   const next = redoStack.pop();
   tokens = next.tokens; shapes = next.shapes;
+  restoreCropFrom(next);
   clearSelectionState();
   renderTokens(); renderShapes();
   renderPhaseThumbActive();
@@ -3326,7 +3427,8 @@ const TOOL_HINTS = {
   ball: "Click to place a ball",
   arrow: "Click and drag to draw",
   shape: "Click and drag to draw a shape",
-  text: "Click on the pitch to add a text label"
+  text: "Click on the pitch to add a text label",
+  crop: "Drag on the field to draw the area to keep"
 };
 // the "click and drag to draw" hints are onboarding for an empty field —
 // once the coach has actually drawn something there, they already know
@@ -3344,6 +3446,7 @@ function updateDrawHint(tool) {
 }
 function setTool(tool, keepPanelOpen) {
   commitOrDiscardTextEdit(); // switching tools while an empty text box is still focused shouldn't leave it behind uncommitted
+  if (cropEditing && tool !== "crop") exitCropEditing("cancel"); // leaving the Crop tool any other way changes nothing
   currentTool = tool;
   if (!keepPanelOpen) closeAllPopovers();
   refreshToolButtonStates();
@@ -3351,6 +3454,7 @@ function setTool(tool, keepPanelOpen) {
   multiTokenIds = []; multiShapeIds = [];
   renderTokens(); renderShapes();
   updateDrawHint(tool);
+  if (tool === "crop") enterCropEditing();
 }
 // scrolls the toolkit panel so a newly-opened accordion panel is fully
 // visible, since opening one can push it further down the list
@@ -3373,7 +3477,7 @@ function focusOpenPanel(id) {
   el.addEventListener("transitionend", onEnd);
   setTimeout(run, 320);
 }
-const TOOL_POPOVER_IDS = { arrow: "arrow-popover", player: "player-popover", equipment: "equipment-popover", shape: "shape-popover", text: "text-popover", ball: "ball-popover" };
+const TOOL_POPOVER_IDS = { arrow: "arrow-popover", player: "player-popover", equipment: "equipment-popover", shape: "shape-popover", text: "text-popover", ball: "ball-popover", crop: "crop-popover" };
 // a toolkit button should look "on" whenever its own panel is the one
 // currently showing — whether that's because this tool is actually armed
 // (currentTool) or because an existing selection opened it for editing
@@ -3479,11 +3583,15 @@ function applySurfaceSelection(newSurface, newFieldFlipped) {
   // for DISPLAY purposes — those are two separate questions)
   const wasVertical = VERTICAL_SURFACES.includes(surface) || !!(!DEDICATED_ORIENTATION_KEYS.has(surface) && ph && ph.fieldFlipped);
   const willBeVertical = VERTICAL_SURFACES.includes(newSurface) || !!(!DEDICATED_ORIENTATION_KEYS.has(newSurface) && newFieldFlipped);
+  // a different KIND of field makes the old crop meaningless; just flipping the same field turns the crop with it
+  const family = k => { const e = Object.entries(ORIENTATION_PAIRS).find(([, pr]) => pr.h === k || pr.v === k); return e ? e[0] : k; };
+  if (ph && ph.crop && family(newSurface) !== family(surface)) delete ph.crop;
   if (wasVertical !== willBeVertical) {
     // orientation is actually changing — rotate every scene's tokens and
     // shapes in this phase along with it, not just whatever's on screen
     // right now, so animation frames don't fall out of sync with the field
     pushHistory();
+    if (ph && ph.crop) ph.crop = { x: ph.crop.y, y: ph.crop.x, w: ph.crop.h, h: ph.crop.w };
     if (ph) {
       ph.scenes.forEach(sc => {
         sc.tokens.forEach(transposeXY);
@@ -3542,11 +3650,142 @@ function pctFromEvent(e) {
   const rect = stage.getBoundingClientRect();
   const cx = e.touches ? e.touches[0].clientX : e.clientX;
   const cy = e.touches ? e.touches[0].clientY : e.clientY;
+  const v = currentView; // the stage shows the crop, so a point on it is a point inside the crop
   return {
-    x: Math.min(100, Math.max(0, ((cx - rect.left) / rect.width) * 100)),
-    y: Math.min(100, Math.max(0, ((cy - rect.top) / rect.height) * 100))
+    x: Math.min(v.x + v.w, Math.max(v.x, v.x + ((cx - rect.left) / rect.width) * v.w)),
+    y: Math.min(v.y + v.h, Math.max(v.y, v.y + ((cy - rect.top) / rect.height) * v.h))
   };
 }
+
+/* ─────────────────────────────────────────────────────────
+   CROP TOOL — open it and the whole field is shown, with the current crop
+   (if any) as a box over it. Drag on the field to draw a new box; drag the
+   box to move it or its handles to resize; Apply keeps that area, Reset
+   brings back the full field, Cancel (or Esc) changes nothing.
+───────────────────────────────────────────────────────── */
+const CROP_HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+function activePhaseObj() { return phases.find(p => p.id === activePhaseId); }
+// re-lay out the field for whatever the crop now is, and redraw everything on it
+function applyCropView() {
+  applySurface(surface);
+  resizeCanvas();
+  renderTokens(); renderShapes();
+  updateCropNote();
+}
+function buildCropOverlay() {
+  let ov = document.getElementById("crop-overlay");
+  if (ov) return ov;
+  ov = document.createElement("div");
+  ov.id = "crop-overlay";
+  const box = document.createElement("div");
+  box.className = "crop-box empty";
+  CROP_HANDLES.forEach(h => { const d = document.createElement("div"); d.className = "crop-handle"; d.dataset.h = h; box.appendChild(d); });
+  ov.appendChild(box);
+  stage.appendChild(ov);
+  ov.addEventListener("mousedown", onCropDown);
+  ov.addEventListener("touchstart", onCropDown, { passive: false });
+  return ov;
+}
+function renderCropBox() {
+  const box = document.querySelector("#crop-overlay .crop-box");
+  if (!box) return;
+  if (!cropDraft) { box.classList.add("empty"); return; }
+  box.classList.remove("empty");
+  box.style.left = cropDraft.x + "%"; box.style.top = cropDraft.y + "%";
+  box.style.width = cropDraft.w + "%"; box.style.height = cropDraft.h + "%";
+  updateCropPanel();
+}
+function updateCropPanel() {
+  const ph = activePhaseObj(), saved = phaseCrop(ph);
+  const draft = cropDraft && normalizeCrop(cropDraft);
+  const status = document.getElementById("crop-status");
+  if (!status) return;
+  status.textContent = cropDraft
+    ? (draft ? `Keeping ${Math.round(draft.w)}% × ${Math.round(draft.h)}% of the field` : "That's the whole field — drag a smaller box")
+    : (saved ? "Currently cropped" : "No crop yet — the whole field is shown");
+  document.getElementById("crop-apply-btn").disabled = !draft;
+  document.getElementById("crop-reset-btn").disabled = !saved && !cropDraft;
+}
+function cropDraftFor(mode, orig, a, b) {
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  if (mode === "new") return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+  if (mode === "move") return { x: clamp(orig.x + (b.x - a.x), 0, 100 - orig.w), y: clamp(orig.y + (b.y - a.y), 0, 100 - orig.h), w: orig.w, h: orig.h };
+  let L = orig.x, T = orig.y, R = orig.x + orig.w, B = orig.y + orig.h;
+  const h = mode.slice(2);
+  if (h.includes("w")) L = clamp(b.x, 0, R - 1);
+  if (h.includes("e")) R = clamp(b.x, L + 1, 100);
+  if (h.includes("n")) T = clamp(b.y, 0, B - 1);
+  if (h.includes("s")) B = clamp(b.y, T + 1, 100);
+  return { x: L, y: T, w: R - L, h: B - T };
+}
+function onCropDown(e) {
+  if (!cropEditing) return;
+  e.preventDefault(); e.stopPropagation();
+  const handle = e.target.closest(".crop-handle");
+  const inBox = e.target.closest(".crop-box");
+  const start = pctFromEvent(e);
+  const orig = cropDraft ? { ...cropDraft } : null;
+  const mode = (handle && orig) ? "h:" + handle.dataset.h : (inBox && orig) ? "move" : "new";
+  let moved = false;
+  trackDrag(ev => {
+    if (ev.cancelable) ev.preventDefault();
+    const p = pctFromEvent(ev);
+    if (Math.abs(p.x - start.x) + Math.abs(p.y - start.y) > 0.4) moved = true;
+    cropDraft = cropDraftFor(mode, orig, start, p);
+    renderCropBox();
+  }, () => {
+    // a plain click (no drag) shouldn't leave a zero-size box behind
+    if (!moved) cropDraft = orig;
+    else if (cropDraft && (cropDraft.w < 1 || cropDraft.h < 1)) cropDraft = orig;
+    renderCropBox(); updateCropPanel();
+  });
+}
+function enterCropEditing() {
+  if (cropEditing) return;
+  const saved = phaseCrop(activePhaseObj());
+  cropEditing = true;
+  cropDraft = saved ? { ...saved } : null;
+  applyCropView();                         // shows the whole field
+  buildCropOverlay().classList.add("on");
+  renderCropBox(); updateCropPanel();
+}
+// how: "apply" keeps the drawn box · "reset" removes the crop · "cancel" changes nothing
+function exitCropEditing(how) {
+  if (!cropEditing) return;
+  const ph = activePhaseObj();
+  if (ph && (how === "apply" || how === "reset")) {
+    const next = how === "apply" ? normalizeCrop(cropDraft) : null;
+    if (JSON.stringify(next) !== JSON.stringify(phaseCrop(ph))) { pushHistory(); if (next) ph.crop = next; else delete ph.crop; }
+  }
+  cropEditing = false; cropDraft = null;
+  const ov = document.getElementById("crop-overlay");
+  if (ov) ov.classList.remove("on");
+  applyCropView();
+  renderPhaseThumbActive();
+}
+// the "N items outside the crop" note — those items aren't gone, just out of view
+function updateCropNote() {
+  const note = document.getElementById("crop-note");
+  if (!note) return;
+  const v = currentView;
+  if (cropEditing || isFullView()) { note.style.display = "none"; return; }
+  const outsideX = x => x < v.x - 0.01 || x > v.x + v.w + 0.01, outsideY = y => y < v.y - 0.01 || y > v.y + v.h + 0.01;
+  let n = tokens.filter(t => outsideX(t.x) || outsideY(t.y)).length;
+  n += shapes.filter(sh => {
+    const x1 = Math.min(sh.x1, sh.x2), x2 = Math.max(sh.x1, sh.x2), y1 = Math.min(sh.y1, sh.y2), y2 = Math.max(sh.y1, sh.y2);
+    return x2 < v.x || x1 > v.x + v.w || y2 < v.y || y1 > v.y + v.h;     // not touching the visible area at all
+  }).length;
+  note.textContent = n === 1 ? "1 item outside the crop" : n + " items outside the crop";
+  note.style.display = n ? "block" : "none";
+}
+document.getElementById("crop-apply-btn").addEventListener("click", () => { exitCropEditing("apply"); setTool("select"); });
+document.getElementById("crop-reset-btn").addEventListener("click", () => { exitCropEditing("reset"); setTool("select"); });
+document.getElementById("crop-cancel-btn").addEventListener("click", () => { exitCropEditing("cancel"); setTool("select"); });
+document.addEventListener("keydown", e => {
+  if (!cropEditing) return;
+  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); exitCropEditing("cancel"); setTool("select"); }
+  else if (e.key === "Enter" && normalizeCrop(cropDraft)) { e.preventDefault(); e.stopPropagation(); exitCropEditing("apply"); setTool("select"); }
+}, true);
 
 /* ─────────────────────────────────────────────────────────
    TOKENS
@@ -4044,8 +4283,9 @@ function renderTokens() {
     el.className = "token " + baseClass + ((t.id === selectedTokenId || multiTokenIds.includes(t.id)) ? " selected" : "");
     el.dataset.tokenId = t.id;
     const pos = playbackOverrides[t.id] || { x: t.x, y: t.y };
-    el.style.left = pos.x + "%";
-    el.style.top  = pos.y + "%";
+    const vp = viewPct(pos.x, pos.y);
+    el.style.left = vp.x + "%";
+    el.style.top  = vp.y + "%";
     let isEditing = false;
     if (t.type === "player") {
       const mode = t.labelMode || "number";
@@ -4153,8 +4393,9 @@ function renderTokens() {
       const nameEl = document.createElement("div");
       nameEl.className = "player-name-label";
       nameEl.textContent = t.name;
-      nameEl.style.left = pos.x + "%";
-      nameEl.style.top  = pos.y + "%";
+      const nvp = viewPct(pos.x, pos.y);
+      nameEl.style.left = nvp.x + "%";
+      nameEl.style.top  = nvp.y + "%";
       nameEl.style.transform = `translate(-50%, ${(t.size/2 + 4) * fieldScaleFactor()}px)`;
       layer.appendChild(nameEl);
     }
@@ -4172,6 +4413,7 @@ function renderTokens() {
     }
   }
   renderObjectsList();
+  updateCropNote(); // the "N items outside the crop" note follows whatever was just drawn
 }
 
 let dragMoved = false;
@@ -4202,8 +4444,9 @@ function buildRotationHandle(t, pos) {
   const dist = halfHeight + 16 * fieldScaleFactor();
   const dx = Math.cos(angleRad) * dist;
   const dy = Math.sin(angleRad) * dist;
-  dot.style.left = pos.x + "%";
-  dot.style.top = pos.y + "%";
+  const dvp = viewPct(pos.x, pos.y);
+  dot.style.left = dvp.x + "%";
+  dot.style.top = dvp.y + "%";
   dot.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
   dot.addEventListener("mousedown", ev => startTokenRotate(ev, t.id));
   dot.addEventListener("touchstart", ev => startTokenRotate(ev, t.id), {passive:false});
@@ -4294,8 +4537,9 @@ function startTextEditDrag(e, id, el) {
     t.x = Math.min(100, Math.max(0, t.x + (p.x - last.x)));
     t.y = Math.min(100, Math.max(0, t.y + (p.y - last.y)));
     last = p;
-    el.style.left = t.x + "%";
-    el.style.top = t.y + "%";
+    const tvp = viewPct(t.x, t.y);
+    el.style.left = tvp.x + "%";
+    el.style.top = tvp.y + "%";
   }
   trackDrag(onMove, () => {
     if (dragging) { pushHistory(); renderPhaseThumbActive(); }
@@ -4398,7 +4642,7 @@ function startTokenDrag(e, id) {
 // sites elsewhere don't need to change
 
 function closeAllPopovers() {
-  ["arrow-popover", "player-popover", "equipment-popover", "shape-popover", "text-popover", "ball-popover", "formations-popover", "field-popover"].forEach(id => {
+  ["arrow-popover", "player-popover", "equipment-popover", "shape-popover", "text-popover", "ball-popover", "crop-popover", "formations-popover", "field-popover"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.remove("open");
   });
@@ -5162,12 +5406,13 @@ function applyFieldZoom() {
 // everything drawn on top of the field is set in fixed CSS/canvas pixels,
 // so it's multiplied by this to grow and shrink in step with the field
 function fieldScaleFactor() {
-  return fieldScaleCurrent;
+  // cropped in, the field is drawn larger — and everything on it grows with it
+  return fieldScaleCurrent * (100 / currentView.w);
 }
 
 document.getElementById("field-zoom-reset-btn").addEventListener("click", resetFieldViewport);
 
-function px(xPct, yPct) { return { x: (xPct/100)*rectW, y: (yPct/100)*rectH }; }
+function px(xPct, yPct) { const v = currentView; return { x: ((xPct - v.x) / v.w) * rectW, y: ((yPct - v.y) / v.h) * rectH }; }
 
 function drawArrowhead(x2, y2, angle, size, color) {
   ctx.beginPath();
@@ -5494,8 +5739,9 @@ function startMarqueeSelect(startP) {
   function updateBoxVisual(curP) {
     const x1 = Math.min(startP.x, curP.x), x2 = Math.max(startP.x, curP.x);
     const y1 = Math.min(startP.y, curP.y), y2 = Math.max(startP.y, curP.y);
-    box.style.left = x1 + "%"; box.style.top = y1 + "%";
-    box.style.width = (x2 - x1) + "%"; box.style.height = (y2 - y1) + "%";
+    const mv = currentView;
+    box.style.left = ((x1 - mv.x) / mv.w * 100) + "%"; box.style.top = ((y1 - mv.y) / mv.h * 100) + "%";
+    box.style.width = ((x2 - x1) / mv.w * 100) + "%"; box.style.height = ((y2 - y1) / mv.h * 100) + "%";
   }
   function onMove(ev) {
     ev.preventDefault();
@@ -6001,7 +6247,10 @@ function newPhaseObj(contentSrc, surfaceSrc) {
     // generic vertical/horizontal flip for surfaces with no pre-made
     // vertical version of their own (see isFieldVertical/applySurface) —
     // Full and Half ignore this and use their own dedicated keys instead
-    fieldFlipped: contentSrc ? !!contentSrc.fieldFlipped : false
+    fieldFlipped: contentSrc ? !!contentSrc.fieldFlipped : false,
+    // the crop (the part of the field this activity shows), copied with it —
+    // only present when there is one, so uncropped activities save exactly as before
+    ...(contentSrc && phaseCrop(contentSrc) ? { crop: { ...phaseCrop(contentSrc) } } : {})
   };
 }
 function saveActiveScene() {
@@ -6144,7 +6393,9 @@ function mirrorCurrentPhase() {
     playingAreaLength: current.playingAreaLength || "", playingAreaWidth: current.playingAreaWidth || "",
     activeSets: current.activeSets || "", activeMinutes: current.activeMinutes || "", activeRest: current.activeRest || "",
     viewZoom: 0,
-    fieldFlipped: !!current.fieldFlipped
+    fieldFlipped: !!current.fieldFlipped,
+    // mirrored left-to-right, so the crop's window moves across with the field
+    ...(phaseCrop(current) ? { crop: { ...phaseCrop(current), x: 100 - phaseCrop(current).x - phaseCrop(current).w } } : {})
   };
   const idx = phases.findIndex(p => p.id === activePhaseId);
   phases.splice(idx + 1, 0, ph);
@@ -6229,6 +6480,7 @@ function updatePhaseLabelsOnly() {
   document.getElementById("phase-count").textContent = `${phaseNoun().toUpperCase()} ${phases.findIndex(p=>p.id===activePhaseId)+1}/${phases.length}`;
 }
 function renderPhaseThumbActive() {
+  updateCropNote();
   saveActivePhase();
   renderPhaseList();
 }
@@ -6487,7 +6739,7 @@ function phaseThumbHTML(ph, opts) {
     return "";
   }).join("");
 
-  return `<svg viewBox="${viewBoxStr}" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%;display:block;">${STRIPES_DEFS}${fieldMarkup}${shapeMarkup}${tokenMarkup}</svg>`;
+  return `<svg viewBox="${croppedViewBox(viewBoxStr, phaseCrop(ph))}" preserveAspectRatio="xMidYMid meet" style="position:absolute;inset:0;width:100%;height:100%;display:block;">${STRIPES_DEFS}${fieldMarkup}${shapeMarkup}${tokenMarkup}</svg>`;
 }
 function renderPhaseList() {
   // belt-and-suspenders: renderPhaseList() runs on almost every state
@@ -7049,7 +7301,7 @@ async function playFullAnimationModal() {
 
   function setStageRatio(ph) {
     const surf = SURFACES[ph.surface] || SURFACES.full;
-    const vb = (isGenericFlip(ph) ? flippedViewBox(surf.viewBox) : surf.viewBox).split(" ").map(Number);
+    const vb = croppedViewBox(isGenericFlip(ph) ? flippedViewBox(surf.viewBox) : surf.viewBox, phaseCrop(ph)).split(" ").map(Number);
     stage.style.aspectRatio = vb[2] + " / " + vb[3];
   }
   function wait(ms) {
@@ -7448,7 +7700,7 @@ async function saveToPlan(mode) {
   const snap = JSON.parse(JSON.stringify(ctx.snapshot));
   const target = snap.phases.find(p => p.id === ctx.activityId);
   if (target) {
-    ["surface", "fieldFlipped", "scenes", "activeSceneId", "infoBlocks", "noteBlocks", "dimensions", "playingAreaLength", "playingAreaWidth"]
+    ["surface", "fieldFlipped", "crop", "scenes", "activeSceneId", "infoBlocks", "noteBlocks", "dimensions", "playingAreaLength", "playingAreaWidth"]
       .forEach(k => { if (edited[k] !== undefined) target[k] = JSON.parse(JSON.stringify(edited[k])); });
     if (drillTitle) target.title = drillTitle;
     if (libId) target.sourceDrillId = libId;
@@ -7579,6 +7831,7 @@ function renderPhaseNotes() {
       // with no Create tab, this is where an activity gets its name
       const titleInput = document.createElement("input");
       titleInput.type = "text"; titleInput.className = "field-input pn-title-input";
+      titleInput.id = "pn-title-" + ph.id;
       titleInput.placeholder = phaseNoun() + " " + (phIdx + 1);
       titleInput.value = ph.title || "";
       titleInput.maxLength = 120;
@@ -7587,7 +7840,14 @@ function renderPhaseNotes() {
         const ov = card.querySelector(".phase-note-thumb-title-overlay, .pn-no-diagram-title");
         if (ov) ov.textContent = ph.title || titleInput.placeholder;
       });
-      exerciseWrap.appendChild(titleInput);
+      // a small label above it, like Sets / Min / Rest, so it's plain this is where the name goes
+      const titleField = document.createElement("div");
+      titleField.className = "pn-title-field";
+      const titleLabel = document.createElement("label");
+      titleLabel.className = "pn-mini-label"; titleLabel.htmlFor = titleInput.id; titleLabel.textContent = "Title";
+      titleField.appendChild(titleLabel);
+      titleField.appendChild(titleInput);
+      exerciseWrap.appendChild(titleField);
     }
     if (thumb) {
       const titleOverlay = document.createElement("div");
@@ -8515,7 +8775,7 @@ function renderImportPhaseRows() {
       rowsEl.appendChild(row);
       // surface/scenes come straight from the list response now — no
       // per-row follow-up fetch needed
-      document.getElementById("import-phase-thumb-" + d.id).innerHTML = phaseThumbHTML({ surface: parseSurfaceKey(d.surface).surface, fieldFlipped: parseSurfaceKey(d.surface).flipped, scenes: d.scenes });
+      document.getElementById("import-phase-thumb-" + d.id).innerHTML = phaseThumbHTML({ surface: parseSurfaceKey(d.surface).surface, fieldFlipped: parseSurfaceKey(d.surface).flipped, crop: parseSurfaceKey(d.surface).crop, scenes: d.scenes });
     });
   }
   const count = filtered.length;
@@ -8559,6 +8819,7 @@ async function importOneDrill(id, title, insertAfterIdx) {
       newPhase.infoBlocks = src.infoBlocks.map(b => ({ ...b, id: nextId++, lines: Array.isArray(b.lines) ? [...b.lines] : b.lines }));
     }
     ["playingAreaLength", "playingAreaWidth"].forEach(k => { if (src[k]) newPhase[k] = src[k]; });
+    if (!newPhase.crop && phaseCrop(src)) newPhase.crop = { ...phaseCrop(src) };
   }
   phases.splice(insertAfterIdx, 0, newPhase);
   return { phase: newPhase, extraPhases: Math.max(0, (Array.isArray(data.phases) ? data.phases.length : 1) - 1) };
@@ -10714,7 +10975,7 @@ async function openStandaloneDrillEditorExisting(id) {
         sc.shapes.forEach(s => { if (s.id != null && s.id >= nextId) nextId = s.id + 1; });
       });
       const ph = {
-        id: phaseNextId++, surface: parseSurfaceKey(data.surface).surface, fieldFlipped: parseSurfaceKey(data.surface).flipped, scenes, activeSceneId: scenes[0].id,
+        id: phaseNextId++, surface: parseSurfaceKey(data.surface).surface, fieldFlipped: parseSurfaceKey(data.surface).flipped, crop: parseSurfaceKey(data.surface).crop, scenes, activeSceneId: scenes[0].id,
         noteBlocks: [data.notes || ""], title: data.title || "", duration: "", dimensions: data.dimensions || ""
       };
       repairPhaseSceneIdContinuity(ph); // in case this specific drill was saved with the id-mismatch corruption before the underlying bug was fixed
@@ -10847,7 +11108,7 @@ function applyLibraryFilters() {
     gridEl.appendChild(card);
     // surface/scenes now come straight from the list response — no more
     // per-card follow-up fetch needed to render the thumbnail
-    document.getElementById("lib-thumb-" + d.id).appendChild(createAnimatedThumb({ surface: parseSurfaceKey(d.surface).surface, fieldFlipped: parseSurfaceKey(d.surface).flipped, scenes: d.scenes }, "lib-card-thumb-inner"));
+    document.getElementById("lib-thumb-" + d.id).appendChild(createAnimatedThumb({ surface: parseSurfaceKey(d.surface).surface, fieldFlipped: parseSurfaceKey(d.surface).flipped, crop: parseSurfaceKey(d.surface).crop, scenes: d.scenes }, "lib-card-thumb-inner"));
   });
 }
 // builds one set of back/page/forward controls into the given container —
@@ -10989,7 +11250,7 @@ async function openLibraryDrillDetail(id) {
       // exactly one phase (or a legacy drill with no phases array at all)
       // — same simple layout as before: one large preview near the top,
       // Notes as its own separate section underneath, no phase label
-      const ph = (Array.isArray(d.phases) && d.phases.length) ? d.phases[0] : { surface: parseSurfaceKey(d.surface).surface, fieldFlipped: parseSurfaceKey(d.surface).flipped, scenes: d.scenes, infoBlocks: d.notes ? [{ enabled: true, title: "", text: d.notes }] : [] };
+      const ph = (Array.isArray(d.phases) && d.phases.length) ? d.phases[0] : { surface: parseSurfaceKey(d.surface).surface, fieldFlipped: parseSurfaceKey(d.surface).flipped, crop: parseSurfaceKey(d.surface).crop, scenes: d.scenes, infoBlocks: d.notes ? [{ enabled: true, title: "", text: d.notes }] : [] };
       const thumbWrap = document.createElement("div");
       thumbWrap.className = "lib-detail-thumb";
       thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, fieldFlipped: ph.fieldFlipped, scenes: ph.scenes }, "lib-detail-thumb-inner"));
