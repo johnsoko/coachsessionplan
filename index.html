@@ -241,6 +241,17 @@
   .crop-handle[data-h="w"] { top: calc(50% - 6px); left: -7px; cursor: ew-resize; } .crop-handle[data-h="e"] { top: calc(50% - 6px); right: -7px; cursor: ew-resize; }
   .crop-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
   .crop-actions .btn { width: 100%; justify-content: center; padding: 7px 10px; font-size: 12.5px; }
+  #crop-bar { position: absolute; left: 10px; top: 10px; z-index: 9; display: flex; align-items: center; gap: 2px; padding: 3px 4px 3px 10px; border-radius: 9px; background: rgba(27, 33, 28, 0.84); color: #F7F8F3; font-size: 11.5px; font-weight: 600; }
+  #crop-bar .crop-bar-label { margin-right: 6px; opacity: 0.85; }
+  #crop-bar button { border: none; background: transparent; color: #F7F8F3; font: inherit; font-weight: 700; padding: 4px 9px; border-radius: 6px; cursor: pointer; }
+  #crop-bar button:hover { background: rgba(247, 248, 243, 0.18); }
+  #crop-bar #crop-bar-reset { color: #FFD400; }
+  /* Apply / Cancel sit right beside the box being drawn, so there's no need to leave the field to finish */
+  .crop-actions-float { position: absolute; z-index: 10; display: flex; gap: 6px; padding: 5px; border-radius: 9px; background: rgba(27, 33, 28, 0.92); transform: translateX(-50%); white-space: nowrap; box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.5); }
+  .crop-actions-float button { border: none; border-radius: 6px; padding: 6px 12px; font: 700 12px var(--body); cursor: pointer; }
+  .crop-actions-float .cf-apply { background: #FFD400; color: #1B211C; }
+  .crop-actions-float .cf-cancel, .crop-actions-float .cf-reset { background: rgba(247, 248, 243, 0.14); color: #F7F8F3; }
+  .crop-actions-float button:hover { filter: brightness(1.12); }
   #crop-note { position: absolute; left: 10px; bottom: 10px; z-index: 7; pointer-events: none; padding: 4px 10px; border-radius: 12px; background: rgba(27, 33, 28, 0.78); color: #F7F8F3; font-size: 11.5px; font-weight: 600; }
   #pitch-svg, #draw-canvas, #token-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
   #pitch-svg { display: block; }
@@ -1729,6 +1740,11 @@
             <canvas id="draw-canvas"></canvas>
             <div id="token-layer"></div>
             <div class="hint-pill" id="hint-pill" style="display:none;"></div>
+            <div id="crop-bar" style="display:none;">
+              <span class="crop-bar-label">Cropped view</span>
+              <button type="button" id="crop-bar-adjust" title="Change the cropped area">Adjust</button>
+              <button type="button" id="crop-bar-reset" title="Show the whole field again — nothing is deleted">Reset</button>
+            </div>
             <div id="crop-note" style="display:none;"></div>
           </div>
         </div>
@@ -3560,6 +3576,8 @@ document.querySelectorAll(".tk-btn[data-tool]").forEach(btn => {
     else if (tool === "shape") { document.getElementById("shape-popover").classList.add("open"); syncShapePopover(); focusOpenPanel("shape-popover"); }
     else if (tool === "text") { document.getElementById("text-popover").classList.add("open"); syncTextPopover(); focusOpenPanel("text-popover"); }
     else if (tool === "ball") { document.getElementById("ball-popover").classList.add("open"); syncBallPopover(); focusOpenPanel("ball-popover"); }
+    // the Crop panel (Apply / Reset / Cancel) opens with its tool, like every other tool's panel
+    if (tool === "crop") { document.getElementById("crop-popover").classList.add("open"); updateCropPanel(); focusOpenPanel("crop-popover"); refreshToolButtonStates(); }
   });
 });
 document.querySelectorAll(".arrow-popover, .team-popover").forEach(p => {
@@ -3712,19 +3730,51 @@ function buildCropOverlay() {
   box.className = "crop-box empty";
   CROP_HANDLES.forEach(h => { const d = document.createElement("div"); d.className = "crop-handle"; d.dataset.h = h; box.appendChild(d); });
   ov.appendChild(box);
+  const act = document.createElement("div");
+  act.className = "crop-actions-float"; act.style.display = "none";
+  act.innerHTML = `<button type="button" class="cf-apply">Apply crop</button><button type="button" class="cf-reset" title="Remove the crop and show the whole field">Reset</button><button type="button" class="cf-cancel">Cancel</button>`;
+  ov.appendChild(act);
+  act.querySelector(".cf-apply").addEventListener("click", () => { if (normalizeCrop(cropDraft)) { exitCropEditing("apply"); setTool("select"); } });
+  act.querySelector(".cf-reset").addEventListener("click", () => { exitCropEditing("reset"); setTool("select"); });
+  act.querySelector(".cf-cancel").addEventListener("click", () => { exitCropEditing("cancel"); setTool("select"); });
   stage.appendChild(ov);
   ov.addEventListener("mousedown", onCropDown);
   ov.addEventListener("touchstart", onCropDown, { passive: false });
+  // double-clicking inside the box is the usual "that's the one" gesture
+  ov.addEventListener("dblclick", e => {
+    if (e.target.closest(".crop-box") && !e.target.closest(".crop-handle") && normalizeCrop(cropDraft)) { exitCropEditing("apply"); setTool("select"); }
+  });
   return ov;
 }
 function renderCropBox() {
   const box = document.querySelector("#crop-overlay .crop-box");
+  const act = document.querySelector("#crop-overlay .crop-actions-float");
   if (!box) return;
-  if (!cropDraft) { box.classList.add("empty"); return; }
+  if (!cropDraft) { box.classList.add("empty"); if (act) act.style.display = "none"; return; }
   box.classList.remove("empty");
   box.style.left = cropDraft.x + "%"; box.style.top = cropDraft.y + "%";
   box.style.width = cropDraft.w + "%"; box.style.height = cropDraft.h + "%";
+  if (act) {
+    // the button strip follows the box: below it, or above when the box is near the bottom edge,
+    // and kept far enough from the sides that it's never clipped
+    act.style.display = "flex";
+    const fieldW = stage.getBoundingClientRect().width || 600, half = 130 / fieldW * 100;
+    act.style.left = Math.min(100 - half, Math.max(half, cropDraft.x + cropDraft.w / 2)) + "%";
+    const below = cropDraft.y + cropDraft.h < 82;
+    act.style.top = below ? "calc(" + (cropDraft.y + cropDraft.h) + "% + 10px)" : "calc(" + cropDraft.y + "% - 46px)";
+    act.querySelector(".cf-reset").style.display = phaseCrop(activePhaseObj()) ? "" : "none";
+  }
   updateCropPanel();
+}
+// "Reset" on the cropped field: back to the whole field in one click, nothing lost, undoable
+function resetCropNow() {
+  const ph = activePhaseObj();
+  if (!ph || !phaseCrop(ph)) return;
+  pushHistory();
+  delete ph.crop;
+  applyCropView();
+  renderPhaseThumbActive();
+  toast("Crop reset — the whole field is back (Undo brings the crop back)");
 }
 function updateCropPanel() {
   const ph = activePhaseObj(), saved = phaseCrop(ph);
@@ -3751,6 +3801,7 @@ function cropDraftFor(mode, orig, a, b) {
 }
 function onCropDown(e) {
   if (!cropEditing) return;
+  if (e.target.closest(".crop-actions-float")) { e.stopPropagation(); return; } // a press on Apply/Cancel is a click, not the start of a new box
   e.preventDefault(); e.stopPropagation();
   const handle = e.target.closest(".crop-handle");
   const inBox = e.target.closest(".crop-box");
@@ -3799,6 +3850,8 @@ function updateCropNote() {
   const note = document.getElementById("crop-note");
   if (!note) return;
   const v = currentView;
+  const bar = document.getElementById("crop-bar");
+  if (bar) bar.style.display = (cropEditing || isFullView()) ? "none" : "flex";
   if (cropEditing || isFullView()) { note.style.display = "none"; return; }
   const outsideX = x => x < v.x - 0.01 || x > v.x + v.w + 0.01, outsideY = y => y < v.y - 0.01 || y > v.y + v.h + 0.01;
   let n = tokens.filter(t => outsideX(t.x) || outsideY(t.y)).length;
@@ -3809,6 +3862,9 @@ function updateCropNote() {
   note.textContent = n === 1 ? "1 item outside the crop" : n + " items outside the crop";
   note.style.display = n ? "block" : "none";
 }
+["mousedown", "touchstart", "click", "dblclick"].forEach(t => document.getElementById("crop-bar").addEventListener(t, e => e.stopPropagation(), { passive: true }));
+document.getElementById("crop-bar-reset").addEventListener("click", resetCropNow);
+document.getElementById("crop-bar-adjust").addEventListener("click", () => document.getElementById("crop-tool").click());
 document.getElementById("crop-apply-btn").addEventListener("click", () => { exitCropEditing("apply"); setTool("select"); });
 document.getElementById("crop-reset-btn").addEventListener("click", () => { exitCropEditing("reset"); setTool("select"); });
 document.getElementById("crop-cancel-btn").addEventListener("click", () => { exitCropEditing("cancel"); setTool("select"); });
