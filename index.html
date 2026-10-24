@@ -9247,9 +9247,235 @@ document.getElementById("opt-show-phase-notes").addEventListener("change", e => 
 // way a library like html2canvas would). The @media print rules do the
 // real work of hiding everything but the Output card itself.
 document.getElementById("output-print-btn").addEventListener("click", () => window.print());
-document.getElementById("output-download-btn").addEventListener("click", () => {
-  toast("Choose \"Save as PDF\" in the print dialog to download");
-  window.print();
+/* ═════════════════════════════════════════════════════════════════════
+   PDF DOWNLOAD — builds the plan as a real PDF file (vector diagrams,
+   selectable text) and saves it, instead of opening the print dialog.
+   The two PDF libraries (jsPDF + svg2pdf.js, ~500 KB) are only fetched the
+   first time someone clicks Download, from this site's own /vendor folder.
+   The layout mirrors the Output page: title, description, then every
+   activity as a block (title + timing/size above its diagram, notes below),
+   in the same Large / Small / Rows arrangement, honouring the Output
+   settings (titles, notes, videos, field colour).
+═════════════════════════════════════════════════════════════════════ */
+const PDF_VENDOR_SCRIPTS = ["vendor/jspdf.umd.min.js", "vendor/svg2pdf.umd.min.js"];
+let pdfLibsPromise = null;
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement("script");
+    const timer = setTimeout(() => reject(new Error("timed out loading " + src)), 20000);
+    el.src = src;
+    el.onload = () => { clearTimeout(timer); resolve(); };
+    el.onerror = () => { clearTimeout(timer); reject(new Error("could not load " + src)); };
+    document.head.appendChild(el);
+  });
+}
+function ensurePdfLibs() {
+  if (window.jspdf && window.jspdf.jsPDF && window.svg2pdf) return Promise.resolve();
+  if (!pdfLibsPromise) {
+    pdfLibsPromise = PDF_VENDOR_SCRIPTS.reduce((p, src) => p.then(() => loadScriptOnce(src)), Promise.resolve())
+      // a host that answers a missing file with a web page "loads" fine but defines nothing
+      .then(() => { if (!(window.jspdf && window.jspdf.jsPDF && window.svg2pdf)) throw new Error("PDF libraries did not initialise"); })
+      .catch(err => { pdfLibsPromise = null; throw err; });
+  }
+  return pdfLibsPromise;
+}
+// the PDF's built-in fonts cover Western European text; anything outside that becomes "?" instead of garbage
+function pdfText(s) {
+  return String(s == null ? "" : s)
+    .replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"')
+    .replace(/[^\u0020-\u007E\u00A0-\u00FF\u2013\u2014\u2022\u2026\u20AC]/g, "?");
+}
+function pdfFileName() {
+  const t = (document.getElementById("title-input").value || "").trim() || "practice-plan";
+  return t.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 60) + ".pdf";
+}
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+  return m ? [parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16), parseInt(m[1].slice(4, 6), 16)] : [46, 107, 63];
+}
+async function buildOutputPdf() {
+  saveActivePhase();
+  await ensurePdfLibs();
+  const doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "portrait", compress: true });
+  const PW = doc.internal.pageSize.getWidth(), PH = doc.internal.pageSize.getHeight();
+  const M = 40, W = PW - 2 * M, FOOT = 26, BOTTOM = PH - M - FOOT / 2;
+  const INK = [27, 33, 28], SOFT = [75, 86, 76], FAINT = [124, 133, 121], RULE = [215, 218, 210];
+  const font = (style, size, color) => { doc.setFont("helvetica", style); doc.setFontSize(size); doc.setTextColor(...(color || INK)); };
+  const wrap = (text, width) => doc.splitTextToSize(pdfText(text), width);
+  let y = M;
+  const newPage = () => { doc.addPage(); y = M; };
+
+  // ── header: title + plan description (the author/date row is screen-only, as in print)
+  const title = pdfText((document.getElementById("title-input").value || "").trim() || "Untitled");
+  font("bold", 22); wrap(title, W).forEach(l => { doc.text(l, M, y + 18); y += 26; });
+  const desc = (planDescription || "").trim();
+  if (desc) { font("normal", 10.5, SOFT); wrap(desc, W).forEach(l => { doc.text(l, M, y + 11); y += 15; }); }
+  y += 6; doc.setDrawColor(...RULE); doc.setLineWidth(0.6); doc.line(M, y, M + W, y); y += 18;
+
+  // ── how the blocks are arranged (same three layouts as the Output page)
+  const layout = outputSettings.layout;
+  const cols = layout === "small" ? 3 : layout === "rows" ? 1 : 2;
+  const colGap = layout === "small" ? 16 : 26, rowGap = 24;
+  const colW = (W - colGap * (cols - 1)) / cols;
+  const thumbOpts = { fieldColor: outputSettings.fieldColor, scale: outputSettings.scale };
+  const fieldRgb = hexToRgb(outputSettings.fieldColor);
+
+  // an off-screen holder so the SVGs can be measured by the library
+  const holder = document.createElement("div");
+  holder.style.cssText = "position:fixed; left:-99999px; top:0; width:800px; height:600px; opacity:0; pointer-events:none;";
+  document.body.appendChild(holder);
+
+  // ── one activity → a list of drawable pieces, each with a height
+  const noteLines = (ph, width) => {
+    const pieces = [];
+    const blocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (Array.isArray(b.lines) ? b.lines : [b.text || ""]).some(l => (l || "").trim()));
+    if (!blocks.length) { pieces.push({ kind: "empty", h: 12, text: "No notes for this phase." }); return pieces; }
+    blocks.forEach((b, bi) => {
+      const label = (b.title || b.placeholder || "").trim();
+      if (label) pieces.push({ kind: "ntitle", h: bi ? 15 : 11, pre: bi ? 4 : 0, text: label });
+      (Array.isArray(b.lines) ? b.lines : [b.text || ""]).filter(l => (l || "").trim()).forEach(l => {
+        font("normal", 8.5);
+        wrap(l, width - 9).forEach((seg, si) => pieces.push({ kind: "nline", h: 11, text: seg, bullet: si === 0 }));
+      });
+    });
+    return pieces;
+  };
+  const blockPieces = (ph, idx, width, withThumb) => {
+    const pieces = [];
+    if (outputSettings.showPhaseTitles) {
+      const meta = pdfText(phaseMetaText(ph));
+      font("normal", 8); const metaW = meta ? doc.getTextWidth(meta) : 0;
+      font("bold", 11);
+      let t = pdfText((ph.title || "").trim() || (phaseNoun() + " " + (idx + 1)));
+      // beside the title when there's room (as on the Output page); in a narrow
+      // column the timing/size drops to its own line under the title instead
+      // of running over it
+      const stacked = metaW > 0 && metaW > width * 0.5;
+      const room = stacked ? width : Math.max(40, width - metaW - 10);
+      const titleLines = doc.splitTextToSize(t, room);   // a long title wraps rather than being cut off
+      const titleH = 6 + 13 * titleLines.length;
+      pieces.push({ kind: "label", h: titleH + (stacked ? 11 : 0) + 2, titleLines, meta, stacked });
+    }
+    if (withThumb && phaseHasDiagram(ph)) pieces.push({ kind: "thumb", h: width * 2.7 / 4 + 9, ph });
+    if (outputSettings.showPhaseNotes) noteLines(ph, width).forEach(p => pieces.push(p));
+    return pieces;
+  };
+  const draw = async (p, x, yy, width) => {
+    if (p.kind === "label") {
+      font("bold", 11); p.titleLines.forEach((l, i) => doc.text(l, x, yy + 11 + i * 13));
+      if (p.meta) {
+        font("normal", 8, FAINT);
+        if (p.stacked) doc.text(p.meta, x, yy + 11 + p.titleLines.length * 13 + 1); else doc.text(p.meta, x + width, yy + 11, { align: "right" });
+      }
+    } else if (p.kind === "thumb") {
+      const h = width * 2.7 / 4;
+      doc.setFillColor(...fieldRgb); doc.rect(x, yy, width, h, "F");
+      holder.innerHTML = phaseThumbHTML(p.ph, thumbOpts);
+      const svg = holder.querySelector("svg");
+      if (svg) {
+        const vb = (svg.getAttribute("viewBox") || "0 0 100 100").split(/[\s,]+/).map(Number);
+        // the on-screen diagram is letterboxed ("meet") inside a 4:2.7 box — do the same here
+        const k = Math.min(width / vb[2], h / vb[3]), dw = vb[2] * k, dh = vb[3] * k;
+        svg.removeAttribute("style"); svg.setAttribute("width", dw); svg.setAttribute("height", dh);
+        await doc.svg(svg, { x: x + (width - dw) / 2, y: yy + (h - dh) / 2, width: dw, height: dh });
+      }
+    } else if (p.kind === "ntitle") {
+      font("bold", 8.5); doc.text(p.text, x, yy + 8 + (p.pre || 0));
+    } else if (p.kind === "nline") {
+      font("normal", 8.5, SOFT);
+      if (p.bullet) { font("normal", 8.5, SOFT); doc.text("•", x + 1, yy + 8); }
+      doc.text(p.text, x + 9, yy + 8);
+    } else if (p.kind === "empty") {
+      font("italic", 8.5, FAINT); doc.text(p.text, x, yy + 8);
+    }
+  };
+  const pieceH = p => p.h + (p.pre || 0);
+  const total = ps => ps.reduce((s, p) => s + pieceH(p), 0);
+
+  try {
+    if (layout === "rows") {
+      const thumbW = Math.min(W * 0.38, 210), gap = 22;
+      for (let i = 0; i < phases.length; i++) {
+        const ph = phases[i], hasThumb = phaseHasDiagram(ph);
+        const textW = hasThumb ? W - thumbW - gap : W;
+        const side = blockPieces(ph, i, textW, false), thumbH = hasThumb ? thumbW * 2.7 / 4 : 0;
+        const need = Math.max(total(side), thumbH);
+        if (y + Math.min(need, PH / 3) > BOTTOM) newPage();
+        let ty = y, yy = y;
+        if (hasThumb) await draw({ kind: "thumb", ph }, M, ty, thumbW);
+        const sx = hasThumb ? M + thumbW + gap : M;
+        for (const p of side) {
+          if (yy + pieceH(p) > BOTTOM) { newPage(); yy = y; }
+          await draw(p, sx, yy, textW); yy += pieceH(p);
+        }
+        y = Math.max(yy, hasThumb ? ty + thumbH : yy) + rowGap;
+        if (y > BOTTOM && i < phases.length - 1) newPage();
+      }
+    } else {
+      for (let r = 0; r < phases.length; r += cols) {
+        const row = phases.slice(r, r + cols).map((ph, k) => ({ ph, idx: r + k, pieces: blockPieces(ph, r + k, colW, true) }));
+        const rowH = Math.max(...row.map(b => total(b.pieces)));
+        if (rowH > BOTTOM - M) {
+          // a block taller than a page (very long notes): flow each one down the page(s) on its own
+          for (const b of row) {
+            for (const p of b.pieces) { if (y + pieceH(p) > BOTTOM) newPage(); await draw(p, M, y, colW); y += pieceH(p); }
+            y += rowGap;
+          }
+          continue;
+        }
+        if (y + rowH > BOTTOM) newPage();
+        for (let c = 0; c < row.length; c++) {
+          let yy = y;
+          for (const p of row[c].pieces) { await draw(p, M + c * (colW + colGap), yy, colW); yy += pieceH(p); }
+        }
+        y += rowH + rowGap;
+      }
+    }
+
+    // ── videos (just their links — a video can't play on paper)
+    if (outputSettings.showVideos && sessionClips.length) {
+      if (y + 40 > BOTTOM) newPage();
+      font("bold", 11); doc.text("Videos", M, y + 11); y += 20;
+      for (const clip of sessionClips) {
+        const line = pdfText(clip.url || "");
+        if (!line) continue;
+        if (y + 14 > BOTTOM) newPage();
+        font("normal", 8.5, [59, 111, 182]);
+        const shown = wrap(line, W)[0];
+        doc.textWithLink(shown, M, y + 9, { url: clip.url }); y += 14;
+      }
+    }
+
+    // ── page numbers
+    const n = doc.getNumberOfPages();
+    for (let i = 1; i <= n; i++) {
+      doc.setPage(i); font("normal", 8, FAINT);
+      doc.text("Page " + i + " of " + n, PW / 2, PH - M + 8, { align: "center" });
+    }
+  } finally {
+    holder.remove();
+  }
+  return doc;
+}
+let pdfBusy = false;
+document.getElementById("output-download-btn").addEventListener("click", async () => {
+  if (pdfBusy) return;
+  pdfBusy = true;
+  const btn = document.getElementById("output-download-btn");
+  btn.disabled = true;
+  toast("Preparing your PDF…");
+  try {
+    const doc = await buildOutputPdf();
+    doc.save(pdfFileName());
+    toast("PDF downloaded");
+  } catch (err) {
+    console.error("PDF download failed:", err);
+    // the libraries couldn't load (offline / not deployed) or something failed — the print dialog still works
+    toast("Couldn't create the PDF here — opening the print dialog instead (choose Save as PDF)");
+    window.print();
+  } finally {
+    pdfBusy = false; btn.disabled = false;
+  }
 });
 document.getElementById("output-share-btn").addEventListener("click", async () => {
   if (!currentDrillId) {
