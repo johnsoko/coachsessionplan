@@ -3214,6 +3214,14 @@ function viewPct(x, y) {
   if (v === FULL_VIEW) return { x, y };        // no crop: exactly the stored position, no arithmetic noise
   return { x: (x - v.x) / v.w * 100, y: (y - v.y) / v.h * 100 };
 }
+// A layout authored for the WHOLE field (a row of players, a formation) fitted
+// into whatever part of it is showing — so things added while cropped land
+// inside the crop instead of out in the part you can't see
+function intoView(x, y) {
+  const v = currentView;
+  if (v === FULL_VIEW) return { x, y };
+  return { x: v.x + x * v.w / 100, y: v.y + y * v.h / 100 };
+}
 function isFullView() { return currentView.w >= 100 && currentView.h >= 100; }
 function isFieldVertical(ph) {
   // Half's own dedicated "vertical" key is literally named "half" (its
@@ -3384,6 +3392,29 @@ function pasteClipboard() {
     shapes.push(copy);
     newShapeIds.push(copy.id);
   });
+  // copied from outside the part of the field that's showing? slide the pasted
+  // group in (as a group, keeping its shape) so it lands where you can see it
+  if (!isFullView()) {
+    const v = currentView, mx = Math.min(3, v.w / 4), my = Math.min(3, v.h / 4);
+    const addedT = tokens.filter(t => newTokenIds.includes(t.id)), addedS = shapes.filter(sh => newShapeIds.includes(sh.id));
+    const xs = [], ys = [];
+    addedT.forEach(t => { xs.push(t.x); ys.push(t.y); });
+    addedS.forEach(sh => { (sh.points ? sh.points : [{ x: sh.x1, y: sh.y1 }, { x: sh.x2, y: sh.y2 }]).forEach(q => { xs.push(q.x); ys.push(q.y); }); });
+    const slide = (lo, hi, vLo, vHi, m) => {
+      if (hi - lo > vHi - vLo - 2 * m) return (vLo + vHi) / 2 - (lo + hi) / 2;        // bigger than the window: centre it
+      if (lo < vLo + m) return vLo + m - lo;
+      if (hi > vHi - m) return vHi - m - hi;
+      return 0;
+    };
+    const dx = slide(Math.min(...xs), Math.max(...xs), v.x, v.x + v.w, mx), dy = slide(Math.min(...ys), Math.max(...ys), v.y, v.y + v.h, my);
+    if (dx || dy) {
+      addedT.forEach(t => { t.x += dx; t.y += dy; });
+      addedS.forEach(sh => {
+        if (sh.points) sh.points.forEach(q => { q.x += dx; q.y += dy; });
+        else { sh.x1 += dx; sh.x2 += dx; sh.y1 += dy; sh.y2 += dy; if (sh.curved && sh.cx != null) { sh.cx += dx; sh.cy += dy; } }
+      });
+    }
+  }
   selectedTokenId = null; selectedShapeId = null;
   if (newTokenIds.length + newShapeIds.length === 1) {
     multiTokenIds = []; multiShapeIds = [];
@@ -3840,7 +3871,8 @@ function insertPlayersBulk(count) {
     for (let c = 0; c < inThisRow; c++) {
       const x = Math.max(4, Math.min(96, startX + c * rowSpacingX));
       const y = Math.max(6, Math.min(94, startY + r * rowSpacingY));
-      addToken("player", x, y, "light");
+      const at = intoView(x, y);
+      addToken("player", at.x, at.y, "light");
       placed++;
     }
   }
@@ -4174,8 +4206,8 @@ function applyFormation(key) {
     const depth = 6 + Math.pow(tNorm, 0.72) * 41;
     const onFarSide = formationSidesFlipped ? team === "light" : team === "dark";
     const depthPos = onFarSide ? 100 - depth : depth;
-    const x = isVertical ? p.y : depthPos;
-    const y = isVertical ? depthPos : p.y;
+    const at = intoView(isVertical ? p.y : depthPos, isVertical ? depthPos : p.y);
+    const x = at.x, y = at.y;
     tokens.push({
       id: nextId++, type: "player", team, x, y, num, pos: p.pos,
       color: teamDefaults[team].color, size: playerSize,
