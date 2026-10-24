@@ -11341,7 +11341,7 @@ async function openLibraryDrillDetail(id) {
       const ph = (Array.isArray(d.phases) && d.phases.length) ? d.phases[0] : { surface: parseSurfaceKey(d.surface).surface, fieldFlipped: parseSurfaceKey(d.surface).flipped, crop: parseSurfaceKey(d.surface).crop, scenes: d.scenes, infoBlocks: d.notes ? [{ enabled: true, title: "", text: d.notes }] : [] };
       const thumbWrap = document.createElement("div");
       thumbWrap.className = "lib-detail-thumb";
-      thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, fieldFlipped: ph.fieldFlipped, scenes: ph.scenes }, "lib-detail-thumb-inner"));
+      thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, fieldFlipped: ph.fieldFlipped, crop: ph.crop, scenes: ph.scenes }, "lib-detail-thumb-inner"));
       const notesLabel = document.createElement("div");
       notesLabel.className = "lib-detail-label";
       notesLabel.textContent = "Notes";
@@ -11368,7 +11368,7 @@ async function openLibraryDrillDetail(id) {
         block.appendChild(label);
         const thumbWrap = document.createElement("div");
         thumbWrap.className = "lib-detail-thumb";
-        thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, fieldFlipped: ph.fieldFlipped, scenes: ph.scenes }, "lib-detail-thumb-inner"));
+        thumbWrap.appendChild(createAnimatedThumb({ surface: ph.surface, fieldFlipped: ph.fieldFlipped, crop: ph.crop, scenes: ph.scenes }, "lib-detail-thumb-inner"));
         block.appendChild(thumbWrap);
         const notesBlocks = (ph.infoBlocks || []).filter(b => b.enabled !== false && (Array.isArray(b.lines) ? b.lines : [b.text || ""]).some(l => (l || "").trim()));
         const notesLabel = document.createElement("div");
