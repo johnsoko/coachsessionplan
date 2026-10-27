@@ -6037,6 +6037,18 @@ let deselectedShapeOnThisDraw = false;
 stage.addEventListener("mousedown", onStageDown);
 stage.addEventListener("touchstart", onStageDown, {passive:false});
 
+// Whatever was just placed stays the selected object — so the size and colour controls in
+// the tool's panel (already open) act on IT, and you can keep adjusting until you click
+// off, instead of having to reselect it first. The tool stays armed to place another;
+// the next one placed simply becomes the selected one.
+function selectJustPlaced(t) {
+  if (!t) return;
+  selectedTokenId = t.id; selectedShapeId = null;
+  multiTokenIds = []; multiShapeIds = [];
+  renderTokens(); renderShapes();
+  if (t.type === "ball") syncBallPopover();
+  else if (t.type === "equipment") syncEquipmentPopover();
+}
 function onStageDown(e) {
   // only hand off to the token's own drag/select handling when the click
   // isn't about to place something new on top of it — Select always
@@ -6069,13 +6081,13 @@ function onStageDown(e) {
   if (PLACEMENT[currentTool]) {
     e.preventDefault(); pushHistory();
     const [type, team] = PLACEMENT[currentTool];
-    addToken(type, p.x, p.y, team);
+    selectJustPlaced(addToken(type, p.x, p.y, team));
     renderPhaseThumbActive();
     return;
   }
   if (currentTool === "equipment") {
     e.preventDefault(); pushHistory();
-    addEquipmentToken(equipmentKind, p.x, p.y);
+    selectJustPlaced(addEquipmentToken(equipmentKind, p.x, p.y));
     renderPhaseThumbActive();
     return;
   }
