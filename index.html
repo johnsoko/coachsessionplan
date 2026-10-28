@@ -6104,7 +6104,14 @@ function onStageDown(e) {
     // drawing tool armed, the person's intent is almost always "start a
     // new line right here," even when that's close to an existing one's
     // endpoint; only a precise click should grab the existing shape instead
-    const clicked = shapesInHitTestOrder().find(s => hitTestShape(s, p.x, p.y, 4));
+    // A closed shape (circle / square / triangle) is background while a drawing tool is armed:
+    // a press on it — inside, on its edge, or near a corner — starts the new line or shape
+    // instead of grabbing the zone underneath (zones are very often drawn first and then drawn
+    // over). Lines and arrows still grab as before, including ones lying on top of a zone;
+    // to select or move a zone, use the Select tool. The one exception is the zone you've just
+    // drawn with the Shape tool, so you can still adjust it before moving on.
+    const grabbable = sh => !SHAPE_KINDS.includes(sh.style) || (currentTool === "shape" && sh.id === selectedShapeId);
+    const clicked = shapesInHitTestOrder().find(sh => grabbable(sh) && hitTestShape(sh, p.x, p.y, 4));
     if (clicked) {
       if (multiShapeIds.includes(clicked.id) && (multiTokenIds.length + multiShapeIds.length > 1)) { startGroupDrag(p); return; }
       selectAndMaybeMoveShape(clicked, p);
