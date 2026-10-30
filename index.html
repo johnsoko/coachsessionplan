@@ -4653,6 +4653,8 @@ function startTokenDrag(e, id) {
   // the start
   if (currentTool !== "select") { currentTool = "select"; closeAllPopovers(); updateDrawHint("select"); }
   dragMoved = false;
+  // was this already the selected object? (for a text box, that decides what a plain click means below)
+  const wasSelected = selectedTokenId === id;
   selectedTokenId = id; selectedShapeId = null;
   multiTokenIds = []; multiShapeIds = [];
   const selT = tokens.find(tk => tk.id === id);
@@ -4703,16 +4705,14 @@ function startTokenDrag(e, id) {
       renderPhaseThumbActive();
       renderTokens();
     } else {
-      // a click with no real movement on a text token enters edit mode
-      // directly — double-click detection (native and app-level) kept
-      // proving unreliable in practice, and a text label's whole point
-      // is usually to edit it, so requiring a second click just added
-      // friction without much benefit. Dragging (real movement) still
-      // works separately via the threshold above, so moving vs editing
-      // stays unambiguous: drag to move, click in place to edit.
+      // A text box takes two clicks to edit, which keeps "grab it to move it" and
+      // "click into the words" apart: the FIRST click only selects it (it's
+      // highlighted, and can be dragged or restyled from its panel); a click on
+      // it again, while it's selected, opens it for typing. (Dragging is told
+      // apart from a click by the movement threshold above.)
       const t = tokens.find(tk => tk.id === id);
       if (t && t.type === "text") {
-        editingTextId = id;
+        if (wasSelected) editingTextId = id;
         renderTokens();
       } else {
         setTimeout(renderTokens, 0);
